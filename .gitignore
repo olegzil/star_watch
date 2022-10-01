@@ -10,6 +10,7 @@
 *.o
 *.so
 _build
+_rel
 compile_commands.json
 deps
 erln8.config
