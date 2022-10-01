@@ -1,0 +1,1 @@
+_build/default/rel/star_watch_server/bin/star_watch_server console
