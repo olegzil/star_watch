@@ -3,6 +3,7 @@
 .tool-versions
 .jiffy.dev
 .jiffy-compile-check
+*.dat
 *.app
 *.beam
 *.d
