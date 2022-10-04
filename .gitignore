@@ -9,6 +9,7 @@
 *.d
 *.o
 *.so
+*.crashdump
 _build
 _rel
 compile_commands.json
