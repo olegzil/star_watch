@@ -1,33 +1,17 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-03 19:55:19
+% @Last Modified time: 2022-10-04 16:17:26
 
 -module(db_access).
--export([init_tables/0, insert_apod_entries/1, update_db_from_json_file/1, readlines/1]).
+-export([insert_apod_entries/1, update_db_from_json_file/1, readlines/1]).
 -export([dump_db/0]).
-
--record(apodimagetable, {
-		url,
-		copyright,
-		date,
-		explanation,
-		hdurl,
-		media_type,
-		service_version, 
-		title 
-	}).
-init_tables() -> 
-	mnesia:create_schema(apodimagetable),
-	mnesia:create_table(apodimagetable, 
-		[{attributes, record_info(fields, apodimagetable)}]).
-
+-include ("include/apod_record_def.hrl").
 %%
 %% This function populates a mnesia database with the contests of all
 %% files found in [DirName]. Files are assumed to be valid json.
 %%
 update_db_from_json_file(DirName) ->
-	initialize_mnesia(),						%like it sais.
 	{ok, Filelist} = file:list_dir(DirName),	%generate a list of file names from the directory provided
 	process_file_list(DirName, Filelist).		%parse the files and populate DB
 
@@ -39,9 +23,15 @@ update_db_from_json_file(DirName) ->
 
 process_file_list(DirName, [FileName|T]) ->
     FileData = readlines(filename:join(DirName, FileName)),  %% read all data from the file 
-    JsonData = jiffy:decode(FileData, []),					 %% parse file data into json
-    insert_apod_entries(JsonData),							 %% insert the json data into mnesia
-    process_file_list(DirName, []);							 %% do it again recurcively			
+    try jiffy:decode(FileData, []) of
+    	JsonData ->
+		    insert_apod_entries(JsonData)					 %% insert the json data into mnesia
+    catch
+    	Class:Reason ->
+    		io:format("~p~n ~p~n", [Reason, filename:join(DirName, FileName)])
+    after
+	    process_file_list(DirName, T)							 %% do it again recurcively			
+    end;
 
 %% Terminating call for the tail recurcive call above. 
 process_file_list(_, []) ->
@@ -53,12 +43,12 @@ insert_apod_entries(JsonData) when JsonData =/= [] ->
 	Fun = fun() ->	% The function used in a mnesia transaction
 		lists:foreach(	%% for each item in the list
 		fun({ApodEntry}) ->
-			Record = convert_json_to_record(ApodEntry), %% convert the item to a struct
+			Record = from_string_to_json_apod(ApodEntry), %% convert the item to a struct
 			case json_key_filter(Record) of 			%% for now we only store image records
 				true ->
 					mnesia:write(Record);				%% if this is an image, store it
 				false ->	%% if this is not an image, print message to terminal
-					io:format("Ignoring video~n")
+					io:format("Ignoring video: ~p~n", [Record#apodimagetable.url])
 			end
 		end,
 		JsonData)
@@ -66,15 +56,6 @@ insert_apod_entries(JsonData) when JsonData =/= [] ->
 	mnesia:transaction(Fun). %% execute the transaction
 
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-initialize_mnesia() -> 
-	mnesia:create_schema([node()]),
-	StartResult = mnesia:start(),
-	CreateResult = mnesia:create_table(apodimagetable, [{disc_copies, [node()]}, {index,
-      [url]}, {type, ordered_set}, {attributes, record_info(fields, apodimagetable)}]),
-	mnesia:info(),
-
-	io:format("StartResult = ~p~nCreateResult = ~p~n", [StartResult, CreateResult]).
-
 
 readlines(FileName) ->
     {ok, Device} = file:open(FileName, [read]),
@@ -90,7 +71,7 @@ get_all_lines(Device) ->
         Line -> Line ++ get_all_lines(Device)
     end.
 
-convert_json_to_record(Item) ->
+from_string_to_json_apod(Item) ->
 	V = #apodimagetable{
 				url 			= proplists:get_value(<<"url">>, Item),
 				copyright 		= proplists:get_value(<<"copyright">>, Item, "none"),
