@@ -1,10 +1,10 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-04 16:17:26
+% @Last Modified time: 2022-10-05 14:30:28
 
 -module(db_access).
--export([insert_apod_entries/1, update_db_from_json_file/1, readlines/1]).
+-export([insert_apod_entries/2, update_db_from_json_file/1, readlines/1]).
 -export([dump_db/0]).
 -include ("include/apod_record_def.hrl").
 %%
@@ -22,31 +22,34 @@ update_db_from_json_file(DirName) ->
 %% [FileName | T] -- a pattern matched list of file names
 
 process_file_list(DirName, [FileName|T]) ->
-    FileData = readlines(filename:join(DirName, FileName)),  %% read all data from the file 
+	FullName = filename:join(DirName, FileName),
+    FileData = readlines(FullName),  %% read all data from the file 
     try jiffy:decode(FileData, []) of
     	JsonData ->
-		    insert_apod_entries(JsonData)					 %% insert the json data into mnesia
+		    insert_apod_entries(JsonData, FullName)					 %% insert the json data into mnesia
     catch
     	Class:Reason ->
-    		io:format("~p~n ~p~n", [Reason, filename:join(DirName, FileName)])
+    		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
     after
-	    process_file_list(DirName, T)							 %% do it again recurcively			
+	    process_file_list(DirName, [])							 %% do it again recurcively			
     end;
 
 %% Terminating call for the tail recurcive call above. 
 process_file_list(_, []) ->
     true.
 
+%%
 %% This function inserts [JsonData] into a mnesia database
 %% [JsonData] -- well formed json data
-insert_apod_entries(JsonData) when JsonData =/= [] ->
+%%
+insert_apod_entries(JsonData, FileName) when JsonData =/= [] ->
 	Fun = fun() ->	% The function used in a mnesia transaction
 		lists:foreach(	%% for each item in the list
 		fun({ApodEntry}) ->
 			Record = from_string_to_json_apod(ApodEntry), %% convert the item to a struct
 			case json_key_filter(Record) of 			%% for now we only store image records
 				true ->
-					mnesia:write(Record);				%% if this is an image, store it
+					mnesia:write(Record);			%% if this is an image, store it
 				false ->	%% if this is not an image, print message to terminal
 					io:format("Ignoring video: ~p~n", [Record#apodimagetable.url])
 			end
@@ -74,7 +77,7 @@ get_all_lines(Device) ->
 from_string_to_json_apod(Item) ->
 	V = #apodimagetable{
 				url 			= proplists:get_value(<<"url">>, Item),
-				copyright 		= proplists:get_value(<<"copyright">>, Item, "none"),
+				copyright 		= proplists:get_value(<<"copyright">>, Item, <<"no copyright available">>),
 				date 			= proplists:get_value(<<"date">>, Item),
 				explanation		=	proplists:get_value(<<"explanation">>, Item),
 				hdurl			=	proplists:get_value(<<"hdurl">>, Item),

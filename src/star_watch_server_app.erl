@@ -24,7 +24,7 @@ initialize_mnesia() ->
         StartResult = mnesia:start(),
         mnesia:change_table_copy_type(schema, node(), disc_copies),
         CreateResult = mnesia:create_table(apodimagetable, [{disc_copies, [node()]}, {type, ordered_set}, {attributes, record_info(fields, apodimagetable)}]),
-        io:format("add table ~p~n", [mnesia:add_table_index(apodimagetable, 3)]),
+        io:format("add table ~p~n", [mnesia:add_table_index(apodimagetable, date)]),
         io:format("StartResult = ~p~nCreateResult = ~p~n", [StartResult, CreateResult])
     end.
 
