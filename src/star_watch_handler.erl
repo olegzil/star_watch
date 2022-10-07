@@ -65,6 +65,6 @@ process_date_request(StartDate, EndDate, Req) ->
         ip => list_to_binary(Ip),
         port => Port
     },
-    TestEncode = jiffy:encode(TestTerm),
-    TestEncode.
+    io:format("~n~p~n", [Json]),
+    TestEncode = jiffy:encode([TestTerm, Term]).
 
