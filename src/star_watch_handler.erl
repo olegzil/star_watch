@@ -49,6 +49,19 @@ parse_request(Request) ->
 process_date_request(StartDate, EndDate, Req) ->
     [R] = mnesia:dirty_index_read(apodimagetable, StartDate, date),
     [E] = mnesia:dirty_index_read(apodimagetable, EndDate, date),
+      F = fun() ->
+          mnesia:foldl(
+              fun(Rec, Acc) ->
+                  io:format("~n~p~n", [Rec]),
+                  undefined
+              end,
+              [],
+              apodimagetable)
+      end,
+    mnesia:transaction(F),
+      {_, Result} = mnesia:transaction(F),
+    io:format("~n~p~n", [Result]),
+
     Term = #{url => R#apodimagetable.url,
              copyright => R#apodimagetable.copyright,
              date => R#apodimagetable.date,
@@ -57,7 +70,6 @@ process_date_request(StartDate, EndDate, Req) ->
              media_type => R#apodimagetable.media_type,
              service_version => R#apodimagetable.service_version,
              title => R#apodimagetable.title},
-    Json = jiffy:encode(Term),
     {IP, Port} = cowboy_req:peer(Req),
     {A, B, C, D} = IP,
     Ip = io_lib:format("~p.~p.~p.~p", [A, B, C, D]),
@@ -65,6 +77,5 @@ process_date_request(StartDate, EndDate, Req) ->
         ip => list_to_binary(Ip),
         port => Port
     },
-    io:format("~n~p~n", [Json]),
     TestEncode = jiffy:encode([TestTerm, Term]).
 
