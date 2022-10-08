@@ -18,19 +18,19 @@ start(_Type, _Args) ->
 stop(_State) ->
 	ok.
 initialize_mnesia() -> 
-    try mnesia:create_schema([node()]) of
-        {error, _} -> io:format("schema exists~n")
-    after
-        mnesia:start(),
-        CreateResult = mnesia:create_table(
-            apodimagetable,
-            [
-                {attributes, record_info(fields, apodimagetable)},
-                {index, [#apodimagetable.date]}, 
-                {type, ordered_set},
-                {disc_copies, nodes()}
-            ]),
-        io:format("create table result = ~p~n", [CreateResult])
-    end.
+    mnesia:stop(),
+    application:set_env(mnesia, dir, "/tmp/star_watch_db"),
+    mnesia:create_schema([node()]),
+    mnesia:start(),
+    CreateResult = mnesia:create_table(
+        apodimagetable,
+        [
+            {attributes, record_info(fields, apodimagetable)},
+            {index, [#apodimagetable.date, #apodimagetable.title, #apodimagetable.hdurl]}, 
+            {type, ordered_set},
+            {disc_copies, nodes()}
+        ]),
+    mnesia:change_table_copy_type(apodimagetable, node(), disc_copies),
+    io:format("create table result = ~p~n", [CreateResult]).
 
 
