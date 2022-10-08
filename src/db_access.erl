@@ -1,11 +1,12 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-05 14:30:28
+% @Last Modified time: 2022-10-08 14:51:06
 
 -module(db_access).
 -export([insert_apod_entries/2, update_db_from_json_file/1, readlines/1]).
 -export([dump_db/0]).
+-import(utils, [date_to_gregorian_days/1]).
 -include ("include/apod_record_def.hrl").
 %%
 %% This function populates a mnesia database with the contests of all
@@ -31,7 +32,7 @@ process_file_list(DirName, [FileName|T]) ->
     	Class:Reason ->
     		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
     after
-	    process_file_list(DirName, [])							 %% do it again recurcively			
+	    process_file_list(DirName, []) %% TODO: replace [] with [T] once debugging is done.			
     end;
 
 %% Terminating call for the tail recurcive call above. 
@@ -42,7 +43,7 @@ process_file_list(_, []) ->
 %% This function inserts [JsonData] into a mnesia database
 %% [JsonData] -- well formed json data
 %%
-insert_apod_entries(JsonData, FileName) when JsonData =/= [] ->
+insert_apod_entries(JsonData, _FileName) when JsonData =/= [] ->
 	Fun = fun() ->	% The function used in a mnesia transaction
 		lists:foreach(	%% for each item in the list
 		fun({ApodEntry}) ->
@@ -75,10 +76,10 @@ get_all_lines(Device) ->
     end.
 
 from_string_to_json_apod(Item) ->
-	V = #apodimagetable{
+	#apodimagetable{
 				url 			= proplists:get_value(<<"url">>, Item),
 				copyright 		= proplists:get_value(<<"copyright">>, Item, <<"no copyright available">>),
-				date 			= proplists:get_value(<<"date">>, Item),
+				date 			= date_to_gregorian_days(proplists:get_value(<<"date">>, Item)),
 				explanation		=	proplists:get_value(<<"explanation">>, Item),
 				hdurl			=	proplists:get_value(<<"hdurl">>, Item),
 				media_type		=	proplists:get_value(<<"media_type">>, Item),

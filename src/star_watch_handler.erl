@@ -3,7 +3,8 @@
 
 -export([init/2]).
 -include("include/apod_record_def.hrl").
-
+-include_lib("stdlib/include/ms_transform.hrl").
+-import(utils, [date_to_gregorian_days/1, gregorian_days_to_string_date/1]).
 init(Req0, State) ->
     Req = handle(Req0, State),
     {ok, Req, State}.
@@ -44,27 +45,18 @@ parse_request(Request) ->
         start_date  := StartDate,
         end_date    := EndDate %{Name, Constraints, Default}
     } = cowboy_req:match_qs([{start_date, nonempty}, {end_date, nonempty}], Request),
-    process_date_request(StartDate, EndDate, Request).
+    process_date_request(date_to_gregorian_days(StartDate), date_to_gregorian_days(EndDate), Request).
+
 
 process_date_request(StartDate, EndDate, Req) ->
-    [R] = mnesia:dirty_index_read(apodimagetable, StartDate, date),
-    [E] = mnesia:dirty_index_read(apodimagetable, EndDate, date),
-      F = fun() ->
-          mnesia:foldl(
-              fun(Rec, Acc) ->
-                  io:format("~n~p~n", [Rec]),
-                  undefined
-              end,
-              [],
-              apodimagetable)
-      end,
-    mnesia:transaction(F),
-      {_, Result} = mnesia:transaction(F),
-    io:format("~n~p~n", [Result]),
+    GetStartDate = fun() -> mnesia:index_read(apodimagetable, StartDate, date) end,
+    GetEndDate   = fun() -> mnesia:dirty_index_read(apodimagetable, EndDate, date) end,
+    {atomic, [R]} = mnesia:transaction(GetStartDate),
+    {atomic, [E]} = mnesia:transaction(GetEndDate),
 
     Term = #{url => R#apodimagetable.url,
              copyright => R#apodimagetable.copyright,
-             date => R#apodimagetable.date,
+             date => list_to_binary(gregorian_days_to_string_date(R#apodimagetable.date)),
              explanation => R#apodimagetable.explanation,
              hdurl => R#apodimagetable.hdurl,
              media_type => R#apodimagetable.media_type,

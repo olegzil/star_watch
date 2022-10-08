@@ -28,9 +28,10 @@ initialize_mnesia() ->
             {attributes, record_info(fields, apodimagetable)},
             {index, [#apodimagetable.date, #apodimagetable.title, #apodimagetable.hdurl]}, 
             {type, ordered_set},
-            {disc_copies, nodes()}
+            {disc_copies, [node()]}
         ]),
-    mnesia:change_table_copy_type(apodimagetable, node(), disc_copies),
+    % mnesia:change_table_copy_type(apodimagetable, node(), disc_copies),
+    mnesia:wait_for_tables([apodimagetable], 5000),
     io:format("create table result = ~p~n", [CreateResult]).
 
 
