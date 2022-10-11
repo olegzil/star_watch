@@ -37,17 +37,20 @@ handle(Req, State) ->
 
 
 %%% 
-%%% Add error handling to the return value of cowboy_req(). 
-%%% If start_date or end_date are empty the function will return {badkey,start_date} or {badkey,end_date}
-%%% A json encoded error message should be returned to the caller.
 parse_request(Request) ->
-    #{
+    try #{
         start_date  := StartDate,
-        end_date    := EndDate 
-    } = cowboy_req:match_qs([start_date, end_date], Request),
-    process_date_request(date_to_gregorian_days(StartDate), date_to_gregorian_days(EndDate), Request).
-
-
+        end_date    := EndDate
+    } = cowboy_req:match_qs([start_date, end_date, api_key], Request) of
+         _ ->
+            process_date_request(date_to_gregorian_days(StartDate), date_to_gregorian_days(EndDate), Request)
+     catch
+         _:Error ->
+            {_, {_, Term}, _} = Error,
+            
+            jiffy:encode(Term)     
+    end.
+    
 process_date_request(StartDate, EndDate, _Req) ->
     Match = ets:fun2ms(
         fun(Record) 
@@ -58,16 +61,27 @@ process_date_request(StartDate, EndDate, _Req) ->
 
     SelectRecords = fun() -> mnesia:select(apodimagetable, Match) end,
     {_, ListOfRecords} = mnesia:transaction(SelectRecords),
-    JsonFreindly = lists:map(fun(DbItem) ->
-                        #{url => DbItem#apodimagetable.url,
-                                     copyright => DbItem#apodimagetable.copyright,
-                                     date => list_to_binary(gregorian_days_to_string_date(DbItem#apodimagetable.date)),
-                                     explanation => DbItem#apodimagetable.explanation,
-                                     hdurl => DbItem#apodimagetable.hdurl,
-                                     media_type => DbItem#apodimagetable.media_type,
-                                     service_version => DbItem#apodimagetable.service_version,
-                                     title => DbItem#apodimagetable.title}                                 
-                                 end, ListOfRecords),
-    io:format("Reqeust: ~p -- ~p~n", [gregorian_days_to_string_date(StartDate), gregorian_days_to_string_date(EndDate)]),
-    io:format("Rerturn: ~p records~n", [length(JsonFreindly)]),
-    jiffy:encode(JsonFreindly).
+    case length(ListOfRecords) of
+        0 ->
+            ErrorResponse = #{
+                date_time => utils:current_time_string(),
+                error_code => 404,
+                error_text => <<"Date range not found">>
+            },
+            jiffy:encode(ErrorResponse);
+        _ ->
+
+            JsonFreindly = lists:map(fun(DbItem) ->
+                                #{url => DbItem#apodimagetable.url,
+                                             copyright => DbItem#apodimagetable.copyright,
+                                             date => list_to_binary(gregorian_days_to_string_date(DbItem#apodimagetable.date)),
+                                             explanation => DbItem#apodimagetable.explanation,
+                                             hdurl => DbItem#apodimagetable.hdurl,
+                                             media_type => DbItem#apodimagetable.media_type,
+                                             service_version => DbItem#apodimagetable.service_version,
+                                             title => DbItem#apodimagetable.title}                                 
+                                         end, ListOfRecords),
+            io:format("Reqeust: ~p -- ~p~n", [gregorian_days_to_string_date(StartDate), gregorian_days_to_string_date(EndDate)]),
+            io:format("Rerturn: ~p records~n", [length(JsonFreindly)]),
+            jiffy:encode(JsonFreindly)
+    end.

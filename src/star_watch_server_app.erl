@@ -4,8 +4,11 @@
 -export([start/2]).
 -export([stop/1]).
 -include("include/apod_record_def.hrl").
+-define(API_KEY, <<"K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8">>).
+
 start(_Type, _Args) ->
-    FetchApodRoute = {"/astronomy/[...]", star_watch_handler, []},
+    ApiKeyConstraints = { api_key, [fun validate_access_key/2] },
+    FetchApodRoute = {"/astronomy/[...]", [ApiKeyConstraints], star_watch_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
         {'_', [FetchApodRoute, CatchAllRoute]}
@@ -19,6 +22,12 @@ start(_Type, _Args) ->
 
 stop(_State) ->
 	ok.
+
+validate_access_key(forward, Value) when Value =:= ?API_KEY ->
+    {ok, Value};
+validate_access_key(forward, _) ->
+    {error, bad_api_key}.
+
 initialize_mnesia() -> 
     case mnesia:table_info(apodimagetable, size) of
         0 -> 
