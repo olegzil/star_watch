@@ -5,8 +5,10 @@
 -export([stop/1]).
 -include("include/apod_record_def.hrl").
 start(_Type, _Args) ->
+    FetchApodRoute = {"/astronomy/[...]", star_watch_handler, []},
+    CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [{"/test/[...]", star_watch_handler, []}]}
+        {'_', [FetchApodRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
         [{port, 8080}],
@@ -18,20 +20,26 @@ start(_Type, _Args) ->
 stop(_State) ->
 	ok.
 initialize_mnesia() -> 
-    mnesia:stop(),
-    application:set_env(mnesia, dir, "/tmp/star_watch_db"),
-    mnesia:create_schema([node()]),
-    mnesia:start(),
-    CreateResult = mnesia:create_table(
-        apodimagetable,
-        [
-            {attributes, record_info(fields, apodimagetable)},
-            {index, [#apodimagetable.date, #apodimagetable.title, #apodimagetable.hdurl]}, 
-            {type, ordered_set},
-            {disc_copies, [node()]}
-        ]),
-    % mnesia:change_table_copy_type(apodimagetable, node(), disc_copies),
-    mnesia:wait_for_tables([apodimagetable], 5000),
-    io:format("create table result = ~p~n", [CreateResult]).
+    case mnesia:table_info(apodimagetable, size) of
+        0 -> 
+            io:format("Initializing empty db~n"),
+            mnesia:stop(),
+            application:set_env(mnesia, dir, "/tmp/star_watch_db"),
+            mnesia:create_schema([node()]),
+            mnesia:start(),
+
+            mnesia:create_table(
+                apodimagetable,
+                [
+                    {attributes, record_info(fields, apodimagetable)},
+                    {index, [#apodimagetable.date, #apodimagetable.title, #apodimagetable.hdurl]}, 
+                    {type, ordered_set},
+                    {disc_copies, [node()]}
+                ]),
+            mnesia:wait_for_tables([apodimagetable], 5000);
+        _ -> 
+            io:format("DB already initialized~n"),
+            ok
+    end.
 
 

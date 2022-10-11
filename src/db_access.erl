@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-08 14:51:06
+% @Last Modified time: 2022-10-09 21:13:08
 
 -module(db_access).
 -export([insert_apod_entries/2, update_db_from_json_file/1, readlines/1]).
@@ -32,7 +32,7 @@ process_file_list(DirName, [FileName|T]) ->
     	Class:Reason ->
     		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
     after
-	    process_file_list(DirName, []) %% TODO: replace [] with [T] once debugging is done.			
+	    process_file_list(DirName, T) 
     end;
 
 %% Terminating call for the tail recurcive call above. 
@@ -62,12 +62,15 @@ insert_apod_entries(JsonData, _FileName) when JsonData =/= [] ->
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 readlines(FileName) ->
-    {ok, Device} = file:open(FileName, [read]),
-    try 
-    	get_all_lines(Device)
-      after 
-      	file:close(Device)
-    end.
+	case file:open(FileName, [read]) of 
+		{error, Error} -> io:format("~nError:~p ~p~n",[Error, FileName]);
+    {ok, Device} -> 
+	    try 
+	    	get_all_lines(Device)
+	      after 
+	      	file:close(Device)
+	    end
+	end.
 
 get_all_lines(Device) ->
     case io:get_line(Device, "") of
@@ -95,15 +98,15 @@ json_key_filter(Record) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_db() ->
-mnesia:activity(sync_dirty,
-	Fun = fun() ->
-	  mnesia:foldl(
-	      fun(#apodimagetable{}, Acc) ->
-	          %% io:format("Record --> ~p~s", [Acc]),
-	          Acc
-	      end,
-	      ignored_acc,
-	      apodimagetable)
-	end),
-	mnesia:transaction(Fun). %% execute the transaction
+	Fun = fun(#apodimagetable{date = Date}, Acc) ->
+		% io:format("~n~p~n", [utils:gregorian_days_to_string_date(Date)]),
+		lists:append(Acc, [utils:gregorian_days_to_string_date(Date)])
+	end, 
+	Transaction = fun() ->
+	  mnesia:foldr(Fun, [], apodimagetable)
+	end,
+	{atomic, DateList} = mnesia:transaction(Transaction),
+	{ok, File} = file:open("/home/oleg/temp/dates.txt", [write]),
+	io:format(File, "~p~n", [DateList]).
+
 

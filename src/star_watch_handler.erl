@@ -43,31 +43,31 @@ handle(Req, State) ->
 parse_request(Request) ->
     #{
         start_date  := StartDate,
-        end_date    := EndDate %{Name, Constraints, Default}
-    } = cowboy_req:match_qs([{start_date, nonempty}, {end_date, nonempty}], Request),
+        end_date    := EndDate 
+    } = cowboy_req:match_qs([start_date, end_date], Request),
     process_date_request(date_to_gregorian_days(StartDate), date_to_gregorian_days(EndDate), Request).
 
 
-process_date_request(StartDate, EndDate, Req) ->
-    GetStartDate = fun() -> mnesia:index_read(apodimagetable, StartDate, date) end,
-    GetEndDate   = fun() -> mnesia:dirty_index_read(apodimagetable, EndDate, date) end,
-    {atomic, [R]} = mnesia:transaction(GetStartDate),
-    {atomic, [E]} = mnesia:transaction(GetEndDate),
+process_date_request(StartDate, EndDate, _Req) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#apodimagetable.date >= StartDate, 
+                 Record#apodimagetable.date =< EndDate ->
+                Record
+        end),
 
-    Term = #{url => R#apodimagetable.url,
-             copyright => R#apodimagetable.copyright,
-             date => list_to_binary(gregorian_days_to_string_date(R#apodimagetable.date)),
-             explanation => R#apodimagetable.explanation,
-             hdurl => R#apodimagetable.hdurl,
-             media_type => R#apodimagetable.media_type,
-             service_version => R#apodimagetable.service_version,
-             title => R#apodimagetable.title},
-    {IP, Port} = cowboy_req:peer(Req),
-    {A, B, C, D} = IP,
-    Ip = io_lib:format("~p.~p.~p.~p", [A, B, C, D]),
-    TestTerm = #{
-        ip => list_to_binary(Ip),
-        port => Port
-    },
-    TestEncode = jiffy:encode([TestTerm, Term]).
-
+    SelectRecords = fun() -> mnesia:select(apodimagetable, Match) end,
+    {_, ListOfRecords} = mnesia:transaction(SelectRecords),
+    JsonFreindly = lists:map(fun(DbItem) ->
+                        #{url => DbItem#apodimagetable.url,
+                                     copyright => DbItem#apodimagetable.copyright,
+                                     date => list_to_binary(gregorian_days_to_string_date(DbItem#apodimagetable.date)),
+                                     explanation => DbItem#apodimagetable.explanation,
+                                     hdurl => DbItem#apodimagetable.hdurl,
+                                     media_type => DbItem#apodimagetable.media_type,
+                                     service_version => DbItem#apodimagetable.service_version,
+                                     title => DbItem#apodimagetable.title}                                 
+                                 end, ListOfRecords),
+    io:format("Reqeust: ~p -- ~p~n", [gregorian_days_to_string_date(StartDate), gregorian_days_to_string_date(EndDate)]),
+    io:format("Rerturn: ~p records~n", [length(JsonFreindly)]),
+    jiffy:encode(JsonFreindly).
