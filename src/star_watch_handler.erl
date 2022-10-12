@@ -4,7 +4,7 @@
 -export([init/2]).
 -include("include/apod_record_def.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
--import(utils, [date_to_gregorian_days/1, gregorian_days_to_string_date/1]).
+-import(utils, [date_to_gregorian_days/1, gregorian_days_to_binary/1]).
 init(Req0, State) ->
     Req = handle(Req0, State),
     {ok, Req, State}.
@@ -27,13 +27,28 @@ handle(Req, State) ->
   end.
 
   postMethod(<<"POST">>, _Body, Req) -> 
-    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req).
+    case parse_request(Req) of
+            {ok, Result} ->
+                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
+            {not_found, Error} ->
+                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
+        end.
 
   getMethod(<<"GET">>, _Id, Req) -> 
-    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req).
+    case parse_request(Req) of
+            {ok, Result} ->
+                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
+            {not_found, Error} ->
+                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
+        end.
 
   putMethod(<<"PUT">>, _Body, Req) -> 
-    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req).
+    case parse_request(Req) of
+            {ok, Result} ->
+                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
+            {not_found, Error} ->
+                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
+        end.
 
 
 %%% 
@@ -63,25 +78,28 @@ process_date_request(StartDate, EndDate, _Req) ->
     {_, ListOfRecords} = mnesia:transaction(SelectRecords),
     case length(ListOfRecords) of
         0 ->
+            DateStart = gregorian_days_to_binary(StartDate),
+            DateEnd = gregorian_days_to_binary(EndDate),
+            Message = <<"Date range not found: ">>,
             ErrorResponse = #{
-                date_time => utils:current_time_string(),
-                error_code => 404,
-                error_text => <<"Date range not found">>
+                <<"date_time">> => utils:current_time_string(),
+                <<"error_code">> => 404,
+                <<"error_text">> => <<Message/binary, DateStart/binary, <<" -- ">>/binary, DateEnd/binary>>
             },
-            jiffy:encode(ErrorResponse);
+            {not_found, jiffy:encode(ErrorResponse)};
         _ ->
 
             JsonFreindly = lists:map(fun(DbItem) ->
                                 #{url => DbItem#apodimagetable.url,
                                              copyright => DbItem#apodimagetable.copyright,
-                                             date => list_to_binary(gregorian_days_to_string_date(DbItem#apodimagetable.date)),
+                                             date => gregorian_days_to_binary(DbItem#apodimagetable.date),
                                              explanation => DbItem#apodimagetable.explanation,
                                              hdurl => DbItem#apodimagetable.hdurl,
                                              media_type => DbItem#apodimagetable.media_type,
                                              service_version => DbItem#apodimagetable.service_version,
                                              title => DbItem#apodimagetable.title}                                 
                                          end, ListOfRecords),
-            io:format("Reqeust: ~p -- ~p~n", [gregorian_days_to_string_date(StartDate), gregorian_days_to_string_date(EndDate)]),
+            io:format("Reqeust: ~p~n", [jiffy:encode([gregorian_days_to_binary(StartDate), gregorian_days_to_binary(EndDate)])]),
             io:format("Rerturn: ~p records~n", [length(JsonFreindly)]),
-            jiffy:encode(JsonFreindly)
+            {ok, jiffy:encode(JsonFreindly)}
     end.

@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-09 21:13:08
+% @Last Modified time: 2022-10-11 15:17:26
 
 -module(db_access).
 -export([insert_apod_entries/2, update_db_from_json_file/1, readlines/1]).
@@ -99,8 +99,8 @@ json_key_filter(Record) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_db() ->
 	Fun = fun(#apodimagetable{date = Date}, Acc) ->
-		% io:format("~n~p~n", [utils:gregorian_days_to_string_date(Date)]),
-		lists:append(Acc, [utils:gregorian_days_to_string_date(Date)])
+		% io:format("~n~p~n", [utils:gregorian_days_to_binary(Date)]),
+		lists:append(Acc, [utils:gregorian_days_to_binary(Date)])
 	end, 
 	Transaction = fun() ->
 	  mnesia:foldr(Fun, [], apodimagetable)
