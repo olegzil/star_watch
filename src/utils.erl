@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-11 22:49:22
+% @Last Modified time: 2022-10-12 12:11:30
 -module(utils).
 -export([date_to_gregorian_days/1, gregorian_days_to_binary/1, fetch_apod_data/0, current_time_string/0]).
 date_to_gregorian_days(Date) ->
@@ -16,7 +16,6 @@ gregorian_days_to_binary(Date) ->
 
 fetch_apod_data() ->
 	inets:start(),
-
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} =
     httpc:request("https://api.nasa.gov/planetary/apod?start_date=2022-01-11&end_date=2022-10-11&api_key=K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8&thumbs=true"),
     Body.

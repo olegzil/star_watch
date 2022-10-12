@@ -18,6 +18,7 @@ start(_Type, _Args) ->
         #{env => #{dispatch => Dispatch}}
     ),
     initialize_mnesia(),
+    start_cron_job(),
     star_watch_server_sup:start_link().
 
 stop(_State) ->
@@ -51,4 +52,7 @@ initialize_mnesia() ->
             ok
     end.
 
-
+start_cron_job() ->
+    Job = {{daily, {every, {5, sec}}},
+    {io, fwrite, ["Hello, world!~n"]}},
+    erlcron:cron(Job).
