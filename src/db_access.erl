@@ -1,10 +1,10 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-11 15:17:26
+% @Last Modified time: 2022-10-12 15:38:47
 
 -module(db_access).
--export([insert_apod_entries/2, update_db_from_json_file/1, readlines/1]).
+-export([insert_apod_entries/1, update_db_from_json_file/1, readlines/1]).
 -export([dump_db/0]).
 -import(utils, [date_to_gregorian_days/1]).
 -include ("include/apod_record_def.hrl").
@@ -27,7 +27,7 @@ process_file_list(DirName, [FileName|T]) ->
     FileData = readlines(FullName),  %% read all data from the file 
     try jiffy:decode(FileData, []) of
     	JsonData ->
-		    insert_apod_entries(JsonData, FullName)					 %% insert the json data into mnesia
+		    insert_apod_entries(JsonData)					 %% insert the json data into mnesia
     catch
     	Class:Reason ->
     		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
@@ -43,7 +43,7 @@ process_file_list(_, []) ->
 %% This function inserts [JsonData] into a mnesia database
 %% [JsonData] -- well formed json data
 %%
-insert_apod_entries(JsonData, _FileName) when JsonData =/= [] ->
+insert_apod_entries(JsonData) when JsonData =/= [] ->
 	Fun = fun() ->	% The function used in a mnesia transaction
 		lists:foreach(	%% for each item in the list
 		fun({ApodEntry}) ->
