@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-12 15:38:47
+% @Last Modified time: 2022-10-12 18:05:57
 
 -module(db_access).
 -export([insert_apod_entries/1, update_db_from_json_file/1, readlines/1]).
@@ -48,12 +48,7 @@ insert_apod_entries(JsonData) when JsonData =/= [] ->
 		lists:foreach(	%% for each item in the list
 		fun({ApodEntry}) ->
 			Record = from_string_to_json_apod(ApodEntry), %% convert the item to a struct
-			case json_key_filter(Record) of 			%% for now we only store image records
-				true ->
-					mnesia:write(Record);			%% if this is an image, store it
-				false ->	%% if this is not an image, print message to terminal
-					io:format("Ignoring video: ~p~n", [Record#apodimagetable.url])
-			end
+			mnesia:write(Record)			%% if this is an image, store it
 		end,
 		JsonData)
 	end,

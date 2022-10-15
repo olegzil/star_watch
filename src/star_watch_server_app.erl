@@ -31,6 +31,8 @@ validate_access_key(forward, _) ->
     {error, bad_api_key}.
 
 initialize_mnesia() -> 
+    mnesia:start(),
+    mnesia:wait_for_tables([apodimagetable], 5000),
     case mnesia:table_info(apodimagetable, size) of
         0 -> 
             io:format("Initializing empty db~n"),
