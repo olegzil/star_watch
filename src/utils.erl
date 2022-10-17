@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-13 15:20:59
+% @Last Modified time: 2022-10-16 12:59:12
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -9,7 +9,12 @@
 		 fetch_data/1,
 		 current_time_string/0,
 		 start_cron_job/0,
-		 time_pair_to_fetch/2]).
+		 time_pair_to_fetch/2,
+		 update_client_record/1, 
+		 dump_telemetry_table/0]).
+
+-include_lib("stdlib/include/ms_transform.hrl").
+-include("include/apodtelemetry.hrl").
 
 -define(ROOT_HOST, "https://api.nasa.gov/planetary/apod?").
 -define(API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
@@ -120,3 +125,50 @@ start_cron_job() ->
     {utils, fetch_data, [periodic]}},
 
     erlcron:cron(apod_daily_fetch_job, Job).
+
+update_client_record(HeaderInfo) ->
+	case HeaderInfo of 
+		{ok, IP} ->
+			io:format("~p~n", [IP]),
+			find_client_ip_and_update(IP);
+		{_, Error} ->
+			io:format("~p~n", [Error])
+	end.
+
+find_client_ip_and_update(IpAddress) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#apodtelemetry.ip_address =:= IpAddress->
+                Record
+        end),
+
+    case mnesia:transaction(fun() -> mnesia:select(apodtelemetry, Match) end) of
+        {atomic,[]} ->
+            mnesia:transaction(
+            	fun() -> 
+            		mnesia:write(#apodtelemetry{ip_address = IpAddress, access_tally = 1})
+            	end
+           	);
+        {atomic,[{_, Key,_}]} ->
+        	UpdateRecord = fun() -> 
+        		case mnesia:read(apodtelemetry, Key) of 
+        			[] -> io:format("Unexpected. Record not found ~p", [IpAddress]);
+        			[#apodtelemetry{ip_address = IpAddress, access_tally = Tally}] ->
+	            		mnesia:write(#apodtelemetry{ip_address = IpAddress, access_tally = Tally + 1}),
+	            		mnesia:read(apodtelemetry, Key)
+       		 	end
+       		 end,
+       		 mnesia:transaction(UpdateRecord)
+    end.
+
+dump_telemetry_table() ->
+	Fun = fun(#apodtelemetry{ip_address = IpAddress, access_tally = Tally}, Acc) ->
+		% io:format("Ip = ~p Tally = ~p~n", [IpAddress, Tally]),
+		lists:append(Acc, [{IpAddress, Tally}])
+	end, 
+	Transaction = fun() ->
+	  mnesia:foldr(Fun, [], apodtelemetry)
+	end,
+	{atomic, Records} = mnesia:transaction(Transaction),
+	io:format("~p~n", [Records]).
+

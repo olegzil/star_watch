@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-12 18:05:57
+% @Last Modified time: 2022-10-16 13:00:27
 
 -module(db_access).
 -export([insert_apod_entries/1, update_db_from_json_file/1, readlines/1]).
@@ -84,12 +84,6 @@ from_string_to_json_apod(Item) ->
 				service_version	=	proplists:get_value(<<"service_version">>, Item),
 				title 			=	proplists:get_value(<<"title">>, Item)
 				}.
-
-json_key_filter(Record) ->
-	if 
-		Record#apodimagetable.media_type =:= <<"image">> -> true;
-		true -> false
-	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_db() ->

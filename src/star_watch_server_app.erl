@@ -3,15 +3,19 @@
 
 -export([start/2]).
 -export([stop/1]).
+-export([create_table/1]).
+
 -include("include/apod_record_def.hrl").
+-include("include/apodtelemetry.hrl").
 -define(API_KEY, <<"K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8">>).
 
 start(_Type, _Args) ->
     ApiKeyConstraints = { api_key, [fun validate_access_key/2] },
     FetchApodRoute = {"/astronomy/[...]", [ApiKeyConstraints], star_watch_handler, []},
+    TelemetryRoute = {"/telemetry/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchApodRoute, CatchAllRoute]}
+        {'_', [TelemetryRoute, FetchApodRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
         [{port, 8080}],
@@ -29,6 +33,35 @@ validate_access_key(forward, Value) when Value =:= ?API_KEY ->
     {ok, Value};
 validate_access_key(forward, _) ->
     {error, bad_api_key}.
+
+create_table(apodtelemetry) ->
+    mnesia:stop(),
+    application:set_env(mnesia, dir, "/tmp/star_watch_db"),
+    mnesia:create_schema([node()]),
+    mnesia:start(),
+    mnesia:create_table(
+        apodtelemetry,
+        [
+            {attributes, record_info(fields, apodtelemetry)},
+            {index, [#apodtelemetry.access_tally]}, 
+            {type, ordered_set},
+            {disc_copies, [node()]}
+        ]),
+    mnesia:wait_for_tables([apodtelemetry], 5000);
+
+create_table(apodimagetable) ->
+    mnesia:stop(),
+    application:set_env(mnesia, dir, "/tmp/star_watch_db"),
+    mnesia:create_schema([node()]),
+    mnesia:start(),
+    mnesia:create_table(
+        apodimagetable,
+        [
+            {attributes, record_info(fields, apodimagetable)},
+            {index, [#apodimagetable.date, #apodimagetable.title, #apodimagetable.hdurl]}, 
+            {type, ordered_set},
+            {disc_copies, [node()]}
+        ]).
 
 initialize_mnesia() -> 
     mnesia:start(),
@@ -49,7 +82,15 @@ initialize_mnesia() ->
                     {type, ordered_set},
                     {disc_copies, [node()]}
                 ]),
-            mnesia:wait_for_tables([apodimagetable], 5000);
+            mnesia:create_table(
+                apodtelemetry,
+                [
+                    {attributes, record_info(fields, apodtelemetry)},
+                    {index, [#apodtelemetry.access_tally]}, 
+                    {type, ordered_set},
+                    {disc_copies, [node()]}
+                ]),
+            mnesia:wait_for_tables([apodimagetable, apodtelemetry], 5000);
         _ -> 
             io:format("DB already initialized~n"),
             ok

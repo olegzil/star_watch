@@ -53,6 +53,8 @@ handle(Req, State) ->
 
 %%% 
 parse_request(Request) ->
+    #{headers := Headers} = Request,
+    utils:update_client_record(maps:find(<<"host">>, Headers)),
     try #{
         start_date  := StartDate,
         end_date    := EndDate
