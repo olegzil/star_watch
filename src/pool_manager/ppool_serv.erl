@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-02-10 16:22:17
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-19 18:05:19
+% @Last Modified time: 2022-10-20 12:27:54
 -module(ppool_serv).
 -behaviour(gen_server).
 -export([start/4, start_link/4, run/2, sync_queue/2, async_queue/2, stop/1]).
@@ -113,6 +113,7 @@ handle_info({'DOWN', Ref, process, _Pid, _}, S = #state{refs=Refs}) ->
 handle_info({start_worker_supervisor, Sup, MFA}, S = #state{}) ->
     {ok, Pid} = supervisor:start_child(Sup, ?SPEC(MFA)),
     link(Pid),
+    io:format("ppool_serv:handle_info~nMFA: ~p~nSup: ~p~n", [MFA, Sup]),
     {noreply, S#state{sup=Pid}};
 handle_info(Msg, State) ->
     io:format("Unknown msg: ~p~n", [Msg]),

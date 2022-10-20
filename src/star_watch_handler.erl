@@ -26,7 +26,7 @@ handle(Req, State) ->
   end.
 
   reply(post, _Body, Req) -> 
-    case parse_request(Req) of
+    case submit_request_for_processing(Req) of
             {ok, Result} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
             {not_found, Error} ->
@@ -34,25 +34,17 @@ handle(Req, State) ->
         end;
 
   reply(get, _Id, Req) -> 
-    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, "Hello World", Req),
-    Reply = parse_request(Req),
-    io:format("~p~n", [Reply]);
-    % case parse_request(Req) of
-    %         {ok, Result} ->
-    %             cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
-    %         {not_found, Error} ->
-    %             cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
-    %     end;
+    submit_request_for_processing(Req);
 
   reply(put, _Body, Req) -> 
-    case parse_request(Req) of
+    case submit_request_for_processing(Req) of
             {ok, Result} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
             {not_found, Error} ->
                 cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
         end.
         
-parse_request(Request) ->
+submit_request_for_processing(Request) ->
     try #{
         start_date  := StartDate,
         end_date    := EndDate
@@ -60,7 +52,7 @@ parse_request(Request) ->
          _ ->
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            io:format("~p~n", [ppool:run(dbcontroller, [Start, End, self()])])
+            io:format("submit_request_for_processing: ~p~n", [ppool:run(database_server, [Start, End, Request])])
      catch
          _:Error ->
             {_, {_, Term}, _} = Error,

@@ -1,59 +1,17 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-19 19:15:24
+% @Last Modified time: 2022-10-20 14:20:01
 
 -module(db_access).
--behaviour(gen_server).
--define(SERVER, ?MODULE). 
 
 -import(utils, [date_to_gregorian_days/1, gregorian_days_to_binary/1]).
 -include ("include/apod_record_def.hrl").
 -include ("include/date_request.hrl").
+-include_lib("stdlib/include/ms_transform.hrl").
 
--export([start_link/3, 
-		 stop/1]).
-
--export([init/1, 
-		 handle_call/3, 
-		 handle_cast/2, 
-		 handle_info/2, 
-		 code_change/3, 
-		 terminate/2]).
-
+-export([process_date_request/2]).
 -export([dump_db/0]).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% gen_server exports %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_link(StartDate, EndDate, SendTo) ->
-	io:format("~n************~p ***************~n", ["db_access:start_link() called"]),
-	gen_server:start_link(?MODULE, {StartDate, EndDate, SendTo}, []).
-
-init({StartDate, EndDate, SendTo}) ->
-	io:format("~ndb_access:init()~n StartDate: ~p EndDate: ~p ~n", [StartDate, EndDate]),
-	{ok, {StartDate, EndDate, SendTo}}.
-
-handle_call(fetch, _From, {Pid, StartDate, EndDate}) ->
-	io:format("~n************~p ***************~n", ["db_access:handle_call(fetch) called"]),
-	Result = process_date_request(StartDate, EndDate),
-	{reply, {Result}, {Pid, StartDate, EndDate}}.
-
-handle_cast(_Args, State) ->
-	{noreply, State}.
-
-handle_info(timeout, State) ->
-	io:format("~n************~p ***************~n", ["db_access:handle_info(time) called"]),
-	{stop, normal, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
-
-stop(Pid) ->
-	gen_server:call(Pid, stop).
-
-terminate(_Reason, _State) -> 
-	ok.
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 process_date_request(StartDate, EndDate) ->
