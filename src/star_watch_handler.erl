@@ -52,7 +52,8 @@ submit_request_for_processing(Request) ->
          _ ->
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            io:format("submit_request_for_processing: ~p~n", [ppool:run(database_server, [Start, End, Request])])
+            Response = ppool:run(database_server, [Start, End, Request]),
+            io:format("~nResponse: ~p", [Response])
      catch
          _:Error ->
             {_, {_, Term}, _} = Error,
