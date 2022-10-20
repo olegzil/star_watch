@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-16 12:59:12
+% @Last Modified time: 2022-10-19 18:36:34
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -11,10 +11,13 @@
 		 start_cron_job/0,
 		 time_pair_to_fetch/2,
 		 update_client_record/1, 
-		 dump_telemetry_table/0]).
+		 dump_telemetry_table/0,
+		 process_file_list/2,
+		 update_db_from_json_file/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
+-include("include/apod_record_def.hrl").
 
 -define(ROOT_HOST, "https://api.nasa.gov/planetary/apod?").
 -define(API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
@@ -171,4 +174,81 @@ dump_telemetry_table() ->
 	end,
 	{atomic, Records} = mnesia:transaction(Transaction),
 	io:format("~p~n", [Records]).
+
+%%
+%% This function populates a mnesia database with the contests of all
+%% files found in [DirName]. Files are assumed to be valid json.
+%%
+update_db_from_json_file(DirName) ->
+	{ok, Filelist} = file:list_dir(DirName),	%generate a list of file names from the directory provided
+	process_file_list(DirName, Filelist).		%parse the files and populate DB
+
+
+%% This function reads a list of files recusively, generates a single list containing
+%% all parsed data and calls jiffy to convert the data from string to Json.
+%% [DirName] -- the name of the directory. It will be concatinated with the file name
+%% [FileName | T] -- a pattern matched list of file names
+
+process_file_list(DirName, [FileName|T]) ->
+	FullName = filename:join(DirName, FileName),
+    FileData = readlines(FullName),  %% read all data from the file 
+    try jiffy:decode(FileData, []) of
+    	JsonData ->
+		    insert_apod_entries(JsonData)					 %% insert the json data into mnesia
+    catch
+    	Class:Reason ->
+    		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
+    after
+	    process_file_list(DirName, T) 
+    end;
+
+%% Terminating call for the tail recurcive call above. 
+process_file_list(_, []) ->
+    true.
+
+%%
+%% This function inserts [JsonData] into a mnesia database
+%% [JsonData] -- well formed json data
+%%
+insert_apod_entries(JsonData) when JsonData =/= [] ->
+	Fun = fun() ->	% The function used in a mnesia transaction
+		lists:foreach(	%% for each item in the list
+		fun({ApodEntry}) ->
+			Record = from_string_to_json_apod(ApodEntry), %% convert the item to a struct
+			mnesia:write(Record)			%% if this is an image, store it
+		end,
+		JsonData)
+	end,
+	mnesia:transaction(Fun). %% execute the transaction
+
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+readlines(FileName) ->
+	case file:open(FileName, [read]) of 
+		{error, Error} -> io:format("~nError:~p ~p~n",[Error, FileName]);
+    {ok, Device} -> 
+	    try 
+	    	get_all_lines(Device)
+	      after 
+	      	file:close(Device)
+	    end
+	end.
+
+get_all_lines(Device) ->
+    case io:get_line(Device, "") of
+        eof  -> [];
+        Line -> Line ++ get_all_lines(Device)
+    end.
+
+from_string_to_json_apod(Item) ->
+	#apodimagetable{
+				url 			= proplists:get_value(<<"url">>, Item),
+				copyright 		= proplists:get_value(<<"copyright">>, Item, <<"no copyright available">>),
+				date 			= date_to_gregorian_days(proplists:get_value(<<"date">>, Item)),
+				explanation		=	proplists:get_value(<<"explanation">>, Item),
+				hdurl			=	proplists:get_value(<<"hdurl">>, Item),
+				media_type		=	proplists:get_value(<<"media_type">>, Item),
+				service_version	=	proplists:get_value(<<"service_version">>, Item),
+				title 			=	proplists:get_value(<<"title">>, Item)
+				}.
 

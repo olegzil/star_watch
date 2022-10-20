@@ -1,89 +1,111 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-16 13:00:27
+% @Last Modified time: 2022-10-19 19:15:24
 
 -module(db_access).
--export([insert_apod_entries/1, update_db_from_json_file/1, readlines/1]).
--export([dump_db/0]).
--import(utils, [date_to_gregorian_days/1]).
+-behaviour(gen_server).
+-define(SERVER, ?MODULE). 
+
+-import(utils, [date_to_gregorian_days/1, gregorian_days_to_binary/1]).
 -include ("include/apod_record_def.hrl").
-%%
-%% This function populates a mnesia database with the contests of all
-%% files found in [DirName]. Files are assumed to be valid json.
-%%
-update_db_from_json_file(DirName) ->
-	{ok, Filelist} = file:list_dir(DirName),	%generate a list of file names from the directory provided
-	process_file_list(DirName, Filelist).		%parse the files and populate DB
+-include ("include/date_request.hrl").
+
+-export([start_link/3, 
+		 stop/1]).
+
+-export([init/1, 
+		 handle_call/3, 
+		 handle_cast/2, 
+		 handle_info/2, 
+		 code_change/3, 
+		 terminate/2]).
+
+-export([dump_db/0]).
 
 
-%% This function reads a list of files recusively, generates a single list containing
-%% all parsed data and calls jiffy to convert the data from string to Json.
-%% [DirName] -- the name of the directory. It will be concatinated with the file name
-%% [FileName | T] -- a pattern matched list of file names
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% gen_server exports %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+start_link(StartDate, EndDate, SendTo) ->
+	io:format("~n************~p ***************~n", ["db_access:start_link() called"]),
+	gen_server:start_link(?MODULE, {StartDate, EndDate, SendTo}, []).
 
-process_file_list(DirName, [FileName|T]) ->
-	FullName = filename:join(DirName, FileName),
-    FileData = readlines(FullName),  %% read all data from the file 
-    try jiffy:decode(FileData, []) of
-    	JsonData ->
-		    insert_apod_entries(JsonData)					 %% insert the json data into mnesia
-    catch
-    	Class:Reason ->
-    		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
-    after
-	    process_file_list(DirName, T) 
-    end;
+init({StartDate, EndDate, SendTo}) ->
+	io:format("~ndb_access:init()~n StartDate: ~p EndDate: ~p ~n", [StartDate, EndDate]),
+	{ok, {StartDate, EndDate, SendTo}}.
 
-%% Terminating call for the tail recurcive call above. 
-process_file_list(_, []) ->
-    true.
+handle_call(fetch, _From, {Pid, StartDate, EndDate}) ->
+	io:format("~n************~p ***************~n", ["db_access:handle_call(fetch) called"]),
+	Result = process_date_request(StartDate, EndDate),
+	{reply, {Result}, {Pid, StartDate, EndDate}}.
 
-%%
-%% This function inserts [JsonData] into a mnesia database
-%% [JsonData] -- well formed json data
-%%
-insert_apod_entries(JsonData) when JsonData =/= [] ->
-	Fun = fun() ->	% The function used in a mnesia transaction
-		lists:foreach(	%% for each item in the list
-		fun({ApodEntry}) ->
-			Record = from_string_to_json_apod(ApodEntry), %% convert the item to a struct
-			mnesia:write(Record)			%% if this is an image, store it
-		end,
-		JsonData)
-	end,
-	mnesia:transaction(Fun). %% execute the transaction
+handle_cast(_Args, State) ->
+	{noreply, State}.
 
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+handle_info(timeout, State) ->
+	io:format("~n************~p ***************~n", ["db_access:handle_info(time) called"]),
+	{stop, normal, State}.
 
-readlines(FileName) ->
-	case file:open(FileName, [read]) of 
-		{error, Error} -> io:format("~nError:~p ~p~n",[Error, FileName]);
-    {ok, Device} -> 
-	    try 
-	    	get_all_lines(Device)
-	      after 
-	      	file:close(Device)
-	    end
-	end.
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
 
-get_all_lines(Device) ->
-    case io:get_line(Device, "") of
-        eof  -> [];
-        Line -> Line ++ get_all_lines(Device)
+stop(Pid) ->
+	gen_server:call(Pid, stop).
+
+terminate(_Reason, _State) -> 
+	ok.
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+process_date_request(StartDate, EndDate) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#apodimagetable.date >= StartDate, 
+                 Record#apodimagetable.date =< EndDate ->
+                Record
+        end),
+
+    SelectRecords = fun() -> mnesia:select(apodimagetable, Match) end,
+    {_, ListOfRecords} = mnesia:transaction(SelectRecords),
+    case length(ListOfRecords) of
+        0 ->
+            io:format("not found on db. fetching from NASA~n"),
+            case utils:fetch_apod_data(StartDate, EndDate, notfound) of
+                {error, _} ->
+                    io:format("NASA fetch failed~n"),
+                    date_rage_not_found(StartDate, EndDate);
+                {ok, JsonResult} ->
+                    io:format("NASA fetch succeeded~n"),
+                    {ok, JsonResult}
+            end;
+
+        _ ->
+            io:format("Found on local db~n"),
+            JsonFreindly = lists:map(fun(DbItem) ->
+                                #{url => DbItem#apodimagetable.url,
+                                             copyright => DbItem#apodimagetable.copyright,
+                                             date => gregorian_days_to_binary(DbItem#apodimagetable.date),
+                                             explanation => DbItem#apodimagetable.explanation,
+                                             hdurl => DbItem#apodimagetable.hdurl,
+                                             media_type => DbItem#apodimagetable.media_type,
+                                             service_version => DbItem#apodimagetable.service_version,
+                                             title => DbItem#apodimagetable.title}                                 
+                                         end, ListOfRecords),
+            io:format("Reqeust: ~p~n", [jiffy:encode([gregorian_days_to_binary(StartDate), gregorian_days_to_binary(EndDate)])]),
+            io:format("Rerturn: ~p records~n", [length(JsonFreindly)]),
+            {ok, jiffy:encode(JsonFreindly)}
     end.
 
-from_string_to_json_apod(Item) ->
-	#apodimagetable{
-				url 			= proplists:get_value(<<"url">>, Item),
-				copyright 		= proplists:get_value(<<"copyright">>, Item, <<"no copyright available">>),
-				date 			= date_to_gregorian_days(proplists:get_value(<<"date">>, Item)),
-				explanation		=	proplists:get_value(<<"explanation">>, Item),
-				hdurl			=	proplists:get_value(<<"hdurl">>, Item),
-				media_type		=	proplists:get_value(<<"media_type">>, Item),
-				service_version	=	proplists:get_value(<<"service_version">>, Item),
-				title 			=	proplists:get_value(<<"title">>, Item)
-				}.
+date_rage_not_found(StartDate, EndDate) ->
+    DateStart = gregorian_days_to_binary(StartDate),
+    DateEnd = gregorian_days_to_binary(EndDate),
+    Message = <<"Date range not found: ">>,
+    ErrorResponse = #{
+        <<"date_time">> => utils:current_time_string(),
+        <<"error_code">> => 404,
+        <<"error_text">> => <<Message/binary, DateStart/binary, <<" -- ">>/binary, DateEnd/binary>>
+    },
+    {not_found, jiffy:encode(ErrorResponse)}.   
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_db() ->

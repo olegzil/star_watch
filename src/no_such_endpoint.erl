@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-10 15:14:47
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-10 19:03:27
+% @Last Modified time: 2022-10-18 21:40:51
 
 -module(no_such_endpoint).
 -export([init/2]).
@@ -15,25 +15,25 @@ handle(Req, State) ->
   case cowboy_req:method(Req) of
     <<"POST">> -> 
       Body = cowboy_req:has_body(Req),
-      Request = postMethod(<<"POST">>, Body, Req),
+      Request = reply(post, Body, Req),
         {ok, Request, State};
     <<"GET">> -> 
       #{id := Id} = cowboy_req:match_qs([{id, [], undefined}], Req),
-      Request = getMethod(<<"GET">>, Id, Req),
+      Request = reply(get, Id, Req),
         {ok, Request, State};
     <<"PUT">> -> 
       Body = cowboy_req:has_body(Req),
-      Request = putMethod(<<"PUT">>, Body, Req),
+      Request = reply(put, Body, Req),
         {ok, Request, State}
   end.
 
-  postMethod(<<"POST">>, _Body, Req) -> 
-    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req).
+  reply(post, _Body, Req) -> 
+    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req);
 
-  getMethod(<<"GET">>, _Id, Req) -> 
-    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req).
+  reply(get, _Id, Req) -> 
+    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req);
 
-  putMethod(<<"PUT">>, _Body, Req) -> 
+  reply(put, _Body, Req) -> 
     cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req).
 
 
