@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-19 18:36:34
+% @Last Modified time: 2022-10-19 22:43:17
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -13,7 +13,8 @@
 		 update_client_record/1, 
 		 dump_telemetry_table/0,
 		 process_file_list/2,
-		 update_db_from_json_file/1]).
+		 update_db_from_json_file/1,
+		 insert_apod_entries/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -37,7 +38,7 @@ update_database(Data) ->
     try jiffy:decode(Data, []) of
     	JsonData ->
 		    %% insert the json data into mnesia
-		    io:format("~p~n", [db_access:insert_apod_entries(JsonData)])
+		    io:format("~p~n", [insert_apod_entries(JsonData)])
 
     catch
     	Class:Reason ->
