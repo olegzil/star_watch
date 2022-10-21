@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-20 14:20:01
+% @Last Modified time: 2022-10-20 18:06:42
 
 -module(db_access).
 
@@ -48,8 +48,7 @@ process_date_request(StartDate, EndDate) ->
                                              service_version => DbItem#apodimagetable.service_version,
                                              title => DbItem#apodimagetable.title}                                 
                                          end, ListOfRecords),
-            io:format("Reqeust: ~p~n", [jiffy:encode([gregorian_days_to_binary(StartDate), gregorian_days_to_binary(EndDate)])]),
-            io:format("Rerturn: ~p records~n", [length(JsonFreindly)]),
+            io:format("Return: ~p records~n", [length(JsonFreindly)]),
             {ok, jiffy:encode(JsonFreindly)}
     end.
 

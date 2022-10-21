@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-02-10 16:22:17
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-20 12:27:54
+% @Last Modified time: 2022-10-20 16:53:05
 -module(ppool_serv).
 -behaviour(gen_server).
 -export([start/4, start_link/4, run/2, sync_queue/2, async_queue/2, stop/1]).
@@ -54,6 +54,7 @@ stop(Name) ->
 %% Gen server
 %% using self() ! {start_worker_supervisor, Sup, MFA} prevents a dead lock. 
 init({Limit, MFA, Sup}) ->
+    io:format("Limit = ~p~n", [Limit]),
     %% We need to find the Pid of the worker supervisor from here,
     %% but alas, this would be calling the supervisor while it waits for us!
     self() ! {start_worker_supervisor, Sup, MFA},
@@ -64,12 +65,16 @@ init({Limit, MFA, Sup}) ->
 %% set up a monitor to know when it's done, store all of this in our state, decrement the 
 %% counter and off we go.
 handle_call({run, Args}, _From, S = #state{limit=N, sup=Sup, refs=R}) when N > 0 ->
+    io:format("Limit = ~p~n", [N]),
     {ok, Pid} = supervisor:start_child(Sup, Args),
     Ref = erlang:monitor(process, Pid),
     {reply, {ok,Pid}, S#state{limit=N-1, refs=gb_sets:add(Ref,R)}};
 
 
 handle_call({run, _Args}, _From, S=#state{limit=N}) when N =< 0 ->
+    io:format("~n**************************************~n", []),
+    io:format("Worker limit reached: Limit = ~n~p~n", [N]),
+    io:format("~n**************************************~n", []),
     {reply, noalloc, S};
 
 %% If there is space for more workers, then the first clause is going to do exactly the same 

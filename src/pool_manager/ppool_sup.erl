@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-02-10 16:08:38
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-19 17:33:32
+% @Last Modified time: 2022-10-20 17:07:04
 -module(ppool_sup).
 -export([start_link/3, init/1]).
 -behaviour(supervisor).
@@ -21,6 +21,7 @@ start_link(Name, Limit, MFA) ->
 % workers to run.
 
 init({Name, Limit, MFA}) ->
+	io:format("~nName: ~p~n", [Name]),
 	MaxRestart = 1,
 	MaxTime = 3600,
 	{ok, {{one_for_all, MaxRestart, MaxTime},

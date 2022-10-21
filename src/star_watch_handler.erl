@@ -26,23 +26,13 @@ handle(Req, State) ->
   end.
 
   reply(post, _Body, Req) -> 
-    case submit_request_for_processing(Req) of
-            {ok, Result} ->
-                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
-            {not_found, Error} ->
-                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
-        end;
+    submit_request_for_processing(Req);
 
   reply(get, _Id, Req) -> 
     submit_request_for_processing(Req);
 
   reply(put, _Body, Req) -> 
-    case submit_request_for_processing(Req) of
-            {ok, Result} ->
-                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
-            {not_found, Error} ->
-                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
-        end.
+    submit_request_for_processing(Req).
         
 submit_request_for_processing(Request) ->
     try #{
@@ -52,8 +42,16 @@ submit_request_for_processing(Request) ->
          _ ->
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            Response = ppool:run(database_server, [Start, End, Request]),
-            io:format("~nResponse: ~p", [Response])
+            timer:sleep(100),
+            Response = ppool:sync_queue(database_server, [Start, End, Request]),
+            timer:sleep(100),
+            {_, Pid} = Response,
+            if 
+              is_pid(Pid) -> 
+                gen_server:call(Pid, {saysomething, <<"Well isn't this something.">>}, infinity),
+                Pid ! stop; % Kill the worker as soon as it has returned its data
+              true -> ok
+            end
      catch
          _:Error ->
             {_, {_, Term}, _} = Error,
