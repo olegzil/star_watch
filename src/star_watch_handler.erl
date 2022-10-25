@@ -42,14 +42,22 @@ submit_request_for_processing(Request) ->
          _ ->
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            timer:sleep(100),
-            Response = ppool:sync_queue(database_server, [Start, End, Request]),
-            timer:sleep(100),
+            Response = supervisor:start_child(star_watch_server_sup, [Start, End]),
             {_, Pid} = Response,
             if 
               is_pid(Pid) -> 
-                gen_server:call(Pid, {saysomething, <<"Well isn't this something.">>}, infinity),
-                Pid ! stop; % Kill the worker as soon as it has returned its data
+                case gen_server:call(Pid, {fetchdata}, infinity) of
+                {ok, Good} ->
+                    cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
+                    Good;
+                  {error, Bad} ->
+                    cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Bad, Request),
+                    Bad;
+                  {_, Other} ->
+                    Other
+                end,
+                io:format("calling stop with Pid=~p~n", [Pid]),
+                gen_server:call(Pid, stop);
               true -> ok
             end
      catch

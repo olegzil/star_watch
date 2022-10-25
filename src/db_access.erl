@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-20 18:06:42
+% @Last Modified time: 2022-10-21 14:00:21
 
 -module(db_access).
 
@@ -26,18 +26,15 @@ process_date_request(StartDate, EndDate) ->
     {_, ListOfRecords} = mnesia:transaction(SelectRecords),
     case length(ListOfRecords) of
         0 ->
-            io:format("not found on db. fetching from NASA~n"),
             case utils:fetch_apod_data(StartDate, EndDate, notfound) of
                 {error, _} ->
                     io:format("NASA fetch failed~n"),
                     date_rage_not_found(StartDate, EndDate);
                 {ok, JsonResult} ->
-                    io:format("NASA fetch succeeded~n"),
                     {ok, JsonResult}
             end;
 
         _ ->
-            io:format("Found on local db~n"),
             JsonFreindly = lists:map(fun(DbItem) ->
                                 #{url => DbItem#apodimagetable.url,
                                              copyright => DbItem#apodimagetable.copyright,
@@ -48,7 +45,6 @@ process_date_request(StartDate, EndDate) ->
                                              service_version => DbItem#apodimagetable.service_version,
                                              title => DbItem#apodimagetable.title}                                 
                                          end, ListOfRecords),
-            io:format("Return: ~p records~n", [length(JsonFreindly)]),
             {ok, jiffy:encode(JsonFreindly)}
     end.
 

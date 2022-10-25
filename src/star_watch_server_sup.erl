@@ -11,11 +11,20 @@ start_link() ->
 
 init([]) ->
     initialize_mnesia(), %% Start mnesia
-    ppool_supersup:start_link(),  %% Start the pool manager
-    ppool:start_pool(database_server, 1024*10000, {database_server, start_link, []}), %% Create a pool of db workers
-    Procs = [],
-    {ok, {{one_for_one, 1, 5}, Procs}}.
-
+    % ppool_supersup:start_link(),  %% Start the pool manager
+    % ppool:start_pool(database_server, 10, {database_server, start_link, []}), %% Create a pool of db workers
+    MaxRestart = 1,
+    MaxTime = 5,
+    {ok, {{simple_one_for_one, MaxRestart, MaxTime},
+          [{serv, 
+             {database_server, start_link, []},
+              temporary, 
+              1000,
+              worker,
+              [simple_one_for_one]}
+           ]
+          }
+    }.
 
 initialize_mnesia() -> 
     mnesia:start(),

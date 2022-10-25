@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-02-10 16:22:17
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-20 16:53:05
+% @Last Modified time: 2022-10-21 14:16:48
 -module(ppool_serv).
 -behaviour(gen_server).
 -export([start/4, start_link/4, run/2, sync_queue/2, async_queue/2, stop/1]).
@@ -31,7 +31,8 @@
 -record(state, {limit=0,
                 sup,
                 refs,
-                queue=queue:new()}).
+                queue=queue:new(),
+                maxlimit = 0}).
 
 start(Name, Limit, Sup, MFA) when is_atom(Name), is_integer(Limit) ->
     gen_server:start({local, Name}, ?MODULE, {Limit, MFA, Sup}, []).
@@ -54,11 +55,10 @@ stop(Name) ->
 %% Gen server
 %% using self() ! {start_worker_supervisor, Sup, MFA} prevents a dead lock. 
 init({Limit, MFA, Sup}) ->
-    io:format("Limit = ~p~n", [Limit]),
     %% We need to find the Pid of the worker supervisor from here,
     %% but alas, this would be calling the supervisor while it waits for us!
     self() ! {start_worker_supervisor, Sup, MFA},
-    {ok, #state{limit=Limit, refs=gb_sets:empty()}}.
+    {ok, #state{limit=Limit, refs=gb_sets:empty(), maxlimit=Limit}}.
 
 %% Whenever there are places left in the pool (the original limit N being decided by the 
 %% programmer adding the pool in the first place), we accept to start the worker. We then 
@@ -71,9 +71,9 @@ handle_call({run, Args}, _From, S = #state{limit=N, sup=Sup, refs=R}) when N > 0
     {reply, {ok,Pid}, S#state{limit=N-1, refs=gb_sets:add(Ref,R)}};
 
 
-handle_call({run, _Args}, _From, S=#state{limit=N}) when N =< 0 ->
+handle_call({run, _Args}, _From, S=#state{limit=N, maxlimit = MaxLimit}) when N =< 0 ->
     io:format("~n**************************************~n", []),
-    io:format("Worker limit reached: Limit = ~n~p~n", [N]),
+    io:format("Worker limit reached: Limit = ~p~n", [MaxLimit]),
     io:format("~n**************************************~n", []),
     {reply, noalloc, S};
 
@@ -106,7 +106,6 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({'DOWN', Ref, process, _Pid, _}, S = #state{refs=Refs}) ->
-    io:format("received down msg~n"),
     case gb_sets:is_element(Ref, Refs) of
         true ->
             handle_down_worker(Ref, S);
