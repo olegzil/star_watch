@@ -2,7 +2,7 @@ Start server
 _build/default/rel/star_watch_server/bin/star_watch_server console
 
 Test command
-db_access:update_db_from_json_file("/home/oleg/Projects/erlang_practice/star_watch_server/data").
+utils:update_db_from_json_file("/home/oleg/Projects/erlang_practice/star_watch_server/data").
 
 Commands to start mnesia
 rd (apodimagetable, {url,copyright,date,explanation,hdurl,media_type,service_version,title}).

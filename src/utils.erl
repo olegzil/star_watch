@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-19 22:43:17
+% @Last Modified time: 2022-10-26 15:17:06
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -14,7 +14,8 @@
 		 dump_telemetry_table/0,
 		 process_file_list/2,
 		 update_db_from_json_file/1,
-		 insert_apod_entries/1]).
+		 insert_apod_entries/1, 
+		 update_database/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").

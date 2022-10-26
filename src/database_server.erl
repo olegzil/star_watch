@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-20 11:39:41
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-24 18:13:59
+% @Last Modified time: 2022-10-24 20:29:03
 -module(database_server).
 -behaviour(gen_server).
 -export([start_link/2, stop/1]).
@@ -24,7 +24,8 @@ handle_call(stop, _From, State) ->
 
 handle_call({fetchdata}, _From, State) ->
 	{Start, End} = State,
-	{reply, db_access:process_date_request(Start, End),  State};
+	FetchResult = db_access:process_date_request(Start, End),
+	{reply, FetchResult,  State};
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.

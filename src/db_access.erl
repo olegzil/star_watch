@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-21 14:00:21
+% @Last Modified time: 2022-10-26 15:54:05
 
 -module(db_access).
 
@@ -11,7 +11,7 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -export([process_date_request/2]).
--export([dump_db/0]).
+-export([dump_db/0, get_all_keys/1, count_media_type/1]).
 
 
 process_date_request(StartDate, EndDate) ->
@@ -31,6 +31,8 @@ process_date_request(StartDate, EndDate) ->
                     io:format("NASA fetch failed~n"),
                     date_rage_not_found(StartDate, EndDate);
                 {ok, JsonResult} ->
+                    io:format("fetching date range from NASA: ~p -- ~p~n",[StartDate, EndDate]),
+                    utils:update_database(JsonResult),
                     {ok, JsonResult}
             end;
 
@@ -61,6 +63,27 @@ date_rage_not_found(StartDate, EndDate) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+count_media_type(MediaType) ->
+    SearchTerm = atom_to_binary(MediaType),
+    io:format("Search term = ~p~n", [SearchTerm]),
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#apodimagetable.media_type =:= SearchTerm ->
+                Record
+        end),
+
+    SelectRecords = fun() -> mnesia:select(apodimagetable, Match) end,
+    {_, ListOfRecords} = mnesia:transaction(SelectRecords),
+    length(ListOfRecords).
+
+get_all_keys(TableName) ->
+    Transaction = fun() ->
+        mnesia:all_keys(TableName)
+    end, 
+    {atomic, KeyList} = mnesia:transaction(Transaction),
+    {ok, File} = file:open("/home/oleg/temp/key_list.txt", [write]),
+    io:format(File, "~p~n", [KeyList]).
+
 dump_db() ->
 	Fun = fun(#apodimagetable{date = Date}, Acc) ->
 		% io:format("~n~p~n", [utils:gregorian_days_to_binary(Date)]),
