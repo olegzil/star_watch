@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-26 15:17:06
+% @Last Modified time: 2022-10-28 16:23:42
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -131,11 +131,10 @@ start_cron_job() ->
 
     erlcron:cron(apod_daily_fetch_job, Job).
 
-update_client_record(HeaderInfo) ->
-	case HeaderInfo of 
-		{ok, IP} ->
-			io:format("~p~n", [IP]),
-			find_client_ip_and_update(IP);
+update_client_record(Telemetry) ->
+	case Telemetry of 
+		{ok, Uuid} ->
+			find_client_ip_and_update(Uuid);
 		{_, Error} ->
 			io:format("~p~n", [Error])
 	end.

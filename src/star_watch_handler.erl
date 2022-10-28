@@ -56,7 +56,6 @@ submit_request_for_processing(Request) ->
                   {_, Other} ->
                     Other
                 end,
-                io:format("calling stop with Pid=~p~n", [Pid]),
                 gen_server:call(Pid, stop);
               true -> ok
             end

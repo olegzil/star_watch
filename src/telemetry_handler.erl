@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-16 12:45:37
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-16 17:45:06
+% @Last Modified time: 2022-10-28 16:23:44
 -module(telemetry_handler).
 -behavior(cowboy_handler).
 
@@ -56,11 +56,20 @@ handle(Req, State) ->
 
 %%% 
 parse_request(Request) ->
-    #{headers := Headers} = Request,
-    io:format("~p~n", [utils:update_client_record(maps:find(<<"host">>, Headers))]),
-    {telemetry, jiffy:encode(#{
-            <<"date_time">> => utils:current_time_string(),
-            <<"status">> => 200,
-            <<"error_text">> => <<"success">>
-        })}.
-    
+    try #{
+        uuid  := Uuid
+    } = cowboy_req:match_qs([uuid, api_key], Request) of
+        _ -> 
+            utils:update_client_record({ok, Uuid}),
+            {telemetry, jiffy:encode(#{
+                    <<"date_time">> => utils:current_time_string(),
+                    <<"status">> => 200,
+                    <<"error_text">> => <<"success">>
+                })}
+    catch
+        _:Error ->
+            io:format("Error: ~p~n", [Error]),
+            {_, {_, Term}, _} = Error,
+            
+            jiffy:encode(Term)             
+    end.
