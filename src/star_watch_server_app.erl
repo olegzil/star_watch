@@ -10,11 +10,12 @@
 
 start(_Type, _Args) ->
     ApiKeyConstraints = { api_key, [fun validate_access_key/2] },
-    FetchApodRoute = {"/astronomy/[...]", [ApiKeyConstraints], star_watch_handler, []},
+    FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints], star_watch_handler, []},
+    StatsRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], stats_handler, []},
     TelemetryRoute = {"/telemetry/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [TelemetryRoute, FetchApodRoute, CatchAllRoute]}
+        {'_', [StatsRoute, TelemetryRoute, FetchApodRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
         [{port, 8080}],

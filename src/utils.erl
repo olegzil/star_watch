@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-28 16:23:42
+% @Last Modified time: 2022-11-02 12:30:35
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -11,7 +11,6 @@
 		 start_cron_job/0,
 		 time_pair_to_fetch/2,
 		 update_client_record/1, 
-		 dump_telemetry_table/0,
 		 process_file_list/2,
 		 update_db_from_json_file/1,
 		 insert_apod_entries/1, 
@@ -164,17 +163,6 @@ find_client_ip_and_update(IpAddress) ->
        		 end,
        		 mnesia:transaction(UpdateRecord)
     end.
-
-dump_telemetry_table() ->
-	Fun = fun(#apodtelemetry{ip_address = IpAddress, access_tally = Tally}, Acc) ->
-		% io:format("Ip = ~p Tally = ~p~n", [IpAddress, Tally]),
-		lists:append(Acc, [{IpAddress, Tally}])
-	end, 
-	Transaction = fun() ->
-	  mnesia:foldr(Fun, [], apodtelemetry)
-	end,
-	{atomic, Records} = mnesia:transaction(Transaction),
-	io:format("~p~n", [Records]).
 
 %%
 %% This function populates a mnesia database with the contests of all

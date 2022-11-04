@@ -1,17 +1,18 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-26 15:54:05
+% @Last Modified time: 2022-11-02 12:30:17
 
 -module(db_access).
 
 -import(utils, [date_to_gregorian_days/1, gregorian_days_to_binary/1]).
--include ("include/apod_record_def.hrl").
--include ("include/date_request.hrl").
+-include_lib("stdlib/include/ms_transform.hrl").
+-include("include/apodtelemetry.hrl").
+-include("include/apod_record_def.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -export([process_date_request/2]).
--export([dump_db/0, get_all_keys/1, count_media_type/1]).
+-export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0]).
 
 
 process_date_request(StartDate, EndDate) ->
@@ -63,6 +64,16 @@ date_rage_not_found(StartDate, EndDate) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+dump_telemetry_table() ->
+    Fun = fun(#apodtelemetry{ip_address = IpAddress, access_tally = Tally}, Acc) ->
+        lists:append(Acc, [{IpAddress, Tally}])
+    end, 
+    Transaction = fun() ->
+      mnesia:foldr(Fun, [], apodtelemetry)
+    end,
+    {atomic, Records} = mnesia:transaction(Transaction),
+    io:format("~p~n", [Records]).
+
 count_media_type(MediaType) ->
     SearchTerm = atom_to_binary(MediaType),
     io:format("Search term = ~p~n", [SearchTerm]),
@@ -86,7 +97,6 @@ get_all_keys(TableName) ->
 
 dump_db() ->
 	Fun = fun(#apodimagetable{date = Date}, Acc) ->
-		% io:format("~n~p~n", [utils:gregorian_days_to_binary(Date)]),
 		lists:append(Acc, [utils:gregorian_days_to_binary(Date)])
 	end, 
 	Transaction = fun() ->
