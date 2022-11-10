@@ -16,8 +16,8 @@ handle(Req, State) ->
       Request = reply(post, Body, Req),
         {ok, Request, State};
     <<"GET">> -> 
-      #{id := Id} = cowboy_req:match_qs([{id, [], undefined}], Req),
-      Request = reply(get, Id, Req),
+      Body = cowboy_req:has_body(Req),
+      Request = reply(get, Body, Req),
         {ok, Request, State};
     <<"PUT">> -> 
       Body = cowboy_req:has_body(Req),
@@ -28,7 +28,7 @@ handle(Req, State) ->
   reply(post, _Body, Req) -> 
     submit_request_for_processing(Req);
 
-  reply(get, _Id, Req) -> 
+  reply(get, _Body, Req) -> 
     submit_request_for_processing(Req);
 
   reply(put, _Body, Req) -> 

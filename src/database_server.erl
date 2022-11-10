@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-20 11:39:41
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-26 16:21:35
+% @Last Modified time: 2022-11-08 15:51:18
 -module(database_server).
 -behaviour(gen_server).
 -export([start_link/2, stop/1]).
@@ -23,7 +23,13 @@ handle_call(stop, _From, State) ->
 handle_call({fetchdata}, _From, State) ->
 	{Start, End} = State,
 	FetchResult = db_access:process_date_request(Start, End),
-	{reply, FetchResult,  State};
+    timer:sleep(500),
+	{reply, FetchResult, State};
+
+handle_call({datasetsize}, _From, State) ->
+    {Start, End} = State,
+    FetchResult = db_access:get_dataset_size(Start, End),
+    {reply, FetchResult,  State};
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.

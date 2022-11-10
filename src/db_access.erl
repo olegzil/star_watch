@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-02 12:30:17
+% @Last Modified time: 2022-11-08 15:45:29
 
 -module(db_access).
 
@@ -12,8 +12,23 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -export([process_date_request/2]).
--export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0]).
+-export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 
+get_dataset_size(StartDate, EndDate) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#apodimagetable.date >= StartDate, 
+                 Record#apodimagetable.date =< EndDate ->
+                Record
+        end),
+
+    SelectRecords = fun() -> mnesia:select(apodimagetable, Match) end,
+    {_, ListOfRecords} = mnesia:transaction(SelectRecords),
+    {
+        ok, jiffy:encode(
+                #{size => length(ListOfRecords)}
+            )
+    }.
 
 process_date_request(StartDate, EndDate) ->
     Match = ets:fun2ms(
@@ -32,7 +47,9 @@ process_date_request(StartDate, EndDate) ->
                     io:format("NASA fetch failed~n"),
                     date_rage_not_found(StartDate, EndDate);
                 {ok, JsonResult} ->
-                    io:format("fetching date range from NASA: ~p -- ~p~n",[StartDate, EndDate]),
+                    Start = calendar:gregorian_days_to_date(StartDate),
+                    End = calendar:gregorian_days_to_date(EndDate),
+                    io:format("fetching date range from NASA: ~p -- ~p~n",[Start, End]),
                     utils:update_database(JsonResult),
                     {ok, JsonResult}
             end;
