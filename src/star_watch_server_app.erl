@@ -6,18 +6,18 @@
 
 -include("include/apod_record_def.hrl").
 -include("include/apodtelemetry.hrl").
--define(API_KEY, <<"K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8">>).
+-include("include/macro_definitions.hrl").
 
 start(_Type, _Args) ->
-    ApiKeyConstraints = { api_key, [fun validate_access_key/2] },
-    DateConstraints = {start_date, [fun validate_date/2]},
+    ApiKeyConstraints   = { api_key,    [fun validate_access_key/2] },
+    DateConstraints     = {start_date,  [fun validate_date/2]},
         
     FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, DateConstraints], star_watch_handler, []},
-    StatsRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], stats_handler, []},
-    RegistrationRoute = {"/telemetry/register[...]", [ApiKeyConstraints], telemetry_handler, []},
+    RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
+    StatsRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [StatsRoute, RegistrationRoute, FetchApodRoute, CatchAllRoute]}
+        {'_', [FetchApodRoute, StatsRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8080}],
@@ -36,6 +36,7 @@ validate_date(forward, Date) ->
        DateLength =/= 3          -> {error, bad_start_date};
        true                      -> {ok, Date}
     end.
+
 
 validate_access_key(forward, Value) when Value =:= ?API_KEY ->
     {ok, Value};

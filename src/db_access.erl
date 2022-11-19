@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-08 15:45:29
+% @Last Modified time: 2022-11-18 19:35:42
 
 -module(db_access).
 
@@ -82,14 +82,40 @@ date_rage_not_found(StartDate, EndDate) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_telemetry_table() ->
-    Fun = fun(#apodtelemetry{ip_address = IpAddress, access_tally = Tally}, Acc) ->
-        lists:append(Acc, [{IpAddress, Tally}])
+    Fun = fun(#apodtelemetry{
+        uuid = Uuid, 
+        access_tally = Tally,
+        statsshowfavorites = StatsFavorites,
+        statshelpmain = StatsHelpMain,
+        statshelpfavorites = StatsHelpFavorites,
+        statshelpdetail = StatsHelpDetail,
+        statssettings = StatsSettings,
+        statssearch = StatsSearch,
+        statsdoubletapselect = StatsDoubleTapSelect,
+        statslongpresstoselect = StatsLongPressSelect,
+        statszoompan = StatsZoomPan,
+        statssetwallpaper = StatsWallpapers
+        }, Acc) ->
+        lists:append(Acc, [
+            list_to_binary(io_lib:format("~p~p", ["Uuid:", Uuid])),
+            list_to_binary(io_lib:format("~p~p", ["Tally:",Tally])),
+            list_to_binary(io_lib:format("~p~p", ["StatsFavorites:",StatsFavorites])),
+            list_to_binary(io_lib:format("~p~p", ["StatsHelpMain",StatsHelpMain])),
+            list_to_binary(io_lib:format("~p~p", ["StatsHelpFavorites:",StatsHelpFavorites])),
+            list_to_binary(io_lib:format("~p~p", ["StatsHelpDetail:",StatsHelpDetail])),
+            list_to_binary(io_lib:format("~p~p", ["StatsDoubleTapSelect:",StatsDoubleTapSelect])),
+            list_to_binary(io_lib:format("~p~p", ["StatsLongPressSelect:",StatsLongPressSelect])),
+            list_to_binary(io_lib:format("~p~p", ["StatsZoomPan:",StatsZoomPan])),
+            list_to_binary(io_lib:format("~p~p", ["StatsWallpapers:",StatsWallpapers])),
+            list_to_binary(io_lib:format("~p~p", ["StatsSettings:",StatsSettings])),
+            list_to_binary(io_lib:format("~p~p", ["StatsSearch:",StatsSearch]))
+            ])
     end, 
     Transaction = fun() ->
       mnesia:foldr(Fun, [], apodtelemetry)
     end,
-    {atomic, Records} = mnesia:transaction(Transaction),
-    io:format("~p~n", [Records]).
+    {atomic, Result} = mnesia:transaction(Transaction),
+    Result.
 
 count_media_type(MediaType) ->
     SearchTerm = atom_to_binary(MediaType),

@@ -11,29 +11,15 @@ init(Req0, State) ->
 
 handle(Req, State) -> 
   case cowboy_req:method(Req) of
-    <<"POST">> -> 
-      Body = cowboy_req:has_body(Req),
-      Request = reply(post, Body, Req),
-        {ok, Request, State};
     <<"GET">> -> 
       Body = cowboy_req:has_body(Req),
       Request = reply(get, Body, Req),
-        {ok, Request, State};
-    <<"PUT">> -> 
-      Body = cowboy_req:has_body(Req),
-      Request = reply(put, Body, Req),
         {ok, Request, State}
   end.
 
-  reply(post, _Body, Req) -> 
-    submit_request_for_processing(Req);
-
   reply(get, _Body, Req) -> 
-    submit_request_for_processing(Req);
-
-  reply(put, _Body, Req) -> 
     submit_request_for_processing(Req).
-        
+
 submit_request_for_processing(Request) ->
     try #{
         start_date  := StartDate,

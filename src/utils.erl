@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-02 12:30:35
+% @Last Modified time: 2022-11-18 22:08:24
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -19,10 +19,7 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
 -include("include/apod_record_def.hrl").
-
--define(ROOT_HOST, "https://api.nasa.gov/planetary/apod?").
--define(API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
-
+-include("include/macro_definitions.hrl").
 
 date_to_gregorian_days(Date) ->
     DateTuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "-", all))),
@@ -131,37 +128,145 @@ start_cron_job() ->
     erlcron:cron(apod_daily_fetch_job, Job).
 
 update_client_record(Telemetry) ->
-	case Telemetry of 
-		{ok, Uuid} ->
-			find_client_ip_and_update(Uuid);
-		{_, Error} ->
-			io:format("~p~n", [Error])
+	{Uuid, Atom} = Telemetry,
+	Action = list_to_atom(
+				string:lowercase(
+					binary_to_list(
+						atom_to_binary(Atom)
+					)
+				)
+			), %make sure atom is lowercase
+	case {Uuid, Action} of 
+		{Uuid, statsregisterapp} ->
+			UpdateFun = fun() -> mnesia:write(#apodtelemetry{uuid = Uuid}) end,
+			mnesia:transaction(UpdateFun),
+			<<"success">>;
+
+		{Uuid, statsupdateaccess} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.access_tally + 1,
+				mnesia:write(Record#apodtelemetry{access_tally = Tally + 1})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statsshowfavorites} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statsshowfavorites + 1,
+				mnesia:write(Record#apodtelemetry{statsshowfavorites = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statshelpmain} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statshelpmain + 1,
+				mnesia:write(Record#apodtelemetry{statshelpmain = Tally}),
+				mnesia:read(apodtelemetry, Uuid)
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statshelpdetail} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statshelpdetail + 1,
+				mnesia:write(Record#apodtelemetry{statshelpdetail = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statshelpfavorites} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statshelpfavorites + 1,
+				mnesia:write(Record#apodtelemetry{statshelpfavorites = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statshelpdaterange} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statshelpdaterange + 1,
+				mnesia:write(Record#apodtelemetry{statshelpdaterange = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statssettings} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statssettings + 1,
+				mnesia:write(Record#apodtelemetry{statssettings = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statssearch} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statssearch + 1,			
+				mnesia:write(Record#apodtelemetry{statssearch = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statsdoubletapselect} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statsdoubletapselect + 1,
+				mnesia:write(Record#apodtelemetry{statsdoubletapselect = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statslongpresstoselect} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statslongpresstoselect + 1,
+				mnesia:write(Record#apodtelemetry{statslongpresstoselect = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statszoompan} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statszoompan + 1,
+				mnesia:write(Record#apodtelemetry{statszoompan = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{Uuid, statssetwallpaper} ->
+			UpdateFun =	fun(Record) -> 
+				Tally = Record#apodtelemetry.statssetwallpaper + 1,
+				mnesia:write(Record#apodtelemetry{statssetwallpaper = Tally})
+			end,
+			find_client_uuid_and_update(Uuid, UpdateFun),
+			<<"success">>;
+
+		{_Uuid, statsgetallstats} ->
+			fetch_stats();
+
+		{_Uuid, Action} ->
+			Atom = atom_to_binary(Action),
+			<<"no such action:", Atom/binary>>
 	end.
 
-find_client_ip_and_update(IpAddress) ->
+find_client_uuid_and_update(Uuid, UpdateFun) ->
     Match = ets:fun2ms(
         fun(Record) 
-            when Record#apodtelemetry.ip_address =:= IpAddress->
+            when Record#apodtelemetry.uuid =:= Uuid->
                 Record
         end),
 
     case mnesia:transaction(fun() -> mnesia:select(apodtelemetry, Match) end) of
-        {atomic,[]} ->
-            mnesia:transaction(
-            	fun() -> 
-            		mnesia:write(#apodtelemetry{ip_address = IpAddress, access_tally = 1})
-            	end
-           	);
-        {atomic,[{_, Key,_}]} ->
-        	UpdateRecord = fun() -> 
-        		case mnesia:read(apodtelemetry, Key) of 
-        			[] -> io:format("Unexpected. Record not found ~p", [IpAddress]);
-        			[#apodtelemetry{ip_address = IpAddress, access_tally = Tally}] ->
-	            		mnesia:write(#apodtelemetry{ip_address = IpAddress, access_tally = Tally + 1}),
-	            		mnesia:read(apodtelemetry, Key)
-       		 	end
-       		 end,
-       		 mnesia:transaction(UpdateRecord)
+    	{atomic, [Record]} -> 
+    			Key = Record#apodtelemetry.uuid,
+                UpdateRecord = fun() -> 
+	    		case mnesia:read(apodtelemetry, Key) of 
+	    			[] -> io:format("Record not found for key: ~p~n", [Key]),
+	    			{error, not_found, Key};
+	    			[UpdatedRecord] -> 
+	    				UpdateFun(UpdatedRecord)
+	   		 	end
+	   		 end,
+	   		 mnesia:transaction(UpdateRecord);
+       	{atomic, []} -> ok
     end.
 
 %%
@@ -211,6 +316,9 @@ insert_apod_entries(JsonData) when JsonData =/= [] ->
 	mnesia:transaction(Fun). %% execute the transaction
 
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fetch_stats() -> 
+	db_access:dump_telemetry_table().
+
 
 readlines(FileName) ->
 	case file:open(FileName, [read]) of 

@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-16 12:45:37
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-10-28 16:23:44
+% @Last Modified time: 2022-11-18 20:52:05
 -module(telemetry_handler).
 -behavior(cowboy_handler).
 
@@ -14,57 +14,31 @@ init(Req0, State) ->
 
 handle(Req, State) -> 
   case cowboy_req:method(Req) of
-    <<"POST">> -> 
-      Body = cowboy_req:has_body(Req),
-      Request = postMethod(<<"POST">>, Body, Req),
-        {ok, Request, State};
     <<"GET">> -> 
       #{id := Id} = cowboy_req:match_qs([{id, [], undefined}], Req),
-      Request = getMethod(<<"GET">>, Id, Req),
-        {ok, Request, State};
-    <<"PUT">> -> 
-      Body = cowboy_req:has_body(Req),
-      Request = putMethod(<<"PUT">>, Body, Req),
+      Request = getMethod(get, Id, Req),
         {ok, Request, State}
   end.
 
-  postMethod(<<"POST">>, _Body, Req) -> 
+  getMethod(get, _Id, Req) -> 
     case parse_request(Req) of
             {telemetry, Result} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
             {not_found, Error} ->
                 cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
         end.
-
-  getMethod(<<"GET">>, _Id, Req) -> 
-    case parse_request(Req) of
-            {telemetry, Result} ->
-                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
-            {not_found, Error} ->
-                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
-        end.
-
-  putMethod(<<"PUT">>, _Body, Req) -> 
-    case parse_request(Req) of
-            {telemetry, Result} ->
-                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Result, Req);
-
-            {not_found, Error} ->
-                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Error, Req)
-        end.
-
-
 %%% 
 parse_request(Request) ->
     try #{
-        uuid  := Uuid
-    } = cowboy_req:match_qs([uuid, api_key], Request) of
+        uuid := Uuid,
+        action := Action
+    } = cowboy_req:match_qs([uuid, action], Request) of
         _ -> 
-            utils:update_client_record({ok, Uuid}),
+            Result = utils:update_client_record({Uuid, binary_to_atom(Action)}),
             {telemetry, jiffy:encode(#{
                     <<"date_time">> => utils:current_time_string(),
                     <<"status">> => 200,
-                    <<"error_text">> => <<"success">>
+                    <<"error_text">> => Result
                 })}
     catch
         _:Error ->

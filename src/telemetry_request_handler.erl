@@ -1,8 +1,8 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-11-01 12:57:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-08 09:45:10
--module(stats_handler).
+% @Last Modified time: 2022-11-17 16:51:22
+-module(telemetry_request_handler).
 -behavior(cowboy_handler).
 -export([init/2]).
 
@@ -11,34 +11,12 @@ init(Req0, State) ->
     {ok, Req, State}.
 
 handle(Req, State) -> 
-  case cowboy_req:method(Req) of
-    <<"POST">> -> 
-      Body = cowboy_req:has_body(Req),
-      Request = reply(post, Body, Req),
-        {ok, Request, State};
+    case cowboy_req:method(Req) of
     <<"GET">> -> 
-      Body = cowboy_req:has_body(Req),
-      Request = reply(get, Body, Req),
-        {ok, Request, State};
-    <<"PUT">> -> 
-      Body = cowboy_req:has_body(Req),
-      Request = reply(put, Body, Req),
+      #{api_key := Id} = cowboy_req:match_qs([{api_key, [], undefined}], Req),
+      Request = reply(get, Id, Req),
         {ok, Request, State}
-  end.
-
-  reply(post, _Body, Request) -> 
-        try #{
-        action  := Action
-    } = cowboy_req:match_qs([action], Request) of
-         _ ->
-         	ActionSelector = list_to_atom(Action),
-         	execute_action(ActionSelector, Request)
-     catch
-         _:Error ->
-            {_, {_, Term}, _} = Error,
-            
-            jiffy:encode(Term)     
-    end;
+    end.
 
   reply(get, _Id, Request) -> 
     try #{
@@ -52,23 +30,8 @@ handle(Req, State) ->
             {_, {_, Term}, _} = Error,
             
             jiffy:encode(Term)     
-    end;
-
-  reply(put, _Body, Request) -> 
-        try #{
-        action  := Action
-    } = cowboy_req:match_qs([action], Request) of
-         _ ->
-         	ActionSelector = binary_to_atom(Action),
-         	execute_action(ActionSelector, Request)
-     catch
-         _:Error ->
-            {_, {_, Term}, _} = Error,
-            
-            jiffy:encode(Term)     
     end.
-        
-    
+
 execute_action(fetchall, Request) ->
 	Start = utils:date_to_gregorian_days(<<"1970-01-01">>),
 	{{Year, Month, Day}, {_A, _B, _C}} = calendar:now_to_datetime(erlang:timestamp()),
