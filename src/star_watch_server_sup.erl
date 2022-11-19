@@ -33,7 +33,7 @@ initialize_mnesia() ->
         0 -> 
             io:format("Initializing empty db~n"),
             mnesia:stop(),
-            application:set_env(mnesia, dir, "/tmp/star_watch_db"),
+%            application:set_env(mnesia, dir, "/tmp/star_watch_db"),
             mnesia:create_schema([node()]),
             mnesia:start(),
 			create_table(apodimagetable),
