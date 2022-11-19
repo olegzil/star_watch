@@ -1,0 +1,2 @@
+-define(ROOT_HOST, "https://api.nasa.gov/planetary/apod?").
+-define(API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
