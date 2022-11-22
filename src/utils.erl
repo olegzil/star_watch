@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-18 22:08:24
+% @Last Modified time: 2022-11-22 15:10:09
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -20,6 +20,7 @@
 -include("include/apodtelemetry.hrl").
 -include("include/apod_record_def.hrl").
 -include("include/macro_definitions.hrl").
+-include("include/registration_query.hrl").
 
 date_to_gregorian_days(Date) ->
     DateTuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "-", all))),
@@ -137,10 +138,37 @@ update_client_record(Telemetry) ->
 				)
 			), %make sure atom is lowercase
 	case {Uuid, Action} of 
+		{Uuid, isregistered} -> 
+			io:format("in isregistered~n"),
+			Match = ets:fun2ms(
+			    fun(Record) 
+			        when Record#apodtelemetry.uuid =:= Uuid->
+			            Record
+			    end),
+			case mnesia:transaction(fun() -> mnesia:select(apodtelemetry, Match) end) of
+				{atomic, [_Record]} -> 
+		    				ReturnValue = #{
+		    					uuid => Uuid,
+		    					registered => true
+		    				},
+		    				ReturnValue;
+			   	{atomic, []} -> 
+		    				ReturnValue = #{
+		    					uuid => Uuid,
+		    					registered => false
+		    				},
+		    				ReturnValue
+			end;
+
 		{Uuid, statsregisterapp} ->
+			io:format("In statsregisterapp~n"),
 			UpdateFun = fun() -> mnesia:write(#apodtelemetry{uuid = Uuid}) end,
 			mnesia:transaction(UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statsupdateaccess} ->
 			UpdateFun =	fun(Record) -> 
@@ -148,7 +176,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{access_tally = Tally + 1})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statsshowfavorites} ->
 			UpdateFun =	fun(Record) -> 
@@ -156,16 +188,24 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statsshowfavorites = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statshelpmain} ->
+			io:format("In statshelpmain~n"),
 			UpdateFun =	fun(Record) -> 
 				Tally = Record#apodtelemetry.statshelpmain + 1,
-				mnesia:write(Record#apodtelemetry{statshelpmain = Tally}),
-				mnesia:read(apodtelemetry, Uuid)
-			end,
+				mnesia:write(Record#apodtelemetry{statshelpmain = Tally})
+				end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statshelpdetail} ->
 			UpdateFun =	fun(Record) -> 
@@ -173,7 +213,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statshelpdetail = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statshelpfavorites} ->
 			UpdateFun =	fun(Record) -> 
@@ -181,7 +225,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statshelpfavorites = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statshelpdaterange} ->
 			UpdateFun =	fun(Record) -> 
@@ -189,7 +237,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statshelpdaterange = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statssettings} ->
 			UpdateFun =	fun(Record) -> 
@@ -197,7 +249,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statssettings = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statssearch} ->
 			UpdateFun =	fun(Record) -> 
@@ -205,7 +261,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statssearch = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statsdoubletapselect} ->
 			UpdateFun =	fun(Record) -> 
@@ -213,7 +273,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statsdoubletapselect = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statslongpresstoselect} ->
 			UpdateFun =	fun(Record) -> 
@@ -221,7 +285,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statslongpresstoselect = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statszoompan} ->
 			UpdateFun =	fun(Record) -> 
@@ -229,7 +297,11 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statszoompan = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{Uuid, statssetwallpaper} ->
 			UpdateFun =	fun(Record) -> 
@@ -237,14 +309,26 @@ update_client_record(Telemetry) ->
 				mnesia:write(Record#apodtelemetry{statssetwallpaper = Tally})
 			end,
 			find_client_uuid_and_update(Uuid, UpdateFun),
-			<<"success">>;
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => <<"success">>
+			};
 
 		{_Uuid, statsgetallstats} ->
-			fetch_stats();
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => fetch_stats()
+			};
 
 		{_Uuid, Action} ->
-			Atom = atom_to_binary(Action),
-			<<"no such action:", Atom/binary>>
+			BadAction = atom_to_binary(Action, utf8),
+			#{
+				uuid => Uuid,
+				registered => true,
+				result => [<<"no such action:", BadAction/binary>>]
+			}
 	end.
 
 find_client_uuid_and_update(Uuid, UpdateFun) ->
@@ -266,7 +350,9 @@ find_client_uuid_and_update(Uuid, UpdateFun) ->
 	   		 	end
 	   		 end,
 	   		 mnesia:transaction(UpdateRecord);
-       	{atomic, []} -> ok
+       	{atomic, []} -> 
+       		io:format("got nothing~n"),
+       		ok
     end.
 
 %%
