@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-16 12:45:37
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-18 20:52:05
+% @Last Modified time: 2022-11-25 21:43:32
 -module(telemetry_handler).
 -behavior(cowboy_handler).
 
@@ -17,7 +17,9 @@ handle(Req, State) ->
     <<"GET">> -> 
       #{id := Id} = cowboy_req:match_qs([{id, [], undefined}], Req),
       Request = getMethod(get, Id, Req),
-        {ok, Request, State}
+        {ok, Request, State};
+    _ ->
+        {error, Req, State}
   end.
 
   getMethod(get, _Id, Req) -> 

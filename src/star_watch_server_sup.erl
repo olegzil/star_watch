@@ -50,7 +50,7 @@ create_table(apodtelemetry) ->
         apodtelemetry,
         [
             {attributes, record_info(fields, apodtelemetry)},
-            {index, [#apodtelemetry.access_tally]}, 
+            {index, [#apodtelemetry.uuid]}, 
             {type, ordered_set},
             {disc_copies, [node()]}
         ]),

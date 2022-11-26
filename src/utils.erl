@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-22 15:10:09
+% @Last Modified time: 2022-11-25 22:59:07
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -151,18 +151,21 @@ update_client_record(Telemetry) ->
 		    					uuid => Uuid,
 		    					registered => true
 		    				},
+		    				io:format("record found: ~p~n", [Uuid]),
 		    				ReturnValue;
 			   	{atomic, []} -> 
 		    				ReturnValue = #{
 		    					uuid => Uuid,
 		    					registered => false
 		    				},
+		    				io:format("record NOT found: ~p~n", [Uuid]),
 		    				ReturnValue
 			end;
 
 		{Uuid, statsregisterapp} ->
-			io:format("In statsregisterapp~n"),
-			UpdateFun = fun() -> mnesia:write(#apodtelemetry{uuid = Uuid}) end,
+			UpdateFun = fun() -> 
+				mnesia:write(#apodtelemetry{uuid = Uuid})
+			end,
 			mnesia:transaction(UpdateFun),
 			#{
 				uuid => Uuid,
@@ -195,7 +198,6 @@ update_client_record(Telemetry) ->
 			};
 
 		{Uuid, statshelpmain} ->
-			io:format("In statshelpmain~n"),
 			UpdateFun =	fun(Record) -> 
 				Tally = Record#apodtelemetry.statshelpmain + 1,
 				mnesia:write(Record#apodtelemetry{statshelpmain = Tally})
@@ -351,7 +353,7 @@ find_client_uuid_and_update(Uuid, UpdateFun) ->
 	   		 end,
 	   		 mnesia:transaction(UpdateRecord);
        	{atomic, []} -> 
-       		io:format("got nothing~n"),
+       		io:format("got nothing for uuid:~p~n", [Uuid]),
        		ok
     end.
 

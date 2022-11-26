@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-11-01 12:57:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-17 16:51:22
+% @Last Modified time: 2022-11-25 21:43:38
 -module(telemetry_request_handler).
 -behavior(cowboy_handler).
 -export([init/2]).
@@ -15,7 +15,9 @@ handle(Req, State) ->
     <<"GET">> -> 
       #{api_key := Id} = cowboy_req:match_qs([{api_key, [], undefined}], Req),
       Request = reply(get, Id, Req),
-        {ok, Request, State}
+        {ok, Request, State};
+    _ ->
+        {error, Req, State}
     end.
 
   reply(get, _Id, Request) -> 

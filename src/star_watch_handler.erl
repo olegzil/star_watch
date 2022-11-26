@@ -14,7 +14,9 @@ handle(Req, State) ->
     <<"GET">> -> 
       Body = cowboy_req:has_body(Req),
       Request = reply(get, Body, Req),
-        {ok, Request, State}
+        {ok, Request, State};
+    _ ->
+      {error, Req, State}
   end.
 
   reply(get, _Body, Req) -> 
