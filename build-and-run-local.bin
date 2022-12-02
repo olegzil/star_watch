@@ -1,9 +1,9 @@
 
 eval $(ssh-agent) ### Make sure the ssh agent is running
-ssh-add ~/.ssh/id_rsa ### Add the key file to the agent
+ssh-add ~/.ssh/id_ed25519 ### Add the key file to the agent
 
-### build with the id_rsa key so that git can clone the repo inside the docker image
-docker build --no-cache  --ssh starwatchsshkey=/home/olegzilberman_zilberman/.ssh/id_rsa -t olegzilberman/star-watch-server:experimental.1 -f Dockerfile .
+### build with the id_ed25519 key so that git can clone the repo inside the docker image
+docker build --no-cache  --ssh starwatchsshkey=~/.ssh/id_ed25519 -t olegzilberman/star-watch-server:experimental.1 -f Dockerfile .
 
 ### Run the docker image
 ###docker run -i -t -d -p 8080:8080 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:experimental.1
