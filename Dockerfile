@@ -16,7 +16,7 @@ RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 #Clone the star-server repo
 #RUN ssh -Tv git@github.com
 RUN rm -rf /buildroot/star_watch_server
-RUN --mount=type=ssh id=star-watch git clone https://github.com/olegzil/star_watch.git /buildroot/star_watch_server
+RUN --mount=type=ssh,id=starwatchsshkey git clone git@github.com:olegzil/star_watch.git /buildroot/star_watch_server
 
 #Build the server
 WORKDIR star_watch_server
