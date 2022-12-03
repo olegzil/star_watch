@@ -1,0 +1,90 @@
+#!/bin/bash
+set -e
+USAGE="Usage: buildIt -b local|cloud -t <TAG name> <-r>\nIf -t is not supplied BUILD TAG defaults to version.1.0.0\n\
+If -b is not suppled, buid type defaults to local.\nIf \"-r true\" is suppled, the docker image is executed\nIf \"-o true\" is supplied an attempt is made to execute the existing build without rebuilding it."
+BUILD="unset"
+TAG="unset"
+
+executeBuild() {
+	BUILD_TYPE=$1
+	BUILD_TAG=$2
+	BUILD_SSH=$3
+	BUILD_RUN=$4
+	BUILD_RUN_ONLY=$5
+
+printf "Function Call -->> type: %s\n" "$BUILD_TYPE" 
+printf "Function Call -->> TAG: %s\n" "$BUILD_TAG"
+printf "Function Call -->> ssh: %s\n" "$BUILD_SSH"
+printf "Function Call -->> RUN: %s\n" "$BUILD_RUN"
+export DOCKER_BUILDKIT=1
+eval $(ssh-agent) ### Make sure the ssh agent is running
+if [[ "$BUILD_RUN_ONLY" == true ]];then	
+	(exec docker run  -i -t -d -p 8080:8080 -p 443:443 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:"$BUILD_TAG"	)
+elif [[ $BUILD_RUN == true ]];then
+	(exec docker build  --ssh starwatchsshkey="$BUILD_SSH" -t olegzilberman/star-watch-server:"$BUILD_TAG" -f Dockerfile .)
+	(exec docker run -i -t -d -p 8080:8080 -p 443:443 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:"$BUILD_TAG"	)
+else
+	(exec docker build  --ssh starwatchsshkey="$BUILD_SSH" -t olegzilberman/star-watch-server:"$BUILD_TAG" -f Dockerfile .)
+fi
+}
+
+while getopts ":b:t:u:r:o:" opt; do
+  case $opt in
+    b) BUILD="$OPTARG"
+    ;;  
+    t) TAG="$OPTARG"
+    ;;  
+    r) RUN="$OPTARG"
+		;;
+		o) RUN_ONLY="$OPTARG"
+		;;
+    u)  
+    echo -e "$USAGE"
+    exit 0
+    ;;  
+    \?) echo "Invalid option -$OPTARG" >&2
+    exit 1
+    ;;  
+  esac
+done
+
+if [[ "$TAG" == "unset" ]];then
+	TAG="version.1.0.0"
+fi
+
+
+if [[ "${BUILD,,}" != 'cloud' && "${BUILD,,}" != 'local' && "${BUILD,,}" != 'unset' ]];then
+	printf "Invalid BUILD type: %s\n" "$BUILD"
+	printf "%s" "$USAGE"
+	exit 1
+fi
+
+if [[ "$BUILD" == 'unset' ]];then
+	BUILD="local"
+	SSH=~/.ssh/id_ed25519
+elif [[ "${BUILD,,}" == 'local' ]];then
+	BUILD='local'
+	SSH=~/.ssh/id_ed25519
+elif [[ "${BUILD,,}" == 'cloud' ]];then
+	BUILD='cloud'
+	SSH=~/.ssh/id_rsa
+fi
+
+printf "You selected\nBuild type: %s\n " "$BUILD"
+printf "Tag name: %s\n " "$TAG"
+printf "SSH: %s\n" "$SSH"
+printf "Run %s\n"  "$RUN"
+printf "Run only: %s\n" "$RUN_ONLY"
+
+read -r -p 'Proceed? (yes/no) ' RESPONSE
+
+if [[ "${RESPONSE,,}" == 'yes' || "${RESPONSE,,}" == 'y' ]];then
+        printf "Proceeding with BUILD:\n"
+	printf "Build type %s\n" "$BUILD"
+	printf "Build TAG %s\n" "$TAG"
+	printf "Build ssh %s\n" "$SSH"
+	printf "Run only %s\n"  "$RUN_ONLY"
+		executeBuild "$BUILD" "$TAG" "$SSH" "$RUN" "$RUN_ONLY"
+else
+        printf "Build Canceled\n"
+fi

@@ -1,3 +1,4 @@
+export DOCKER_BUILDKIT=1
 
 eval $(ssh-agent) ### Make sure the ssh agent is running
 ssh-add ~/.ssh/id_ed25519 ### Add the key file to the agent

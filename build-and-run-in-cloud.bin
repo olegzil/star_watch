@@ -1,4 +1,4 @@
-
+#!/bin/bash 
 eval $(ssh-agent) ### Make sure the ssh agent is running
 ssh-add ~/.ssh/id_rsa ### Add the key file to the agent
 
