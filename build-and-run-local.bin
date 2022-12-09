@@ -7,4 +7,4 @@ ssh-add ~/.ssh/id_ed25519 ### Add the key file to the agent
 docker build --no-cache  --ssh starwatchsshkey=~/.ssh/id_ed25519 -t olegzilberman/star-watch-server:experimental.1 -f Dockerfile .
 
 ### Run the docker image
-###docker run -i -t -d -p 8080:8080 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:experimental.1
+docker run --rm -i -t -d -p 8080:8080 -p 443:443 -p 8443:8443 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:experimental.1

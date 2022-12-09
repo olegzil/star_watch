@@ -21,8 +21,8 @@ eval $(ssh-agent) ### Make sure the ssh agent is running
 if [[ "$BUILD_RUN_ONLY" == true ]];then	
 	(exec docker run  -i -t -d -p 8080:8080 -p 443:443 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:"$BUILD_TAG"	)
 elif [[ $BUILD_RUN == true ]];then
-	(exec docker build  --ssh starwatchsshkey="$BUILD_SSH" -t olegzilberman/star-watch-server:"$BUILD_TAG" -f Dockerfile .)
-	(exec docker run -i -t -d -p 8080:8080 -p 443:443 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:"$BUILD_TAG"	)
+	(exec docker build --no-cache  --ssh starwatchsshkey="$BUILD_SSH" -t olegzilberman/star-watch-server:"$BUILD_TAG" -f Dockerfile .)
+	(exec docker run -i -t -d -p 8080:8080 -p 443:443 -p 8443:8443 --init -v /mnt/disks/star-watch-data:/mnt/disks/star-watch-data --volume="$PWD/ssl:/etc/ssl/certs" --log-driver=syslog olegzilberman/star-watch-server:"$BUILD_TAG"	)
 else
 	(exec docker build  --ssh starwatchsshkey="$BUILD_SSH" -t olegzilberman/star-watch-server:"$BUILD_TAG" -f Dockerfile .)
 fi

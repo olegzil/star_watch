@@ -4,7 +4,7 @@
 -include("include/apodtelemetry.hrl").
 -define(SERVER, ?MODULE).
 -export([start_link/0]).
--export([init/1]).
+-export([init/1, create_table/1]).
 
 start_link() ->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
@@ -38,26 +38,21 @@ initialize_mnesia() ->
             mnesia:start(),
 			create_table(apodimagetable),
 			create_table(apodtelemetry),
-	        mnesia:wait_for_tables([apodimagetable, apodtelemetry], 5000);
+	        mnesia:wait_for_tables([apodimagetable, apodtelemetry, mnesiatable], 5000);
         _ -> 
             io:format("DB already initialized~n"),
             ok
     end.
 
 create_table(apodtelemetry) ->
-    mnesia:start(),
     mnesia:create_table(
         apodtelemetry,
         [
             {attributes, record_info(fields, apodtelemetry)},
-            {index, [#apodtelemetry.uuid]}, 
             {type, ordered_set},
             {disc_copies, [node()]}
-        ]),
-    mnesia:wait_for_tables([apodtelemetry], 5000);
-
+        ]);
 create_table(apodimagetable) ->
-    mnesia:start(),
     mnesia:create_table(
         apodimagetable,
         [
@@ -66,3 +61,4 @@ create_table(apodimagetable) ->
             {type, ordered_set},
             {disc_copies, [node()]}
         ]).
+
