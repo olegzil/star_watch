@@ -38,7 +38,7 @@ initialize_mnesia() ->
             mnesia:start(),
 			create_table(apodimagetable),
 			create_table(apodtelemetry),
-	        mnesia:wait_for_tables([apodimagetable, apodtelemetry, mnesiatable], 5000);
+	        mnesia:wait_for_tables([apodimagetable, apodtelemetry], 5000);
         _ -> 
             io:format("DB already initialized~n"),
             ok

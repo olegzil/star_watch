@@ -23,14 +23,6 @@ start(_Type, _Args) ->
          [{port,8080}],
         #{env => #{dispatch => Dispatch}}
     ),
-     {ok, _} = cowboy:start_tls(my_http_listener,
-            [
-                {port, 8443},
-                {certfile, "/etc/ssl/certs"},
-                {keyfile, "/etc/ssl/certs"}
-            ],
-            #{env => #{dispatch => Dispatch}}
-        ),
     inets:start(),
     utils:start_cron_job(),
     star_watch_server_sup:start_link().
