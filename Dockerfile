@@ -1,9 +1,14 @@
 # syntax=docker/dockerfile:1.0.0-experimental
 # Build stage 0
 
+
 FROM erlang:alpine
-RUN apk add --no-cache gcc musl-dev
-RUN apk add build-base
+RUN apk add --no-cache gcc musl-dev && \
+    apk add build-base && \
+    apk add --no-cache openssl && \
+    apk add --no-cache ncurses-libs && \
+    apk add --no-cache libstdc++
+
 # Set working directory
 RUN mkdir /buildroot
 WORKDIR /buildroot
@@ -18,16 +23,12 @@ RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 RUN rm -rf /buildroot/star_watch_server
 RUN --mount=type=ssh,id=starwatchsshkey git clone git@github.com:olegzil/star_watch.git /buildroot/star_watch_server
 
+
 #Build the server
 WORKDIR star_watch_server
 RUN rebar3 as prod release
 
 # Build stage 1
-FROM alpine
-RUN apk add --no-cache openssl && \
-    apk add --no-cache ncurses-libs && \
-    apk add --no-cache libstdc++
-
 
 # Install the released application
 COPY --from=0 /buildroot/star_watch_server/_build/prod/rel/star_watch_server /server
