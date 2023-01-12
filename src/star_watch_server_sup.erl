@@ -2,6 +2,7 @@
 -behaviour(supervisor).
 -include("include/apod_record_def.hrl").
 -include("include/apodtelemetry.hrl").
+-include("include/celestial_object_table.hrl").
 -define(SERVER, ?MODULE).
 -export([start_link/0]).
 -export([init/1, create_table/1]).
@@ -16,14 +17,11 @@ init([]) ->
     MaxRestart = 1,
     MaxTime = 5,
     {ok, {{simple_one_for_one, MaxRestart, MaxTime},
-          [{serv, 
+          [{serv1, 
              {database_server, start_link, []},
-              temporary, 
-              1000,
-              worker,
-              [simple_one_for_one]}
-           ]
-          }
+              temporary, 1000, worker,[simple_one_for_one]}
+          ]
+        }
     }.
 
 initialize_mnesia() -> 
@@ -38,7 +36,8 @@ initialize_mnesia() ->
             mnesia:start(),
 			create_table(apodimagetable),
 			create_table(apodtelemetry),
-	        mnesia:wait_for_tables([apodimagetable, apodtelemetry], 5000);
+            create_table(celestial_object_table),
+	        mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table], 5000);
         _ -> 
             io:format("DB already initialized~n"),
             ok
@@ -60,5 +59,15 @@ create_table(apodimagetable) ->
             {index, [#apodimagetable.date, #apodimagetable.title, #apodimagetable.hdurl]}, 
             {type, ordered_set},
             {disc_copies, [node()]}
+        ]);
+create_table(celestial_object_table) ->
+    mnesia:create_table(
+        celestial_object_table,
+        [
+            {attributes, record_info(fields, celestial_object_table)},
+            {index, [#celestial_object_table.key, #celestial_object_table.date]}, 
+            {type, ordered_set},
+            {disc_copies, [node()]}
         ]).
+
 

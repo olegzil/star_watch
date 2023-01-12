@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-25 22:59:07
+% @Last Modified time: 2023-01-12 11:49:02
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -14,13 +14,13 @@
 		 process_file_list/2,
 		 update_db_from_json_file/1,
 		 insert_apod_entries/1, 
-		 update_database/1]).
+		 update_database/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
 -include("include/apod_record_def.hrl").
 -include("include/macro_definitions.hrl").
--include("include/registration_query.hrl").
+-include("src/include/registration_query.hrl").
 
 date_to_gregorian_days(Date) ->
     DateTuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "-", all))),
@@ -32,7 +32,11 @@ gregorian_days_to_binary(Date) ->
 	ListOfStrings = lists:map(fun(Item)-> integer_to_list(Item) end, List),
 	list_to_binary(string:join(ListOfStrings, "-")).
 
-update_database(Data) ->
+update_database(nasadata, Data) ->
+	% TODO: Implement
+	ok;
+
+update_database(apod, Data) ->
     try jiffy:decode(Data, []) of
     	JsonData ->
 		    %% insert the json data into mnesia
@@ -46,35 +50,35 @@ update_database(Data) ->
 fetch_data(now) ->
 	Future = 0,
 	Past = 0,
-	fetch_apod_data(Past, Future, production);	
+	fetch_apod_data(production, Past, Future);	
 
 fetch_data(periodic) ->
 	Past = 24*60*60,
 	Future = 0,
-	fetch_apod_data(Past, Future, production).
+	fetch_apod_data(production, Past, Future).
 
-fetch_apod_data(Past, Future, production) ->
+fetch_apod_data(production, Past, Future) ->
 	Query = uri_string:compose_query([{"start_date", time_pair_to_fetch(past, Past)}, 
 									  {"end_date", time_pair_to_fetch(future, Future)},
 									  {"api_key", ?API_KEY},
 									  {"thumbs", "true"}
 									  ]),
-	Request = string:join([?ROOT_HOST, Query], ""),
+	Request = string:join([?APOD_HOST, Query], ""),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
-			update_database(Body);
+			update_database(apod, Body);
 		{ok,{_,_,ErrorMessage}} ->
 			{error, ErrorMessage};
 		Other ->
 			{error, Other}
 	end;
 
-fetch_apod_data(GregorianStartDays, GregorianEndDays, notfound) ->
+fetch_apod_data(notfound, GregorianStartDays, GregorianEndDays) ->
 	S = calendar:gregorian_days_to_date(GregorianStartDays),
 	E = calendar:gregorian_days_to_date(GregorianEndDays),
-	fetch_apod_data(S, E, tuples);
+	fetch_apod_data(tuples, S, E);
 
-fetch_apod_data({StartYear, StartMonth, StartDay}, {EndYear, EndMonth, EndDay}, tuples) ->
+fetch_apod_data(tuples, {StartYear, StartMonth, StartDay}, {EndYear, EndMonth, EndDay}) ->
 	Past = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[StartYear, StartMonth, StartDay]))),
 	Future = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[EndYear, EndMonth, EndDay]))),
 	Query = uri_string:compose_query([{"start_date", Past}, 
@@ -82,10 +86,10 @@ fetch_apod_data({StartYear, StartMonth, StartDay}, {EndYear, EndMonth, EndDay}, 
 									  {"api_key", ?API_KEY},
 									  {"thumbs", "true"}
 									  ]),
-	Request = string:join([?ROOT_HOST, Query], ""),
+	Request = string:join([?APOD_HOST, Query], ""),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
-			update_database(Body),
+			update_database(apod, Body),
 			{ok, Body};
 		{ok,{_,_,ErrorMessage}} ->
 			{error, ErrorMessage};
@@ -123,10 +127,10 @@ time_pair_to_fetch(past, TimeDeltaInSeconds) ->
 	binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[Year, Month, Day]))).
 
 start_cron_job() ->
-	Job = {{daily, {12, 1, am}},
+	ImageOfTheDayJob = {{daily, {12, 1, am}},
     {utils, fetch_data, [periodic]}},
 
-    erlcron:cron(apod_daily_fetch_job, Job).
+    erlcron:cron(apod_daily_fetch_job, ImageOfTheDayJob).
 
 update_client_record(Telemetry) ->
 	{Uuid, Atom} = Telemetry,

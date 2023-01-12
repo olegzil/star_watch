@@ -10,9 +10,11 @@
 
 start(_Type, _Args) ->
     ApiKeyConstraints   = { api_key,    [fun validate_access_key/2] },
-    DateConstraints     = {start_date,  [fun validate_date/2]},
+    APODDateConstraints     = {start_date,  [fun validate_date_apod/2]},
+    NASADateConstraints = {year_start, [fun validate_date_nasa/2]},
         
-    FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, DateConstraints], star_watch_handler, []},
+    FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, APODDateConstraints], celestial_body_handler, []}, %%%TODO: Create celestial_body_handler
+    FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, []},
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
     StatsRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
@@ -20,7 +22,7 @@ start(_Type, _Args) ->
         {'_', [FetchApodRoute, StatsRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
-         [{port,8080}],
+         [{port,8082}],
         #{env => #{dispatch => Dispatch}}
     ),
     inets:start(),
@@ -30,7 +32,11 @@ start(_Type, _Args) ->
 stop(_State) ->
 	ok.
 
-validate_date(forward, Date) ->
+validate_date_nasa(forward, Date) ->
+    IntDate = binary_to_integer(Date),
+    {ok, IntDate}.
+
+validate_date_apod(forward, Date) ->
     DateLength = length(string:split(Date, "-", all)),
     if is_binary(Date) =:= false -> {error, bad_start_date};
        DateLength =/= 3          -> {error, bad_start_date};

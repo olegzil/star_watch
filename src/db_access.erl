@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-18 19:35:42
+% @Last Modified time: 2023-01-12 10:44:29
 
 -module(db_access).
 
@@ -42,7 +42,7 @@ process_date_request(StartDate, EndDate) ->
     {_, ListOfRecords} = mnesia:transaction(SelectRecords),
     case length(ListOfRecords) of
         0 ->
-            case utils:fetch_apod_data(StartDate, EndDate, notfound) of
+            case utils:fetch_apod_data(notfound, StartDate, EndDate) of
                 {error, _} ->
                     io:format("NASA fetch failed~n"),
                     date_rage_not_found(StartDate, EndDate);
