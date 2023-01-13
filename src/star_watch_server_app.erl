@@ -19,7 +19,7 @@ start(_Type, _Args) ->
     StatsRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchApodRoute, StatsRoute, RegistrationRoute, CatchAllRoute]}
+        {'_', [FetchNasaImagesRoute, FetchApodRoute, StatsRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8080}],
