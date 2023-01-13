@@ -22,7 +22,7 @@ start(_Type, _Args) ->
         {'_', [FetchApodRoute, StatsRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
-         [{port,8082}],
+         [{port,8080}],
         #{env => #{dispatch => Dispatch}}
     ),
     inets:start(),
