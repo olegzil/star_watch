@@ -23,14 +23,18 @@ handle(Req, State) ->
     submit_request_for_processing(Req).
 
 submit_request_for_processing(Request) ->
+    % DebugResult_1 = cowboy_req:match_qs([start_date, end_date, api_key], Request),
+    % io:format("DebugResult_1: ~p~n", [DebugResult_1]),
     try #{
         start_date  := StartDate,
-        end_date    := EndDate
+        end_date    := EndDate,
+        api_key     := ApiKey
     } = cowboy_req:match_qs([start_date, end_date, api_key], Request) of
          _ ->
+            io:format("StartDate: ~p~nEndDate: ~p~nApiKey:~p~n", [StartDate, EndDate, ApiKey]),
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            Response = supervisor:start_child(star_watch_server_sup, [Start, End]),
+            Response = supervisor:start_child(star_watch_apod_sup, [Start, End]),
             {_, Pid} = Response,
             if 
               is_pid(Pid) -> 
@@ -50,7 +54,7 @@ submit_request_for_processing(Request) ->
      catch
          _:Error ->
             {_, {_, Term}, _} = Error,
-            
+            io:format("Error: ~p~n", [Error]),          
             jiffy:encode(Term)     
     end.
     

@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-11 19:18:26
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-12 11:45:23
+% @Last Modified time: 2023-01-13 16:15:49
 -module(celestial_body_handler).
 -behavior(cowboy_handler).
 -include("include/macro_definitions.hrl").
@@ -17,21 +17,23 @@ handle(Req, State) ->
     <<"GET">> -> 
       Body = cowboy_req:has_body(Req),
       Request = submit_request_for_processing(Body, Req),
-        {ok, Request, State};
+      {ok, Request, State};
     _ ->
       {error, Req, State}
   end.
 
-submit_request_for_processing(_Body, Request) ->
+submit_request_for_processing(Body, Request) ->
     try #{
-        start_date  := StartDate,
-        end_date    := EndDate,
-        celestial_object_table := CelestialObject
-    } = cowboy_req:match_qs([celstial_object, start_date, end_date, api_key], Request) of
+        year_start  := StartDate,
+        year_end    := EndDate,
+        celestial_object := CelestialObject
+    } = cowboy_req:match_qs([celestial_object, year_start, year_end, api_key], Request) of
          _ ->
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            Response = supervisor:start_child(star_watch_server_sup, ?CHILD_SPEC_1(CelestialObject, Start, End)),
+            io:format("Received: Start=~p  End=~p~n", [Start, End]),
+            Response = supervisor:start_child(star_watch_apod_sup, ?CHILD_SPEC_1(CelestialObject, Start, End)),
+            io:format("supervisor:start_child returned ~p~n", [Response]),
             {_, Pid} = Response,
             if 
               is_pid(Pid) -> 
@@ -51,7 +53,7 @@ submit_request_for_processing(_Body, Request) ->
      catch
          _:Error ->
             {_, {_, Term}, _} = Error,
-            
+            io:format("***** Error *****: ~p~n", [Term]),
             jiffy:encode(Term)     
     end.
     

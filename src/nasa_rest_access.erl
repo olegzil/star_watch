@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-12 10:11:59
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-12 11:48:39
+% @Last Modified time: 2023-01-12 19:40:36
 -module(nasa_rest_access).
 -include("include/macro_definitions.hrl").
 -export([fetch_root_page/3]).
@@ -20,7 +20,7 @@ fetch_root_page(CelestialBodyName, GregorianStartDays, GregorianEndDays) ->
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			FilteredData = parse_root_page(Body),
 			FinalDBData = fetch_collection_json(FilteredData),
-			db_access:update_database(FinalDBData),
+			utils:update_database(nasadata, FinalDBData),
 			{ok, Body};
 		{ok,{_,_,ErrorMessage}} ->
 			{error, ErrorMessage};

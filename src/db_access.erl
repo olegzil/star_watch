@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-12 10:44:29
+% @Last Modified time: 2023-01-12 19:37:55
 
 -module(db_access).
 
@@ -50,7 +50,7 @@ process_date_request(StartDate, EndDate) ->
                     Start = calendar:gregorian_days_to_date(StartDate),
                     End = calendar:gregorian_days_to_date(EndDate),
                     io:format("fetching date range from NASA: ~p -- ~p~n",[Start, End]),
-                    utils:update_database(JsonResult),
+                    utils:update_database(apod, JsonResult),
                     {ok, JsonResult}
             end;
 
