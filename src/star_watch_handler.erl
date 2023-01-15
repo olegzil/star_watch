@@ -30,12 +30,10 @@ submit_request_for_processing(Request) ->
         api_key     := ApiKey
     } = cowboy_req:match_qs([start_date, end_date, api_key], Request) of
          _ ->
-            io:format("StartDate: ~p~nEndDate: ~p~nApiKey:~p~n", [StartDate, EndDate, ApiKey]),
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            {ok, Response} = star_watch_master_sup:attach_child(apod, {Start, End}),
-            io:format("Response: ~p~n", [Response]),
-            {_, Pid} = Response,
+            Response = star_watch_master_sup:attach_child(apod, {Start, End}),
+            {ok, Pid} = Response,
             if 
               is_pid(Pid) -> 
                 case gen_server:call(Pid, {fetchdata}, infinity) of
