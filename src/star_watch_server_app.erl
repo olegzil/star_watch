@@ -33,7 +33,7 @@ start(_Type, _Args) ->
     ),
     inets:start(),
     utils:start_cron_job(),
-    star_watch_apod_sup:start_link().
+    star_watch_master_sup:start_link().
 
 stop(_State) ->
 	ok.

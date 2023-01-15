@@ -29,7 +29,12 @@
 							<<"deep_field">>]).
 -define(CHILD_SPEC_1(CELSESTIALOBJECT, DATESTART, DATEEND), 
 			{serv2, 
-				{nasa_data_aquisition, start_link, [CELSESTIALOBJECT, DATESTART,DATEEND]},
+				{nasa_data_aquisition_server, start_link, [CELSESTIALOBJECT, DATESTART,DATEEND]},
 				temporary, 1000, worker,[simple_one_for_one]
 			}
         ).
+-define(NASAAPIPROCESSOR(NAME, ARGS),
+			{NAME,
+                 {NAME, start_link, ARGS},
+                  transient, infinity, worker, [one_for_one]}
+	).

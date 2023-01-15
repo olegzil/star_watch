@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-11 19:18:26
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-13 16:15:49
+% @Last Modified time: 2023-01-13 20:21:03
 -module(celestial_body_handler).
 -behavior(cowboy_handler).
 -include("include/macro_definitions.hrl").
@@ -32,12 +32,12 @@ submit_request_for_processing(Body, Request) ->
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
             io:format("Received: Start=~p  End=~p~n", [Start, End]),
-            Response = supervisor:start_child(star_watch_apod_sup, ?CHILD_SPEC_1(CelestialObject, Start, End)),
+            Response = supervisor:start_child(star_watch_master_sup, [CelestialObject, Start, End]),
             io:format("supervisor:start_child returned ~p~n", [Response]),
             {_, Pid} = Response,
             if 
               is_pid(Pid) -> 
-                case gen_server:call(Pid, {fetchdata}, infinity) of
+                case gen_server:call(Pid, {fetchnasadata}, infinity) of
                 {ok, Good} ->
                     cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
                     Good;

@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-11-01 12:57:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-13 16:15:49
+% @Last Modified time: 2023-01-13 18:09:23
 -module(telemetry_request_handler).
 -behavior(cowboy_handler).
 -export([init/2]).
@@ -38,7 +38,7 @@ execute_action(fetchall, Request) ->
 	Start = utils:date_to_gregorian_days(<<"1970-01-01">>),
 	{{Year, Month, Day}, {_A, _B, _C}} = calendar:now_to_datetime(erlang:timestamp()),
 	End = calendar:date_to_gregorian_days({Year, Month, Day}),
-    Response = supervisor:start_child(star_watch_apod_sup, [Start, End]),
+    Response = supervisor:start_child(star_watch_master_sup, [Start, End]),
     {_, Pid} = Response,
     if 
       is_pid(Pid) -> 
@@ -72,7 +72,7 @@ execute_action(datasetsize, Request) ->
 fetch_dataset_size(StartDate, EndDate, Request) ->
   Start = utils:date_to_gregorian_days(StartDate),
   End = utils:date_to_gregorian_days(EndDate),
-    Response = supervisor:start_child(star_watch_apod_sup, [Start, End]),
+    Response = supervisor:start_child(star_watch_master_sup, [Start, End]),
     {_, Pid} = Response,
     if 
       is_pid(Pid) -> 
