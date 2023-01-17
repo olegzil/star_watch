@@ -20,12 +20,12 @@ start(_Type, _Args) ->
     YearEndConstraint = {year_end, [fun validate_year_end/2]},
         
     FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
-    FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, []},
+    FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, [1]},
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
-    StatsRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
+    TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchNasaImagesRoute, FetchApodRoute, StatsRoute, RegistrationRoute, CatchAllRoute]}
+        {'_', [FetchNasaImagesRoute, FetchApodRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8083}],
@@ -33,6 +33,7 @@ start(_Type, _Args) ->
     ),
     inets:start(),
     utils:start_cron_job(),
+    io:format("******* Calling ******* star_watch_master_sup:start_link()~n"),
     star_watch_master_sup:start_link().
 
 stop(_State) ->

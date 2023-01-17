@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-13 16:45:38
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-15 12:32:26
+% @Last Modified time: 2023-01-16 15:58:14
 
 -module(star_watch_master_sup).
 -behaviour(supervisor).
@@ -14,6 +14,8 @@ start_link() ->
 
 init([]) ->
     {ok, {{one_for_one, 10, 3600}, []}}.
+
+%%%%%%%%%%%%%%%%%%%%% Public functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 attach_child(Child, Args) when Child =:= apod ->
                     ApodServer = {apod, 
                             {database_server, start_link, [Args]}, 
@@ -23,9 +25,11 @@ attach_child(Child, Args) when Child =:= apod ->
 attach_child(_Child, _Args) ->
     {error, invalid_child_requested}.
 
+%%%%%%%%%%%%%%%%%%%%% Private functions %%%%%%%%%%%%%%%%%%%%%
 child_start_selector(ApodServer) -> 
     {ServerID, _, _, _, _, _} =  ApodServer,
     Result = supervisor:start_child(?MODULE, ApodServer),
+    io:format("child_start_selector returned: ~p~n", [Result]),
     case Result of
         {error,already_present} ->
             supervisor:terminate_child(?MODULE, ServerID),
