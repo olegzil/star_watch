@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-11 19:18:26
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-13 20:21:03
+% @Last Modified time: 2023-01-19 10:55:20
 -module(celestial_body_handler).
 -behavior(cowboy_handler).
 -include("include/macro_definitions.hrl").
@@ -22,18 +22,18 @@ handle(Req, State) ->
       {error, Req, State}
   end.
 
-submit_request_for_processing(Body, Request) ->
+submit_request_for_processing(_Body, Request) ->
     try #{
         year_start  := StartDate,
         year_end    := EndDate,
         celestial_object := CelestialObject
     } = cowboy_req:match_qs([celestial_object, year_start, year_end, api_key], Request) of
          _ ->
+            ObjectList = string:split(binary_to_list(CelestialObject), ",", all),
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
             io:format("Received: Start=~p  End=~p~n", [Start, End]),
-            Response = supervisor:start_child(star_watch_master_sup, [CelestialObject, Start, End]),
-            io:format("supervisor:start_child returned ~p~n", [Response]),
+            Response = star_watch_master_sup:attach_child(nasageneralapi, {ObjectList, Start, End}),
             {_, Pid} = Response,
             if 
               is_pid(Pid) -> 

@@ -2,5 +2,7 @@
 		key,
 		date,
 		title,
-		description
+		description,
+		url,
+		hdurl
 	}).

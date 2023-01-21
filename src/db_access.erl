@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-12 19:37:55
+% @Last Modified time: 2023-01-18 21:19:18
 
 -module(db_access).
 
@@ -11,8 +11,16 @@
 -include("include/apod_record_def.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
--export([process_date_request/2]).
+-export([process_date_request/2, update_nasa_table/1]).
 -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
+
+update_nasa_table(DBItem) -> 
+    Fun = 
+        fun() ->
+            mnesia:write(DBItem)            %% if this is an image, store it
+        end,
+    mnesia:transaction(Fun). %% execute the transaction
+
 
 get_dataset_size(StartDate, EndDate) ->
     Match = ets:fun2ms(

@@ -7,7 +7,6 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -import(utils, [date_to_gregorian_days/1, gregorian_days_to_binary/1]).
 init(Req0, State) ->
-    io:format("star_watch_handler:init~n"),
     handle(Req0, State).
 
 handle(Req, State) -> 

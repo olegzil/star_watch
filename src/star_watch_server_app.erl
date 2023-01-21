@@ -25,7 +25,7 @@ start(_Type, _Args) ->
     TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchNasaImagesRoute, FetchApodRoute, RegistrationRoute, CatchAllRoute]}
+        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8083}],
@@ -33,7 +33,6 @@ start(_Type, _Args) ->
     ),
     inets:start(),
     utils:start_cron_job(),
-    io:format("******* Calling ******* star_watch_master_sup:start_link()~n"),
     star_watch_master_sup:start_link().
 
 stop(_State) ->
@@ -62,20 +61,22 @@ validate_access_key(forward, _) ->
 
 initialize_mnesia() -> 
     mnesia:start(),
-    mnesia:wait_for_tables([apodimagetable], 5000),
-    case mnesia:table_info(apodimagetable, size) of
-        0 -> 
+    mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table], 5000),
+    init_table(celestial_object_table),
+    init_table(apodimagetable),
+    init_table(apodtelemetry),
+    mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table], 5000).
+
+init_table(TableName) ->
+    case mnesia:table_info(TableName, size) of
+        0 ->
             io:format("Initializing empty db~n"),
             mnesia:stop(),
-%            application:set_env(mnesia, dir, "/tmp/star_watch_db"),
             mnesia:create_schema([node()]),
             mnesia:start(),
-            create_table(apodimagetable),
-            create_table(apodtelemetry),
-            create_table(celestial_object_table),
-            mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table], 5000);
-        _ -> 
-            io:format("DB already initialized~n"),
+            create_table(TableName);
+        InitData ->
+            io:format("DB Table: ~p exists with size: ~p~n", [TableName, InitData]),
             ok
     end.
 
@@ -101,7 +102,6 @@ create_table(celestial_object_table) ->
         celestial_object_table,
         [
             {attributes, record_info(fields, celestial_object_table)},
-            {index, [#celestial_object_table.key, #celestial_object_table.date]}, 
-            {type, ordered_set},
+            {type, bag},
             {disc_copies, [node()]}
         ]).

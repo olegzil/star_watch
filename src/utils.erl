@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-12 11:49:02
+% @Last Modified time: 2023-01-16 18:20:15
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -22,8 +22,15 @@
 -include("include/macro_definitions.hrl").
 -include("src/include/registration_query.hrl").
 
-date_to_gregorian_days(Date) ->
+date_to_gregorian_days(<<A,B,C,D,E,F,G,H,I,J>>) ->
+	Date = <<A,B,C,D,E,F,G,H,I,J>>,
     DateTuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "-", all))),
+    calendar:date_to_gregorian_days(DateTuple);
+
+date_to_gregorian_days(<<A,B,C,D>>) ->
+	Date = <<A,B,C,D>>,
+    Tuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "", all))),
+    DateTuple = erlang:insert_element(2,erlang:insert_element(2, Tuple, 1), 1),
     calendar:date_to_gregorian_days(DateTuple).
 
 gregorian_days_to_binary(Date) ->
