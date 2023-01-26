@@ -60,20 +60,18 @@ validate_access_key(forward, _) ->
     {error, bad_api_key}.
 
 initialize_mnesia() -> 
+    mnesia:stop(),
+    mnesia:create_schema([node() | nodes()]),
     mnesia:start(),
-    mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table], 5000),
-    init_table(celestial_object_table),
     init_table(apodimagetable),
     init_table(apodtelemetry),
+    init_table(celestial_object_table),
     mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table], 5000).
 
 init_table(TableName) ->
     case mnesia:table_info(TableName, size) of
         0 ->
-            io:format("Initializing empty db~n"),
-            mnesia:stop(),
-            mnesia:create_schema([node()]),
-            mnesia:start(),
+            io:format("Initializing empty table: ~p~n", [TableName]),
             create_table(TableName);
         InitData ->
             io:format("DB Table: ~p exists with size: ~p~n", [TableName, InitData]),

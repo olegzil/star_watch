@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-16 18:20:15
+% @Last Modified time: 2023-01-25 12:24:34
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -14,7 +14,9 @@
 		 process_file_list/2,
 		 update_db_from_json_file/1,
 		 insert_apod_entries/1, 
-		 update_database/2]).
+		 update_database/2,
+		 find_token_in_string/2,
+		 generate_coparable_list/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -38,10 +40,6 @@ gregorian_days_to_binary(Date) ->
 	List = tuple_to_list(GregorianDate), 
 	ListOfStrings = lists:map(fun(Item)-> integer_to_list(Item) end, List),
 	list_to_binary(string:join(ListOfStrings, "-")).
-
-update_database(nasadata, Data) ->
-	% TODO: Implement
-	ok;
 
 update_database(apod, Data) ->
     try jiffy:decode(Data, []) of
@@ -447,4 +445,32 @@ from_string_to_json_apod(Item) ->
 				service_version	=	proplists:get_value(<<"service_version">>, Item),
 				title 			=	proplists:get_value(<<"title">>, Item)
 				}.
+
+find_token_in_string(Heystack, [Needle|ListOfNeedles]) ->
+	case string:find(Heystack, Needle) of
+		nomatch ->
+			find_token_in_string(Heystack, ListOfNeedles);
+		_ ->
+			io:format("Found ~p~n", [Needle]),
+			true
+	end;
+find_token_in_string(_Args, []) -> false.
+
+generate_coparable_list(ListOfBinaries) ->
+	list_of_binaries_to_lower_case_list_of_binaries(ListOfBinaries, []).
+
+list_of_binaries_to_lower_case_list_of_binaries([H|T], Acc) ->
+	list_of_binaries_to_lower_case_list_of_binaries(T, [string:casefold(H)|Acc]);
+	
+list_of_binaries_to_lower_case_list_of_binaries([], Acc) -> Acc.
+
+% find_substring(String, Needles) ->
+% 	find_token_in_list_of_binaries(String, Needles).
+
+% find_token_in_string(Target, [H|T]) ->
+% 	case string:find(H, Target) of 
+% 		nomatch -> find_token_in_string(Target, T);
+% 		_ -> true
+% 	end;
+% find_token_in_string(_Target, []) -> false.
 

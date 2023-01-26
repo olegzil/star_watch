@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-11-01 12:57:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-15 14:00:34
+% @Last Modified time: 2023-01-25 11:40:34
 -module(telemetry_request_handler).
 -behavior(cowboy_handler).
 -export([init/2]).
@@ -73,7 +73,7 @@ fetch_dataset_size(StartDate, EndDate, Request) ->
   Start = utils:date_to_gregorian_days(StartDate),
   End = utils:date_to_gregorian_days(EndDate),
     Response = star_watch_master_sup:attach_child(apod, {Start, End}),
-    {_, Pid} = Response,
+    {_ChildID, {_ChildStartResult, Pid}} = Response,
     if 
       is_pid(Pid) -> 
         case gen_server:call(Pid, {datasetsize}, infinity) of

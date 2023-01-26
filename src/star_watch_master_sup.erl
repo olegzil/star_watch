@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-13 16:45:38
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-17 15:45:45
+% @Last Modified time: 2023-01-25 16:37:24
 
 -module(star_watch_master_sup).
 -behaviour(supervisor).
@@ -17,17 +17,21 @@ init([]) ->
 
 %%%%%%%%%%%%%%%%%%%%% Public functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 attach_child(Child, Args) when Child =:= apod ->
-                    Server = {Child, 
+                    ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
+                    Server = {ChildName, 
                             {database_server, start_link, [Args]}, 
                             temporary, 5000, worker, [database_server]},
+                    Result = child_start_selector(Server),
+                    {ChildName, Result};
 
-                    child_start_selector(Server);
 attach_child(Child, Args) when Child =:= nasageneralapi ->
-                    Server = {Child, 
+                    ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
+                    Server = {ChildName, 
                             {nasa_data_aquisition_server, start_link, [Args]}, 
                             transient, 5000, worker, [nasa_data_aquisition_server]},
+                    Result = child_start_selector(Server),
+                    {ChildName, Result};
 
-                    child_start_selector(Server);
 attach_child(_Child, _Args) ->
     {error, invalid_child_requested}.
 
@@ -35,7 +39,6 @@ attach_child(_Child, _Args) ->
 child_start_selector(Server) -> 
     {ServerID, _, _, _, _, _} =  Server,
     Result = supervisor:start_child(?MODULE, Server),
-    io:format("child_start_selector returned: ~p~n", [Result]),
     case Result of
         {error, already_present} ->
             supervisor:terminate_child(?MODULE, ServerID),

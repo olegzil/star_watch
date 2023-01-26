@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-11 19:18:26
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-19 10:55:20
+% @Last Modified time: 2023-01-25 12:01:09
 -module(celestial_body_handler).
 -behavior(cowboy_handler).
 -include("include/macro_definitions.hrl").
@@ -32,9 +32,8 @@ submit_request_for_processing(_Body, Request) ->
             ObjectList = string:split(binary_to_list(CelestialObject), ",", all),
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
-            io:format("Received: Start=~p  End=~p~n", [Start, End]),
             Response = star_watch_master_sup:attach_child(nasageneralapi, {ObjectList, Start, End}),
-            {_, Pid} = Response,
+            {_ChildID, {_ChildStartResults, Pid}} = Response,
             if 
               is_pid(Pid) -> 
                 case gen_server:call(Pid, {fetchnasadata}, infinity) of

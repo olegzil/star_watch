@@ -4,5 +4,8 @@
 		title,
 		description,
 		url,
+		center,
+		keywords,
+		nasa_id,
 		hdurl
 	}).
