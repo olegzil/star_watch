@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-11 19:37:07
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-23 14:06:08
+% @Last Modified time: 2023-01-27 18:30:48
 -module(nasa_data_aquisition_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -13,16 +13,16 @@ start_link(Args) ->
 stop(Pid) ->
     gen_server:call(Pid, stop).
 
-init({CelestialObject, StartDate, EndDate}) ->
-    {ok, {CelestialObject, StartDate, EndDate}}.
+init({CelestialObject, Page, StartDate, EndDate}) ->
+    {ok, {CelestialObject, Page, StartDate, EndDate}}.
 
 %%% OTP Callbacks
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
 handle_call({fetchnasadata}, _From, State) ->
-	{CelestialObject, YearStart, YearEnd} = State,
-    spawn(?MODULE, async_call, [YearStart, YearEnd, 1, CelestialObject]),
+	{CelestialObject, Page, YearStart, YearEnd} = State,
+    spawn(?MODULE, async_call, [YearStart, YearEnd, Page, CelestialObject]),
     {reply, {ok, <<"success">>}, State};
 
 

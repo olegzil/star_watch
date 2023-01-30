@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-20 11:39:41
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-15 12:32:00
+% @Last Modified time: 2023-01-26 15:45:40
 -module(database_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -28,7 +28,7 @@ handle_call({fetchdata}, _From, State) ->
 
 handle_call({datasetsize}, _From, State) ->
     {Start, End} = State,
-    FetchResult = db_access:get_dataset_size(Start, End),
+    FetchResult = db_access:get_dataset_size(apod, Start, End),
     {reply, FetchResult,  State};
 
 handle_call(_Msg, _From, State) ->

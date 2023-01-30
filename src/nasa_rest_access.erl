@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-12 10:11:59
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-25 16:37:12
+% @Last Modified time: 2023-01-29 20:46:18
 -module(nasa_rest_access).
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
@@ -53,16 +53,23 @@ process_clean_collection_url(CelestialObject, DataList, CollectionUrl, ListTail)
 					% update the db record with this data
 					% Should return a map with keys [<<"center">>,<<"date_created">>,<<"description">>, <<"description_508">>,<<"keywords">>,<<"media_type">>, <<"nasa_id">>,<<"secondary_creator">>,<<"title">>]
 					DataMap = lists:nth(1, DataList), 	 
+					DateDays = case maps:get(<<"date_created">>, DataMap, notfound) of
+						notfound ->
+							{Date, _Unused} = calendar:now_to_datetime(erlang:timestamp()),
+							Date;
+						Date ->
+							utils:date_to_gregorian_days([Date])
+					end,
 					DBItem = #celestial_object_table {
-								key = CelestialObject,
-								date = 			maps:get(<<"date_created">>, DataMap, <<"notfound">>),
+								key = binary_to_atom(list_to_binary(CelestialObject)),
+								date = 			DateDays,
 								title = 		maps:get(<<"title">>, 		 DataMap, <<"notfound">>),
 								description = 	maps:get(<<"description">>,  DataMap, <<"notfound">>),
 								center = 		maps:get(<<"center">>, 		 DataMap, <<"notfound">>),
 								nasa_id = 		maps:get(<<"nasa_id">>, 	 DataMap, <<"notfound">>),
 								keywords = 		maps:get(<<"keywords">>, 	 DataMap, <<"notfound">>),
-								url = ThumbImageUrl,
-								hdurl = LargImageUrl
+								url = util:encode_url(ThumbImageUrl),
+								hdurl = util:encode_url(LargImageUrl)
 								},
 					db_access:update_nasa_table(DBItem),
 					process_data_item(CelestialObject, ListTail);
@@ -97,7 +104,7 @@ process_data_item(_CelestialObject, []) ->
 	io:format("********** process_data_item ZERO LENGTH LIST FOUND~n"),
 	ok.
 
-%%% TODO:CODE return a tuple {notfound, Key, Needles, Heystack} if the offending token has been found.
+%%% TODO:CODE return a tuple {notfound, Key, Needles, Heystack} if the offending token has NOT been found.
 apply_filter(DataList, [H|T]) ->
 	DataMap = lists:nth(1, DataList), 	 
 	Key = atom_to_binary(element(1, H)), 
@@ -143,7 +150,8 @@ filter_based_on_key(Key, Needles, Target) ->
 			false
 	end.
 
-fetch_collection_urls(Url) -> 
+fetch_collection_urls(Arg) ->
+	Url = util:encode_url(Arg), 
 	case httpc:request(Url) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			JsonData = jiffy:decode(Body, []),

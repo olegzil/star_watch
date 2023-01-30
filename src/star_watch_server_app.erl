@@ -18,14 +18,17 @@ start(_Type, _Args) ->
     APODDateConstraints     = {start_date,  [fun validate_date_apod/2]},
     YearStartConstraint = {year_start, [fun validate_year_start/2]},
     YearEndConstraint = {year_end, [fun validate_year_end/2]},
+    CelestialObjectConstraint = {celestial_body, [fun validate_celestial_object_request/2]},
+
         
-    FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
+    FetchCelestialBodyRoute = {"/astronomy/celestialbody/request/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint, CelestialObjectConstraint], nasa_celestial_object_fetch_handler, []},
+    FetchNasaImagesRoute = {"/astronomy/populate/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
     FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, [1]},
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
     TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
+        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, FetchCelestialBodyRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8083}],
@@ -37,6 +40,8 @@ start(_Type, _Args) ->
 
 stop(_State) ->
 	ok.
+validate_celestial_object_request(forward, CelestialObject) ->
+    lists:member(CelestialObject, ?REQUEST_LIST).
 
 validate_year_start(forward, Date) ->
     IntDate = binary_to_integer(Date),

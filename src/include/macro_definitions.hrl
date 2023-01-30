@@ -7,7 +7,7 @@
 							{mars, {keywords, [<<"mars">>]}}, 
 							{jupiter, {keywords,[<<"jupiter">>]}}, 
 							{saturn, {keywords,[<<"saturn">>]}}, 
-							{urnaus, {keywords,[<<"uranus">>]}}, 
+							{uranus, {keywords,[<<"uranus">>]}}, 
 							{neptune, {keywords,[<<"neptune">>]}}, 
 							{pluto, {keywords,[<<"pluto">>]}}, 
 							{europa, {keywords,[<<"europa">>]}}, 
@@ -30,9 +30,9 @@
 							{sun, {keywords,[<<"Solar Dynamics Observatory">>]}}, 
 							{chandra, {keywords,[<<"Chandra X-ray Observatory">>]}} %%% Use keywords="Chandra X-ray Observatory"
 							]). 
--define(CHILD_SPEC_1(CELSESTIALOBJECT, DATESTART, DATEEND), 
+-define(CHILD_SPEC_1(CELSESTIALOBJECT, PAGE, DATESTART, DATEEND), 
 			{serv2, 
-				{nasa_data_aquisition_server, start_link, [CELSESTIALOBJECT, DATESTART,DATEEND]},
+				{nasa_data_aquisition_server, start_link, [CELSESTIALOBJECT, PAGE, DATESTART,DATEEND]},
 				temporary, 1000, worker,[simple_one_for_one]
 			}
         ).
@@ -50,3 +50,32 @@
 						<<"illustration">>,<<"model of">>,<<"operates">>,<<"process of assembly">>,<<"propulsion module">>,<<"short clip">>,<<"supercomputer">>,<<"speakers">>,<<"science instruments">>,<<"laser altimeter">>,
 						<<"altimetry">>,<<"movie">>,<<"movies">>,<<"video">>,<<"3-d">>,<<"3d">>,<<"girl">>,<<"woman">>,<<"women">>,<<"payload">>,<<"payloads">>]}
 	]).
+-define(REQUEST_LIST, [
+			mercury,
+            venus,
+            mars,
+            jupiter,
+            saturn,
+            urnaus,
+            neptune,
+            pluto,
+            europa,
+            ganymede,
+            io,
+            callisto,
+            titan,
+            enceladus,
+            dione,
+            iapetus,
+            mimas,
+            tethys,
+            hyperion,
+            epimetheus,
+            phoebe,
+            rhea,
+            galaxies,
+            galaxy,
+            exoplanet,
+            sun,
+            chandra
+]).

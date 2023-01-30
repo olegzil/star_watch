@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-18 21:19:18
+% @Last Modified time: 2023-01-27 14:27:30
 
 -module(db_access).
 
@@ -9,10 +9,11 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
 -include("include/apod_record_def.hrl").
+-include("include/celestial_object_table.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -export([process_date_request/2, update_nasa_table/1]).
--export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
+-export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/3, get_data_for_date_range/4]).
 
 update_nasa_table(DBItem) -> 
     Fun = 
@@ -21,8 +22,41 @@ update_nasa_table(DBItem) ->
         end,
     mnesia:transaction(Fun). %% execute the transaction
 
+get_data_for_date_range(nasa, CelestialObject, StartDate, EndDate) ->
+    Key = binary_to_atom(CelestialObject),
+    io:format("CelestialObject: ~p~nStatDate: ~p~nEndDate:~p~n", [Key, StartDate, EndDate]),
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#celestial_object_table.key =:= Key,
+                 Record#celestial_object_table.date >= StartDate,
+                 Record#celestial_object_table.date =< EndDate ->
+                Record
+        end),
+    SelectRecords = fun() -> mnesia:select(celestial_object_table, Match) end,
+    {atomic, ListOfRecords} = mnesia:transaction(SelectRecords),
+    case length(ListOfRecords) of 
+        0 -> 
+            Range = io_lib:format("~s -- ~s", [gregorian_days_to_binary(StartDate), gregorian_days_to_binary(EndDate)]),
+            {error, jiffy:encode(
+                #{
+                    key => CelestialObject,
+                    message => <<"no records found">>,
+                    range => list_to_binary(Range)
+                }
+                )};
+        _ ->
+            Json = lists:map(fun(DbItem) ->
+                    #{url => DbItem#celestial_object_table.url,
+                      date => gregorian_days_to_binary(DbItem#celestial_object_table.date),
+                      explanation => DbItem#celestial_object_table.description,
+                      hdurl => DbItem#celestial_object_table.hdurl,
+                      media_type => <<"image">>,
+                      title => DbItem#celestial_object_table.title}                                 
+                      end, ListOfRecords),
+            {ok, jiffy:encode(Json)}
+    end.
 
-get_dataset_size(StartDate, EndDate) ->
+get_dataset_size(apod, StartDate, EndDate) ->
     Match = ets:fun2ms(
         fun(Record) 
             when Record#apodimagetable.date >= StartDate, 
@@ -31,6 +65,22 @@ get_dataset_size(StartDate, EndDate) ->
         end),
 
     SelectRecords = fun() -> mnesia:select(apodimagetable, Match) end,
+    {_, ListOfRecords} = mnesia:transaction(SelectRecords),
+    {
+        ok, jiffy:encode(
+                #{size => length(ListOfRecords)}
+            )
+    };
+
+get_dataset_size(nasadata, StartDate, EndDate) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#celestial_object_table.date >= StartDate, 
+                 Record#celestial_object_table.date =< EndDate ->
+                Record
+        end),
+
+    SelectRecords = fun() -> mnesia:select(celestial_object_table, Match) end,
     {_, ListOfRecords} = mnesia:transaction(SelectRecords),
     {
         ok, jiffy:encode(

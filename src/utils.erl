@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-25 12:24:34
+% @Last Modified time: 2023-01-29 20:51:07
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -16,24 +16,44 @@
 		 insert_apod_entries/1, 
 		 update_database/2,
 		 find_token_in_string/2,
-		 generate_coparable_list/1]).
+		 generate_coparable_list/1,
+		 convert_date_to_integer/0,
+		 encode_url/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
 -include("include/apod_record_def.hrl").
 -include("include/macro_definitions.hrl").
+-include("include/celestial_object_table.hrl").
 -include("src/include/registration_query.hrl").
 
-date_to_gregorian_days(<<A,B,C,D,E,F,G,H,I,J>>) ->
-	Date = <<A,B,C,D,E,F,G,H,I,J>>,
-    DateTuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "-", all))),
-    calendar:date_to_gregorian_days(DateTuple);
+%%% DateString -- <<"2018-11-26T00:00:00Z">>
+%%% 1. Use string:split to create a list of strings/binaries
+%%% 2. Use string:split again to separate the time string from the letter 'T' and generate [Day, Time]
+%%% 3. Generate a Date tuple
+%%% 4. Finally call date_to_gregorain_days to get an integer representing the time span in days
+date_to_gregorian_days([DateString]) ->
+	[Year, Month, DateTime] = string:split(DateString, "-", all),
+	[Day, _Time] = string:split(DateTime, "T"),
+	Date = {binary_to_integer(Year), binary_to_integer(Month), binary_to_integer(Day)},
+	calendar:date_to_gregorian_days(Date);
 
-date_to_gregorian_days(<<A,B,C,D>>) ->
-	Date = <<A,B,C,D>>,
-    Tuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "", all))),
-    DateTuple = erlang:insert_element(2,erlang:insert_element(2, Tuple, 1), 1),
-    calendar:date_to_gregorian_days(DateTuple).
+
+date_to_gregorian_days(DateString) ->
+	[Year, Month, Day] = string:split(DateString, "-", all),
+	Date = {binary_to_integer(Year), binary_to_integer(Month), binary_to_integer(Day)},
+	calendar:date_to_gregorian_days(Date).
+
+% date_to_gregorian_days(<<A,B,C,D,E,F,G,H,I,J>>) ->
+% 	Date = <<A,B,C,D,E,F,G,H,I,J>>,
+%     DateTuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "-", all))),
+%     calendar:date_to_gregorian_days(DateTuple);
+
+% date_to_gregorian_days(<<A,B,C,D>>) ->
+% 	Date = <<A,B,C,D>>,
+%     Tuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "", all))),
+%     DateTuple = erlang:insert_element(2,erlang:insert_element(2, Tuple, 1), 1),
+%     calendar:date_to_gregorian_days(DateTuple).
 
 gregorian_days_to_binary(Date) ->
 	GregorianDate = calendar:gregorian_days_to_date(Date),
@@ -464,13 +484,29 @@ list_of_binaries_to_lower_case_list_of_binaries([H|T], Acc) ->
 	
 list_of_binaries_to_lower_case_list_of_binaries([], Acc) -> Acc.
 
-% find_substring(String, Needles) ->
-% 	find_token_in_list_of_binaries(String, Needles).
+convert_date_to_integer() ->
+    Match = ets:fun2ms(
+        fun(Record) when is_binary(Record#celestial_object_table.date) ->
+        	Record
+        end),
+   case mnesia:transaction(fun() -> mnesia:select(celestial_object_table, Match) end) of
+    	{atomic, [Record]} -> 
+             UpdateRecord = fun() -> 
+	        		mnesia:write(Record#celestial_object_table{date = utils:date_to_gregorian_days([Record#celestial_object_table.date])})
+	   		 end,
+	   		 mnesia:transaction(UpdateRecord);
+       	{atomic, []} -> ok
+    end.
 
-% find_token_in_string(Target, [H|T]) ->
-% 	case string:find(H, Target) of 
-% 		nomatch -> find_token_in_string(Target, T);
-% 		_ -> true
-% 	end;
-% find_token_in_string(_Target, []) -> false.
-
+encode_url(Url) ->
+	[Head|Tail] = string:split(Url, " "),
+	case Tail of
+		[] ->
+			Url;
+		_ ->
+			A = Head,
+			[B] = Tail,
+			Space = <<" ">>,
+			Remainder = <<Space/binary, B/binary>>,
+			string:concat(binary_to_list(A),  uri_string:quote(binary_to_list(Remainder)))
+	end.
