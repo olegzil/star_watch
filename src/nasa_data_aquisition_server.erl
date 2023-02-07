@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-11 19:37:07
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-27 18:30:48
+% @Last Modified time: 2023-02-05 18:45:10
 -module(nasa_data_aquisition_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).

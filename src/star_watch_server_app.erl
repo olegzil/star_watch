@@ -19,16 +19,17 @@ start(_Type, _Args) ->
     YearStartConstraint = {year_start, [fun validate_year_start/2]},
     YearEndConstraint = {year_end, [fun validate_year_end/2]},
     CelestialObjectConstraint = {celestial_body, [fun validate_celestial_object_request/2]},
-
+    ControlKeyConstraints = {api_key, [fun validate_server_control_key/2]},
         
     FetchCelestialBodyRoute = {"/astronomy/celestialbody/request/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint, CelestialObjectConstraint], nasa_celestial_object_fetch_handler, []},
-    FetchNasaImagesRoute = {"/astronomy/populate/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
+    FetchNasaImagesRoute = {"/astronomy/populate/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], nasa_celestial_object_db_populate_handler, []},
     FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, [1]},
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
     TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
+    ServerControlRout = {"/control/[...]", [ControlKeyConstraints], server_control_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, FetchCelestialBodyRoute, CatchAllRoute]}
+        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, FetchCelestialBodyRoute, ServerControlRout, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8083}],
@@ -50,7 +51,7 @@ validate_year_start(forward, Date) ->
 validate_year_end(forward, Date) ->
     IntDate = binary_to_integer(Date),
     {ok, IntDate}.
-    
+
 validate_date_apod(forward, Date) ->
     DateLength = length(string:split(Date, "-", all)),
     if is_binary(Date) =:= false -> {error, bad_start_date};
@@ -58,11 +59,15 @@ validate_date_apod(forward, Date) ->
        true                      -> {ok, Date}
     end.
 
-
 validate_access_key(forward, Value) when Value =:= ?API_KEY ->
     {ok, Value};
 validate_access_key(forward, _) ->
     {error, bad_api_key}.
+
+validate_server_control_key(forward, Key) when Key =:= ?SERVER_CONTROL_KEY ->
+    {ok, Key};
+validate_server_control_key(forward, _) ->
+    {error, bad_server_contro_key}.
 
 initialize_mnesia() -> 
     mnesia:stop(),

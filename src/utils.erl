@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-29 20:51:07
+% @Last Modified time: 2023-02-05 20:30:55
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -15,8 +15,8 @@
 		 update_db_from_json_file/1,
 		 insert_apod_entries/1, 
 		 update_database/2,
-		 find_token_in_string/2,
-		 generate_coparable_list/1,
+		 find_token_in_string/3,
+		 generate_comparable_list/1,
 		 convert_date_to_integer/0,
 		 encode_url/1]).
 
@@ -466,21 +466,27 @@ from_string_to_json_apod(Item) ->
 				title 			=	proplists:get_value(<<"title">>, Item)
 				}.
 
-find_token_in_string(Heystack, [Needle|ListOfNeedles]) ->
+find_token_in_string(stringsearch, Heystack, [Needle|ListOfNeedles]) ->
 	case string:find(Heystack, Needle) of
 		nomatch ->
-			find_token_in_string(Heystack, ListOfNeedles);
+			find_token_in_string(stringsearch, Heystack, ListOfNeedles);
 		_ ->
 			io:format("Found ~p~n", [Needle]),
 			true
 	end;
-find_token_in_string(_Args, []) -> false.
+find_token_in_string(stringsearch, _Args, []) -> false;
 
-generate_coparable_list(ListOfBinaries) ->
+find_token_in_string(listsearch, Target, Needles) ->
+	lists:member(string:lowercase(Target), Needles);
+
+find_token_in_string(listsearch2, Target, Needles) ->
+	lists:member(string:lowercase(Target), Needles).
+
+generate_comparable_list(ListOfBinaries) ->
 	list_of_binaries_to_lower_case_list_of_binaries(ListOfBinaries, []).
 
 list_of_binaries_to_lower_case_list_of_binaries([H|T], Acc) ->
-	list_of_binaries_to_lower_case_list_of_binaries(T, [string:casefold(H)|Acc]);
+	list_of_binaries_to_lower_case_list_of_binaries(T, [string:lowercase(H)|Acc]);
 	
 list_of_binaries_to_lower_case_list_of_binaries([], Acc) -> Acc.
 
@@ -508,5 +514,5 @@ encode_url(Url) ->
 			[B] = Tail,
 			Space = <<" ">>,
 			Remainder = <<Space/binary, B/binary>>,
-			string:concat(binary_to_list(A),  uri_string:quote(binary_to_list(Remainder)))
+			list_to_binary(string:concat(binary_to_list(A),  uri_string:quote(binary_to_list(Remainder))))
 	end.

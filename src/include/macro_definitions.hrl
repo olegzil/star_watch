@@ -1,6 +1,7 @@
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
 -define(APOD_HOST, "https://api.nasa.gov/planetary/apod?").
 -define(API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
+-define(SERVER_CONTROL_KEY, "998b622c-a693-11ed-afa1-0242ac120002").
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 
 							{venus, {keywords, [<<"venus">>]}}, 
@@ -28,27 +29,65 @@
 							{galaxy, {keywords,[<<"galaxy">>]}},
 							{exoplanet, {keywords,[<<"exoplanet">>]}},
 							{sun, {keywords,[<<"Solar Dynamics Observatory">>]}}, 
+							{blackhole, {keywords, [<<"black hole">>]}},
 							{chandra, {keywords,[<<"Chandra X-ray Observatory">>]}} %%% Use keywords="Chandra X-ray Observatory"
 							]). 
--define(CHILD_SPEC_1(CELSESTIALOBJECT, PAGE, DATESTART, DATEEND), 
-			{serv2, 
-				{nasa_data_aquisition_server, start_link, [CELSESTIALOBJECT, PAGE, DATESTART,DATEEND]},
-				temporary, 1000, worker,[simple_one_for_one]
-			}
-        ).
-
 %%% A list of tuples. The first member is the Json tag to retrieve. The second member is a list of tuples that marks the json entry as unusable.
 -define(EXCLUTION_LIST, [ 
-		{title, [<<"animation">>, <<"venus transit">>]},
+		{title, [<<"animation">>, <<"venus transit">>, <<"movie">>]},
 		{center, [<<"arc">>, <<"hq">>, <<"ksc">>, <<"msfc">>, <<"jrc">> ,<<"grc">>, <<"jsc">>, <<"ssc">>]},
 		{keywords, [<<"engage series">>, <<"president">>, <<"humans in space">>, <<"international space station">>, <<"pressconference">>]},
-		{nasa_id, [<<"pia11404">>,<<"pia11219">>,<<"pia14083">>,<<"pia14079">>,	<<"pia17385">>,<<"pia12083">>,<<"pia14279">>,<<"pia12366">>,<<"pia12278">>,<<"pia11078">>,<<"pia10396">>,<<"pia10395">>,
-					<<"pia14358">>,<<"pia11414">>,<<"pia16866">>,<<"pia11372">>,<<"pia11959">>,<<"pia14078">>,<<"pia12364">>,<<"pia14078">>,<<"pia14078">>,<<"pia12213">>,<<"pia10189">>,<<"pia10380">>,
-					<<"pia03101">>,<<"pia11076">>,<<"pia16951">>,<<"pia12369">>,<<"pia16525">>,<<"pia16539">>,<<"pia16823">>,<<"pia13188">>,<<"pia13188">>]},
-				{description, [<<"northrop">>,<<"anniversary">>,<<"award">>,<<"administrator">>,<<"aboard the rocket">>,<<"animation">>,<<"begins assembly">>,<<"building">>,<<"chair of">>,<<"control room">>,
+		{nasa_id, [<<"PIA23306">>, <<"PIA23305">>, <<"PIA24046">>,<<"PIA24045">>,<<"PIA24044">>,<<"PIA24093">>,<<"PIA24049">>,<<"PIA24491">>,<<"PIA24812">>,<<"PIA25073">>,<<"PIA25050">>,<<"PIA25048">>,
+					<<"PIA05053">>, <<"PIA05018">>, <<"PIA05016">>, <<"PIA05017">>, 
+					<<"PIA13235">>, <<"PIA13231">>, <<"PIA13017">>, <<"PIA13018">>, <<"PIA13019">>, <<"PIA12352">>, <<"PIA11422">>, <<"PIA11233">>, <<"PIA11232">>, <<"PIA04142">>, <<"PIA04143">>, <<"PIA04144">>, 
+					<<"PIA23162">>, <<"PIA23156">>, <<"PIA23162">>, <<"PIA23155">>, <<"PIA23156">>, <<"PIA23158">>, <<"PIA22319">>, <<"PIA22342">>, <<"ED15-0193-097">>, <<"ED15-0193-069">>, <<"PIA13359">>, 
+					<<"PIA23463">>, <<"PIA11404">>,<<"PIA11219">>,<<"PIA14083">>,<<"PIA14079">>,	<<"PIA17385">>,<<"PIA12083">>,<<"PIA14279">>,<<"PIA12366">>,<<"PIA12278">>,<<"PIA11078">>,<<"PIA10396">>,<<"PIA10395">>,
+					<<"PIA23464">>, <<"PIA14358">>,<<"PIA11414">>,<<"PIA16866">>,<<"PIA11372">>,<<"PIA11959">>,<<"PIA14078">>,<<"PIA12364">>,<<"PIA14078">>,<<"PIA14078">>,<<"PIA12213">>,<<"PIA10189">>,<<"PIA10380">>,
+					<<"PIA03101">>,<<"PIA11076">>,<<"PIA16951">>,<<"PIA12369">>,<<"PIA16525">>,<<"PIA16539">>,<<"PIA16823">>,<<"PIA13188">>,<<"PIA13188">>, <<"PIA04827">>,<<"PIA04830">>, <<"PIA04823">>,
+					<<"PIA04825">>, <<"PIA04835">>, <<"PIA04822">>, <<"PIA04834">>, <<"PIA04821">>, <<"PIA04820">>, <<"PIA04826">>, <<"PIA04828">>, <<"PIA04829">>, <<"PIA04833">>, <<"PIA04832">>, 
+					<<"PIA04851">>, <<"PIA04854">>, <<"PIA04848">>,<<"PIA04853">>, <<"PIA04849">>, <<"PIA04852">>, <<"PIA04850">>, <<"PIA04988">>,<<"PIA05034">>, <<"PIA05042">>, <<"PIA05145">>, <<"PIA05156">>, 
+					<<"PIA05187">>, <<"PIA05197">>, <<"PIA05195">>, <<"PIA05196">>, <<"PIA05221">>, <<"PIA05270">>, <<"PIA05488">>, <<"PIA05839">>, <<"PIA05840">>,<<"PIA13806">>, <<"PIA13805">>, <<"PIA13808">>, <<"PIA13980">>,
+					<<"PIA23316">>, <<"PIA23315">>, <<"PIA23317">>, <<"PIA23275">>, <<"PIA07207">>, <<"PIA07208">>, <<"PIA07209">>, <<"PIA07206">>, <<"PIA07211">>, <<"PIA07214">>,<<"PIA03524">>, <<"PIA03523">>, <<"PIA03522">>, <<"PIA03525">>,
+					<<"PIA2306">>, <<"PIA10017">>, <<"PIA10015">>, <<"PIA10013">>, <<"PIA10208">>,<<"PIA11426">>, <<"PIA11437">>, <<"PIA11808">>, <<"PIA11425">>, <<"PIA11438">>, <<"PIA11436">>, <<"PIA11431">>, 
+					<<"PIA23264">>, <<"PIA11428">>, <<"PIA11440">>, <<"PIA11427">>, <<"PIA11430">>, <<"PIA13360">>, <<"PIA13383">>, <<"PIA13384">>, <<"PIA13398">>, <<"PIA13397">>, <<"PIA13463">>, <<"PIA13580">>, 
+					<<"PIA23263">>, <<"PIA11439">>, <<"PIA11994">>, <<"PIA11995">>,<<"PIA12117">>,<<"PIA14254">>, <<"PIA14257">>, <<"PIA14252">>, <<"PIA14258">>, <<"PIA14308">>, <<"PIA14309">>, <<"PIA14758">>,
+					<<"PIA13032">>, <<"PIA13230">>, <<"PIA13306">>, <<"PIA13352">>, <<"PIA14128">>, <<"PIA14127">>, <<"PIA14256">>, <<"PIA14253">>, <<"PIA15022">>, <<"PIA15021">>, <<"PIA15020">>, 
+					<<"PIA15028">>, <<"PIA15026">>, <<"PIA15027">>, <<"PIA15023">>, <<"PIA15106">>, <<"PIA15285">>, <<"PIA15682">>, <<"PIA15683">>, <<"PIA16055">>, <<"PIA16088">>, <<"PIA16100">>,
+					<<"LRC-2013-00666">>, <<"LRC-2013-00665">>, <<"LRC-2013-00664">>, <<"LRC-2013-00663">>, <<"LRC-2013-00662">>, <<"LRC-2013-00667">>, <<"PIA17952">>, <<"PIA18858">>, <<"PIA18859">>, <<"PIA18860">>,  
+					<<"PIA18865">>, <<"PIA18863">>,<<"PIA19089">>, <<"PIA19086">>,<<"PIA20331">>, <<"PIA20600">>, <<"PIA20029">>, <<"PIA20761">>, <<"PIA20848">>, <<"PIA21138">>, <<"PIA21500">>,
+					<<"AFRC2017-0020-1">>, <<"AFRC2016-0246-142">>, <<"AFRC2019-0261-094">>, <<"MAF_20221027_CS3_IT_lifttoG-epb_011">>, <<"MAF_20221027_CS3_IT_lifttoG-epb_002">>, 
+					<<"MAF_20221027_CS3_IT_lifttoG-epb_012">>, <<"MAF_20221027_CS3_IT_lifttoG-epb_005">>,<<"MAF_20221027_CS3_IT_lifttoG-epb_008">>, <<"AFRC2017-0048-11">>, <<"AFRC2017-0048-32">>,
+					<<"AFRC2017-0048-30">>,<<"AFRC2017-0048-22">>,<<"AFRC2020-0063-15">>, <<"AFRC2020-0063-06">>, <<"MAF_20201029_ZetaResponse_014">>, <<"MAF_20201029_ZetaResponse_011">>, 
+					<<"MAF_20201029_ZetaResponse_012">>, <<"MAF_20221027_CS3_IT_lifttoG-epb_004(1)">>, <<"PIA22062">>, 
+					<<"PIA22103">>,<<"PIA23590">>, <<"PIA23620">>,<<"PIA23591">>, <<"PIA23592">>, <<"PIA23621">>, <<"PIA23763">>, <<"PIA23761">>, <<"PIA23769">>, 
+					<<"PIA23770">>, <<"PIA23821">>, <<"PIA23823">>, <<"PIA23824">>, <<"PIA23773">>, <<"PIA23828">>, <<"PIA23826">>, <<"PIA23829">>, <<"PIA23830">>, <<"PIA23780">>, <<"PIA23885">>, 
+					<<"PIA23888">>, <<"PIA23890">>, <<"PIA23916">>, <<"PIA23889">>, <<"PIA23917">>, <<"PIA23918">>, <<"PIA23920">>, <<"PIA23922">>, <<"PIA23921">>, <<"PIA23923">>, <<"PIA23925">>, 
+					<<"PIA23924">>,<<"PIA24193">>, <<"PIA24191">>, <<"PIA24192">>, <<"PIA24194">>, <<"PIA24203">>, <<"PIA24197">>, <<"PIA24198">>, <<"PIA24199">>, <<"PIA24196">>, <<"PIA24968">>, 
+					<<"PIA24205">>, <<"PIA24208">>, <<"PIA24207">>, <<"PIA24164">>, <<"PIA24166">>, <<"PIA24267">>, <<"PIA24585">>, <<"PIA24499">>, <<"PIA24597">>, <<"PIA24591">>, <<"PIA24667">>, 
+					<<"PIA24668">>, <<"PIA24832">>, <<"PIA24932">>, <<"PIA24528">>, <<"PIA24527">>, <<"PIA24766">>,<<"PIA23724">>, <<"PIA23722">>, <<"PIA23723">>, <<"PIA25677">>,<<"PIA25676">>, 
+					<<"PIA25067">>, <<"PIA25066">>, <<"PIA25637">>, <<"PIA25442">>, <<"PIA25443">>, <<"PIA25328">>, <<"PIA25590">>, <<"PIA25636">>, <<"PIA25638">>, <<"PIA25653">>, <<"EC02-0072-11">>, 
+					<<"EC02-0072-20">>, <<"ED15-0187-390">>, <<"PIA04265">>,<<"GSFC_20171208_ARCHIVE_E0021">>, <<"PIA11117">>,
+					<<"MAF_20210208_Orion_ArtIII_TtoFB_006">>,<<"MAF_20210208_Orion_ArtIII_TtoFB_002">>,<<"MAF_20210208_Orion_ArtIII_TtoFB_004">>,<<"MAF_20210208_Orion_ArtIII_TtoFB_005">>,
+					<<"MAF_20210209_Orion_ArtIII_TtoFB_011">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_013">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_026">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_008">>,
+					<<"MAF_20210209_Orion_ArtIII_TtoFB_014">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_015">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_016">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_017">>,
+					<<"MAF_20210209_Orion_ArtIII_TtoFB_018">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_019">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_021">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_024">>,
+					<<"MAF_20210209_Orion_ArtIII_TtoFB_028">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_020">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_022">>,<<"MAF_20210209_Orion_ArtIII_TtoFB_025">>,
+					<<"MAF_20210209_Orion_ArtIII_TtoFB_027">>,<<"MAF_20220118_CS3_LH2_303to451_061">>,<<"MAF_20220118_CS3_LH2_303to451_279">>,<<"MAF_20220118_CS3_LH2_303to451_350">>,
+					<<"MAF_20220118_CS3_LH2_303to451_709">>,<<"MAF_20220118_CS3_LH2_303to451_240">>,<<"MAF_20220118_CS3_LH2_303to451_301">>,<<"MAF_20220118_CS3_LH2_303to451_435">>,
+					<<"MAF_20220118_CS3_LH2_303to451_495">>,<<"MAF_20220118_CS3_LH2_303to451_608">>,<<"MAF_20220118_CS3_LH2_303to451_403">>,<<"MAF_20220118_CS3_LH2_303to451_587">>,
+					<<"MAF_20220118_CS3_LH2_303to451_637">>,<<"MAF_20220118_CS3_LH2_303to451_773">>,<<"MAF_20220127_CS3_LH2ProofAft12">>,<<"MAF_20220127_CS3_LH2ProofAft04">>,
+					<<"MAF_20220127_CS3_LH2ProofAft01">>,<<"MAF_20220127_CS3_LH2ProofAft03">>,<<"MAF_20220127_CS3_LH2ProofAft07">>,<<"MAF_20220210_CS3_LoxAftBarrel10">>,
+					<<"MAF_20220210_CS3_LoxAftBarrel12">>,<<"MAF_20220210_CS3_LoxAftBarrel05">>,<<"MAF_20220210_CS3_LoxAftBarrel08">>,<<"MAF_20220210_CS3_LoxAftBarrel15">>,
+					<<"MAF_20220210_CS3_LoxAftBarrel16">>,<<"MAF_20220916_CS4_FwdSkirtVWC04">>,<<"MAF_20220916_CS4_FwdSkirtVWC09">>,<<"MAF_20220916_CS4_FwdSkirtVWC06">>,<<"MAF_20220916_CS4_FwdSkirtVWC02">>,
+					<<"MAF_20221027_CS3_IT_lifttoG-epb_011">>,<<"MAF_20221027_CS3_IT_lifttoG-epb_002">>,<<"MAF_20221027_CS3_IT_lifttoG-epb_012">>,<<"MAF_20221027_CS3_IT_lifttoG-epb_005">>,
+					<<"MAF_20221027_CS3_IT_lifttoG-epb_004(1)">>,<<"MAF_20221027_CS3_IT_lifttoG-epb_008">>, <<"MAF_20221027_CS3_IT_lifttoG-epb_011">>
+]},
+				{description, [
+						<<"being tested">>, <<"group photo">>,
+						<<"northrop">>,<<"anniversary">>,<<"award">>,<<"administrator">>,<<"aboard the rocket">>,<<"animation">>,<<"begins assembly">>,<<"building">>,<<"chair of">>,<<"control room">>,
 						<<"cleanroom">>,<<"clean room">>,<<"engineers">>,<<"engineer">>,<<"employees">>,<<"enjoying">>,<<"fabricated">>,<<"goddard space flight center">>,<<"graphic">>,<<"hubble opperations">>,
 						<<"illustration">>,<<"model of">>,<<"operates">>,<<"process of assembly">>,<<"propulsion module">>,<<"short clip">>,<<"supercomputer">>,<<"speakers">>,<<"science instruments">>,<<"laser altimeter">>,
-						<<"altimetry">>,<<"movie">>,<<"movies">>,<<"video">>,<<"3-d">>,<<"3d">>,<<"girl">>,<<"woman">>,<<"women">>,<<"payload">>,<<"payloads">>]}
+						<<"altimetry">>,<<"movie">>,<<"movies">>,<<"video">>,<<"3-d">>,<<"3d">>,<<"girl">>,<<"woman">>,<<"women">>,<<"payload">>,<<"payloads">>,<<"scientists">>, <<"processing facility">>]}
 	]).
 -define(REQUEST_LIST, [
 			mercury,

@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-27 14:27:30
+% @Last Modified time: 2023-02-03 15:48:01
 
 -module(db_access).
 
@@ -27,9 +27,7 @@ get_data_for_date_range(nasa, CelestialObject, StartDate, EndDate) ->
     io:format("CelestialObject: ~p~nStatDate: ~p~nEndDate:~p~n", [Key, StartDate, EndDate]),
     Match = ets:fun2ms(
         fun(Record) 
-            when Record#celestial_object_table.key =:= Key,
-                 Record#celestial_object_table.date >= StartDate,
-                 Record#celestial_object_table.date =< EndDate ->
+            when Record#celestial_object_table.key =:= Key ->
                 Record
         end),
     SelectRecords = fun() -> mnesia:select(celestial_object_table, Match) end,
@@ -51,6 +49,7 @@ get_data_for_date_range(nasa, CelestialObject, StartDate, EndDate) ->
                       explanation => DbItem#celestial_object_table.description,
                       hdurl => DbItem#celestial_object_table.hdurl,
                       media_type => <<"image">>,
+                      nasa_id => DbItem#celestial_object_table.nasa_id,
                       title => DbItem#celestial_object_table.title}                                 
                       end, ListOfRecords),
             {ok, jiffy:encode(Json)}

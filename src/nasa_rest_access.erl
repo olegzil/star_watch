@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-12 10:11:59
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-29 20:46:18
+% @Last Modified time: 2023-02-05 20:31:40
 -module(nasa_rest_access).
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
@@ -11,12 +11,13 @@
 fetch_root_page(Subject, GregorianStartDays, GregorianEndDays, Page) ->
     io:format("fetch_root_page:Page = ~p~n", [Page]),
 
-	CelestialObject = string:casefold(Subject),
+	CelestialObject = string:lowercase(Subject),
 	{StartYear, _StartMonth, _StartDay} = calendar:gregorian_days_to_date(GregorianStartDays), 
 	{EndYear, _EndMonth, _EndDay} = calendar:gregorian_days_to_date(GregorianEndDays),
 	Past = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p",[StartYear]))),
 	Future = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p",[EndYear]))),
 	TargetTuple = lists:keyfind(list_to_atom(CelestialObject), 1, ?CELESTIAL_OBJECTS),
+	io:format("TargetTuple: ~p~n", [TargetTuple]),
 	SearchTarget = atom_to_list(element(1, TargetTuple)),
 	ActionPair = element(2, TargetTuple),
 	Verb = atom_to_list(element(1, ActionPair)), 
@@ -68,8 +69,8 @@ process_clean_collection_url(CelestialObject, DataList, CollectionUrl, ListTail)
 								center = 		maps:get(<<"center">>, 		 DataMap, <<"notfound">>),
 								nasa_id = 		maps:get(<<"nasa_id">>, 	 DataMap, <<"notfound">>),
 								keywords = 		maps:get(<<"keywords">>, 	 DataMap, <<"notfound">>),
-								url = util:encode_url(ThumbImageUrl),
-								hdurl = util:encode_url(LargImageUrl)
+								url = utils:encode_url(ThumbImageUrl),
+								hdurl = utils:encode_url(LargImageUrl)
 								},
 					db_access:update_nasa_table(DBItem),
 					process_data_item(CelestialObject, ListTail);
@@ -108,7 +109,7 @@ process_data_item(_CelestialObject, []) ->
 apply_filter(DataList, [H|T]) ->
 	DataMap = lists:nth(1, DataList), 	 
 	Key = atom_to_binary(element(1, H)), 
-	Needles = utils:generate_coparable_list(element(2, H)), %% Retrieve the needles to look for in the heystack and make sure they're lower case
+	Needles = utils:generate_comparable_list(element(2, H)), %% Retrieve the needles to look for in the heystack and make sure they're lower case
 	Heystack = maps:get(Key, DataMap, notfound),
 	case Heystack of
 		notfound -> 
@@ -128,22 +129,24 @@ apply_filter(_DataList, []) -> false.
 filter_based_on_key(Key, Needles, Target) ->
 	case Key of
 		<<"center">> ->
-			Result = lists:member(string:casefold(Target), Needles),
+			String = string:lowercase(Target),
+			Result = utils:find_token_in_string(listsearch, String, Needles),
 			Result;
 		<<"description">> ->
 			NormalizedStr = binary_to_list(Target),
 			Heystack = [Char || Char <- NormalizedStr, Char > 31, Char < 127], %% only ascii
-			Result = utils:find_token_in_string(Heystack, Needles),
+			Result = utils:find_token_in_string(stringsearch, Heystack, Needles),
 			Result;
 		<<"keywords">> ->
-			NormalizedList = utils:generate_coparable_list(Target),
+			NormalizedList = utils:generate_comparable_list(Target),
 			Result = [] =/= [LHS || LHS <- NormalizedList, RHS <- Needles, LHS =:= RHS],
 			Result;
 		<<"nasa_id">> ->
-			lists:member(Target, Needles);
+			Result = utils:find_token_in_string(listsearch2, Target, Needles),
+			Result;
 		<<"title">> ->
-			String = string:casefold(Target),
-			Result = utils:find_token_in_string(String, Needles),
+			String = string:lowercase(Target),
+			Result = utils:find_token_in_string(stringsearch, String, Needles),
 			Result;
 		_ ->
 			io:format("Invalid search: ~p~n", [Key]),
@@ -151,7 +154,7 @@ filter_based_on_key(Key, Needles, Target) ->
 	end.
 
 fetch_collection_urls(Arg) ->
-	Url = util:encode_url(Arg), 
+	Url = utils:encode_url(Arg), 
 	case httpc:request(Url) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			JsonData = jiffy:decode(Body, []),
@@ -169,8 +172,8 @@ extract_image_url(start, Target, JsonListData) ->
 	extract_image_url(loop, Target, JsonListData);
 
 extract_image_url(loop, Target, [Item|T]) ->
-	NormalizedUrl = string:casefold(Item),
-	NormalizedTarget = string:casefold(Target),
+	NormalizedUrl = string:lowercase(Item),
+	NormalizedTarget = string:lowercase(Target),
 	MP4Heystack = binary:match(NormalizedUrl, <<".mp4">>), % Does the list contain vidio files?
 	case MP4Heystack =:= nomatch of % No video files in the list, proceed with standard search
 		true ->
