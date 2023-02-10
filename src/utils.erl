@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-05 20:30:55
+% @Last Modified time: 2023-02-09 13:49:11
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -471,16 +471,22 @@ find_token_in_string(stringsearch, Heystack, [Needle|ListOfNeedles]) ->
 		nomatch ->
 			find_token_in_string(stringsearch, Heystack, ListOfNeedles);
 		_ ->
-			io:format("Found ~p~n", [Needle]),
 			true
 	end;
 find_token_in_string(stringsearch, _Args, []) -> false;
 
 find_token_in_string(listsearch, Target, Needles) ->
-	lists:member(string:lowercase(Target), Needles);
+	lists:member(string:lowercase(Target), string:lowercase(Needles));
 
-find_token_in_string(listsearch2, Target, Needles) ->
-	lists:member(string:lowercase(Target), Needles).
+find_token_in_string(pia, Target, Needles) ->
+	Result = lists:member(Target, Needles),
+	if
+		Result =:= true ->
+			io:format("Found: ~p --> ~p~n", [Target, Result]);
+		true -> true
+	end,
+	Result.
+
 
 generate_comparable_list(ListOfBinaries) ->
 	list_of_binaries_to_lower_case_list_of_binaries(ListOfBinaries, []).

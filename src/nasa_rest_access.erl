@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-12 10:11:59
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-05 20:31:40
+% @Last Modified time: 2023-02-09 13:50:18
 -module(nasa_rest_access).
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
@@ -142,7 +142,7 @@ filter_based_on_key(Key, Needles, Target) ->
 			Result = [] =/= [LHS || LHS <- NormalizedList, RHS <- Needles, LHS =:= RHS],
 			Result;
 		<<"nasa_id">> ->
-			Result = utils:find_token_in_string(listsearch2, Target, Needles),
+			Result = utils:find_token_in_string(pia, Target, Needles),
 			Result;
 		<<"title">> ->
 			String = string:lowercase(Target),
