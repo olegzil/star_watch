@@ -14,18 +14,20 @@ start(_Type, _Args) ->
     % ppool_supersup:start_link(),  %% Start the pool manager
     % ppool:start_pool(database_server, 10, {database_server, start_link, []}), %% Create a pool of db workers
     
+    YoutubeApiConstraints  = {api_key, [fun validate_youtube_api_key/2]},
     ApiKeyConstraints   = { api_key,    [fun validate_access_key/2] },
     APODDateConstraints     = {start_date,  [fun validate_date_apod/2]},
     YearStartConstraint = {year_start, [fun validate_year_start/2]},
     YearEndConstraint = {year_end, [fun validate_year_end/2]},
         
+    FetchYoutubeChanneRoute = {"/youtube/channelselector/[...]", [YoutubeApiConstraints], youtube_channel_handler, []},
     FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
     FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, [1]},
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
     TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
+        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute, FetchYoutubeChanneRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8083}],
@@ -37,6 +39,11 @@ start(_Type, _Args) ->
 
 stop(_State) ->
 	ok.
+
+validate_youtube_api_key(forward, Value) when Value =:= ?YOUTUBE_API_KEY ->
+    {ok, Value};
+validate_youtube_api_key(forward, _) ->
+    {error, bad_youtube_api_key}.
 
 validate_year_start(forward, Date) ->
     IntDate = binary_to_integer(Date),
@@ -54,7 +61,7 @@ validate_date_apod(forward, Date) ->
     end.
 
 
-validate_access_key(forward, Value) when Value =:= ?API_KEY ->
+validate_access_key(forward, Value) when Value =:= ?ASTRONOMY_API_KEY ->
     {ok, Value};
 validate_access_key(forward, _) ->
     {error, bad_api_key}.
@@ -66,7 +73,8 @@ initialize_mnesia() ->
     init_table(apodimagetable),
     init_table(apodtelemetry),
     init_table(celestial_object_table),
-    mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table], 5000).
+    init_table(youtube_channel),
+    mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel], 5000).
 
 init_table(TableName) ->
     case mnesia:table_info(TableName, size) of

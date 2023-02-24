@@ -1,19 +1,17 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-25 12:24:34
+% @Last Modified time: 2023-02-23 17:52:25
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
-		 fetch_apod_data/3, 
-		 fetch_data/1,
 		 current_time_string/0,
-		 start_cron_job/0,
+		 start_cron_job/1,
 		 time_pair_to_fetch/2,
 		 update_client_record/1, 
 		 process_file_list/2,
 		 update_db_from_json_file/1,
-		 insert_apod_entries/1, 
+		 insert_db_entries/1, 
 		 update_database/2,
 		 find_token_in_string/2,
 		 generate_coparable_list/1]).
@@ -45,63 +43,23 @@ update_database(apod, Data) ->
     try jiffy:decode(Data, []) of
     	JsonData ->
 		    %% insert the json data into mnesia
-		    io:format("~p~n", [insert_apod_entries(JsonData)])
+		    io:format("~p~n", [insert_db_entries(apod, JsonData)])
 
     catch
     	Class:Reason ->
     		io:format("~p~n ~p~n", [Class, Reason])
     end.
 
-fetch_data(now) ->
-	Future = 0,
-	Past = 0,
-	fetch_apod_data(production, Past, Future);	
+update_database(youtube, Data) ->
+    try jiffy:decode(Data, []) of
+    	JsonData ->
+		    %% insert the json data into mnesia
+		    io:format("~p~n", [insert_db_entries(youtube, JsonData)])
 
-fetch_data(periodic) ->
-	Past = 24*60*60,
-	Future = 0,
-	fetch_apod_data(production, Past, Future).
-
-fetch_apod_data(production, Past, Future) ->
-	Query = uri_string:compose_query([{"start_date", time_pair_to_fetch(past, Past)}, 
-									  {"end_date", time_pair_to_fetch(future, Future)},
-									  {"api_key", ?API_KEY},
-									  {"thumbs", "true"}
-									  ]),
-	Request = string:join([?APOD_HOST, Query], ""),
-	case httpc:request(Request) of
-		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
-			update_database(apod, Body);
-		{ok,{_,_,ErrorMessage}} ->
-			{error, ErrorMessage};
-		Other ->
-			{error, Other}
-	end;
-
-fetch_apod_data(notfound, GregorianStartDays, GregorianEndDays) ->
-	S = calendar:gregorian_days_to_date(GregorianStartDays),
-	E = calendar:gregorian_days_to_date(GregorianEndDays),
-	fetch_apod_data(tuples, S, E);
-
-fetch_apod_data(tuples, {StartYear, StartMonth, StartDay}, {EndYear, EndMonth, EndDay}) ->
-	Past = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[StartYear, StartMonth, StartDay]))),
-	Future = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[EndYear, EndMonth, EndDay]))),
-	Query = uri_string:compose_query([{"start_date", Past}, 
-									  {"end_date", Future},
-									  {"api_key", ?API_KEY},
-									  {"thumbs", "true"}
-									  ]),
-	Request = string:join([?APOD_HOST, Query], ""),
-	case httpc:request(Request) of
-		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
-			update_database(apod, Body),
-			{ok, Body};
-		{ok,{_,_,ErrorMessage}} ->
-			{error, ErrorMessage};
-		Other ->
-			{error, Other}
-	end.
-
+    catch
+    	Class:Reason ->
+    		io:format("~p~n ~p~n", [Class, Reason])
+    end.
 
 current_time_string() ->
 	{{Year, Month, Day}, {Hour, Min, Sec}} = 
@@ -131,11 +89,17 @@ time_pair_to_fetch(past, TimeDeltaInSeconds) ->
 		calendar:gregorian_seconds_to_datetime(FutureSeconds),
 	binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[Year, Month, Day]))).
 
-start_cron_job() ->
+start_cron_job(apod) ->
 	ImageOfTheDayJob = {{daily, {12, 1, am}},
-    {utils, fetch_data, [periodic]}},
+    {apod_data_aquistion, fetch_data, [periodic]}},
 
-    erlcron:cron(apod_daily_fetch_job, ImageOfTheDayJob).
+    erlcron:cron(apod_daily_fetch_job, ImageOfTheDayJob);
+
+start_cron_job(youtube) ->
+	ImageOfTheDayJob = {{daily, {12, 1, am}},
+    {youtube_data_aquistion, fetch_data, [periodic]}},
+
+    erlcron:cron(youtube_daily_fetch_job, ImageOfTheDayJob).
 
 update_client_record(Telemetry) ->
 	{Uuid, Atom} = Telemetry,
@@ -385,7 +349,7 @@ process_file_list(DirName, [FileName|T]) ->
     FileData = readlines(FullName),  %% read all data from the file 
     try jiffy:decode(FileData, []) of
     	JsonData ->
-		    insert_apod_entries(JsonData)					 %% insert the json data into mnesia
+		    insert_db_entries(JsonData)					 %% insert the json data into mnesia
     catch
     	Class:Reason ->
     		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
@@ -401,11 +365,22 @@ process_file_list(_, []) ->
 %% This function inserts [JsonData] into a mnesia database
 %% [JsonData] -- well formed json data
 %%
-insert_apod_entries(JsonData) when JsonData =/= [] ->
+insert_db_entries(apod, JsonData) when JsonData =/= [] ->
 	Fun = fun() ->	% The function used in a mnesia transaction
 		lists:foreach(	%% for each item in the list
-		fun({ApodEntry}) ->
-			Record = from_string_to_json_apod(ApodEntry), %% convert the item to a struct
+		fun({DBEntry}) ->
+			Record = from_string_to_json(apod, DBEntry), %% convert the item to a struct
+			mnesia:write(Record)			%% if this is an image, store it
+		end,
+		JsonData)
+	end,
+	mnesia:transaction(Fun); %% execute the transaction
+
+insert_db_entries(youtube, JsonData) when JsonData =/= [] ->
+	Fun = fun() ->	% The function used in a mnesia transaction
+		lists:foreach(	%% for each item in the list
+		fun({DBEntry}) ->
+			Record = from_string_to_json(youtube, DBEntry), %% convert the item to a struct
 			mnesia:write(Record)			%% if this is an image, store it
 		end,
 		JsonData)
@@ -434,7 +409,7 @@ get_all_lines(Device) ->
         Line -> Line ++ get_all_lines(Device)
     end.
 
-from_string_to_json_apod(Item) ->
+from_string_to_json(apod, Item) ->
 	#apodimagetable{
 				url 			= proplists:get_value(<<"url">>, Item),
 				copyright 		= proplists:get_value(<<"copyright">>, Item, <<"no copyright available">>),
@@ -444,6 +419,17 @@ from_string_to_json_apod(Item) ->
 				media_type		=	proplists:get_value(<<"media_type">>, Item),
 				service_version	=	proplists:get_value(<<"service_version">>, Item),
 				title 			=	proplists:get_value(<<"title">>, Item)
+				};
+
+from_string_to_json(youtube, Item) ->
+	#youtube_channel{
+				channel_id 		= proplists:get_value(<<"channel_id">>, Item),
+				video_id 		= proplists:get_value(<<"video_id">>, Item),
+				date 			= date_to_gregorian_days(proplists:get_value(<<"date">>, Item)),
+				width			=	proplists:get_value(<<"width">>, Item),
+				height			=	proplists:get_value(<<"height">>, Item),
+				title			=	proplists:get_value(<<"title">>, Item),
+				url_medium		=	proplists:get_value(<<"url_medium">>, Item)
 				}.
 
 find_token_in_string(Heystack, [Needle|ListOfNeedles]) ->
