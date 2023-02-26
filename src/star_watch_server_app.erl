@@ -6,6 +6,7 @@
 
 -include("include/apod_record_def.hrl").
 -include("include/apodtelemetry.hrl").
+-include("include/youtube_channel.hrl").
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
 
@@ -27,20 +28,21 @@ start(_Type, _Args) ->
     TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute, FetchYoutubeChanneRoute]}
+        {'_', [FetchYoutubeChanneRoute, FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8083}],
         #{env => #{dispatch => Dispatch}}
     ),
     inets:start(),
-    utils:start_cron_job(),
+    utils:start_cron_job(youtube),
+    utils:start_cron_job(apod),
     star_watch_master_sup:start_link().
 
 stop(_State) ->
 	ok.
 
-validate_youtube_api_key(forward, Value) when Value =:= ?YOUTUBE_API_KEY ->
+validate_youtube_api_key(forward, Value) when Value =:= ?YOUTUBE_CLIENT_KEY ->
     {ok, Value};
 validate_youtube_api_key(forward, _) ->
     {error, bad_youtube_api_key}.
@@ -100,6 +102,14 @@ create_table(apodimagetable) ->
         [
             {attributes, record_info(fields, apodimagetable)},
             {index, [#apodimagetable.date, #apodimagetable.title, #apodimagetable.hdurl]}, 
+            {type, ordered_set},
+            {disc_copies, [node()]}
+        ]);
+create_table(youtube_channel) ->
+    mnesia:create_table(
+        youtube_channel,
+        [
+            {attributes, record_info(fields, youtube_channel)},
             {type, ordered_set},
             {disc_copies, [node()]}
         ]);

@@ -1,57 +1,82 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 17:50:53
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-23 17:56:23
+% @Last Modified time: 2023-02-26 14:55:39
 -module(youtube_data_aquisition).
--export([fetch_apod_data/3,fetch_data/1]).
+-export([fetch_data/2]).
+-include("include/macro_definitions.hrl").
 
-fetch_data(now) ->
-	Future = 0,
-	Past = 0,
-	fetch_apod_data(production, Past, Future);	
+fetch_data(production, ChannelId) ->
+	fetch_channel_data([ChannelId], #{}); 
 
-fetch_data(periodic) ->
-	Past = 24*60*60,
-	Future = 0,
-	fetch_apod_data(production, Past, Future).
+fetch_data(periodic, ChannelIDs) ->
+	fetch_channel_data(ChannelIDs, #{}).
 
-fetch_apod_data(production, ApiKey, ChannelID) ->
-	Query = uri_string:compose_query([{"key", ApiKey}, 
-									  {"channelId", ChannelID},
-									  {"api_key", ?ASTRONOMY_API_KEY},
-									  {"part", "snippet,id"},
-									  {"order", "date"}
-									  ]),
-	Request = string:join([?YOUTUBE_HOST, Query], ""),
+fetch_channel_data([ChannelID | Tail], MasterMap) ->
+	Section = ChannelID,
+	Request = first_page_query(ChannelID),
+
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
-			update_database(youtube, Body);
+			{ok, FirstPageMap} = utils:update_database(youtube, Body),				% Commit data from the first fetch to the database
+			PageMap = #{<<"first_page">> => FirstPageMap},
+			PageToken = get_next_page_token(FirstPageMap),							% Extract the next page token
+			{ok, PageMapComplete} = fetch_next_page(ChannelID, PageToken, PageMap), % Atempt to fetch data for the next page, or return
+			MergedMaps = maps:merge(PageMap, PageMapComplete),
+			NewMaster = maps:put(Section, MergedMaps, MasterMap),
+			{ok, MapData} = fetch_channel_data(Tail, maps:put(Section, PageMapComplete, NewMaster)),
+			{ok, jiffy:encode(MapData)};
+
 		{ok,{_,_,ErrorMessage}} ->
 			{error, ErrorMessage};
 		Other ->
 			{error, Other}
 	end;
 
-fetch_apod_data(notfound, GregorianStartDays, GregorianEndDays) ->
-	S = calendar:gregorian_days_to_date(GregorianStartDays),
-	E = calendar:gregorian_days_to_date(GregorianEndDays),
-	fetch_apod_data(tuples, S, E);
+fetch_channel_data([], Acc) -> {ok, Acc}.
 
-fetch_apod_data(tuples, {StartYear, StartMonth, StartDay}, {EndYear, EndMonth, EndDay}) ->
-	Past = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[StartYear, StartMonth, StartDay]))),
-	Future = binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[EndYear, EndMonth, EndDay]))),
-	Query = uri_string:compose_query([{"start_date", Past}, 
-									  {"end_date", Future},
-									  {"api_key", ?ASTRONOMY_API_KEY},
-									  {"thumbs", "true"}
-									  ]),
-	Request = string:join([?APOD_HOST, Query], ""),
+fetch_next_page(ChannelID, [PageToken], Acc) ->
+	Request = next_page_query(ChannelID, PageToken),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
-			update_database(youtube, Body),
-			{ok, Body};
+			{ok, Map} = utils:update_database(youtube, Body),
+			Token = get_next_page_token(Map),
+			fetch_next_page(ChannelID, Token, maps:put(PageToken, Map, Acc)); %%% TODO: last arg should be a map
+			
 		{ok,{_,_,ErrorMessage}} ->
 			{error, ErrorMessage};
 		Other ->
 			{error, Other}
+	end;
+fetch_next_page(_ChannelID, [], Acc) -> {ok, Acc}.
+
+get_next_page_token(Map) ->
+	Keys = maps:keys(Map),
+	Found = lists:any(fun(Element) -> Element =:= ?YOUTUBE_NEXTPAGE end, Keys),
+	case Found of
+		true ->
+			[maps:get(?YOUTUBE_NEXTPAGE, Map)];
+		false ->
+			io:format("Next page token not found~n"),
+			[]
 	end.
+
+
+first_page_query(ChannelID) ->
+	Query = uri_string:compose_query([{"key", ?YOUTUBE_API_KEY}, 
+									  {"channelId", ChannelID},
+									  {"part", "snippet,id"},
+									  {"order", "date"},
+									  {"maxResults", ?YOUTUBE_MAXRESULTS}
+									  ]),
+	string:join([?YOUTUBE_HOST, Query], "").
+
+next_page_query(ChannelID, PageToken) ->
+	Query = uri_string:compose_query([{"key", ?YOUTUBE_API_KEY}, 
+									  {"channelId", ChannelID},
+									  {"part", "snippet,id"},
+									  {"order", "date"},
+									  {"maxResults", ?YOUTUBE_MAXRESULTS},
+									  {"pageToken", PageToken}
+									  ]),
+	string:join([?YOUTUBE_HOST, Query], "").

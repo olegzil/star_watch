@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-23 17:52:25
+% @Last Modified time: 2023-02-26 12:48:27
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -11,7 +11,7 @@
 		 update_client_record/1, 
 		 process_file_list/2,
 		 update_db_from_json_file/1,
-		 insert_db_entries/1, 
+		 insert_db_entries/2, 
 		 update_database/2,
 		 find_token_in_string/2,
 		 generate_coparable_list/1]).
@@ -19,6 +19,7 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
 -include("include/apod_record_def.hrl").
+-include("include/youtube_channel.hrl").
 -include("include/macro_definitions.hrl").
 -include("src/include/registration_query.hrl").
 
@@ -31,7 +32,16 @@ date_to_gregorian_days(<<A,B,C,D>>) ->
 	Date = <<A,B,C,D>>,
     Tuple = list_to_tuple(lists:map(fun(Item)-> binary_to_integer(Item) end, string:split(Date, "", all))),
     DateTuple = erlang:insert_element(2,erlang:insert_element(2, Tuple, 1), 1),
-    calendar:date_to_gregorian_days(DateTuple).
+    calendar:date_to_gregorian_days(DateTuple);
+
+date_to_gregorian_days(Date) ->
+	[YearB, MonthB, DateTimeB] = string:split(Date,"-", all),
+	Year = binary_to_integer(YearB),
+	Month = binary_to_integer(MonthB),
+	DateList = string:split(DateTimeB, "T"),
+	[DatePart|_] = DateList,
+	DateValue = binary_to_integer(DatePart),
+	calendar:date_to_gregorian_days({Year, Month, DateValue}).
 
 gregorian_days_to_binary(Date) ->
 	GregorianDate = calendar:gregorian_days_to_date(Date),
@@ -41,24 +51,26 @@ gregorian_days_to_binary(Date) ->
 
 update_database(apod, Data) ->
     try jiffy:decode(Data, []) of
-    	JsonData ->
+    	Map ->
 		    %% insert the json data into mnesia
-		    io:format("~p~n", [insert_db_entries(apod, JsonData)])
+		    io:format("~p~n", [insert_db_entries(apod, Map)])
 
     catch
     	Class:Reason ->
     		io:format("~p~n ~p~n", [Class, Reason])
-    end.
+    end;
 
 update_database(youtube, Data) ->
-    try jiffy:decode(Data, []) of
-    	JsonData ->
+    try jiffy:decode(Data, [return_maps]) of
+    	Map ->
 		    %% insert the json data into mnesia
-		    io:format("~p~n", [insert_db_entries(youtube, JsonData)])
+		    io:format("~p~n", [insert_db_entries(youtube, Map)]),
+		    {ok, Map}
 
     catch
     	Class:Reason ->
-    		io:format("~p~n ~p~n", [Class, Reason])
+    		Message = io_lib:format("~p~n ~p~n", [Class, Reason]),
+    		{error, Message}
     end.
 
 current_time_string() ->
@@ -97,7 +109,7 @@ start_cron_job(apod) ->
 
 start_cron_job(youtube) ->
 	ImageOfTheDayJob = {{daily, {12, 1, am}},
-    {youtube_data_aquistion, fetch_data, [periodic]}},
+    {youtube_data_aquistion, fetch_data, [periodic, ?YOUTUBE_CHANNEL_IDS]}},
 
     erlcron:cron(youtube_daily_fetch_job, ImageOfTheDayJob).
 
@@ -349,7 +361,7 @@ process_file_list(DirName, [FileName|T]) ->
     FileData = readlines(FullName),  %% read all data from the file 
     try jiffy:decode(FileData, []) of
     	JsonData ->
-		    insert_db_entries(JsonData)					 %% insert the json data into mnesia
+		    insert_db_entries(apod, JsonData)					 %% insert the json data into mnesia
     catch
     	Class:Reason ->
     		io:format("~p~n ~p~n ~p~n", [Class, Reason, filename:join(DirName, FileName)])
@@ -369,23 +381,28 @@ insert_db_entries(apod, JsonData) when JsonData =/= [] ->
 	Fun = fun() ->	% The function used in a mnesia transaction
 		lists:foreach(	%% for each item in the list
 		fun({DBEntry}) ->
-			Record = from_string_to_json(apod, DBEntry), %% convert the item to a struct
+			Record = create_record(apod, DBEntry), %% convert the item to a struct
 			mnesia:write(Record)			%% if this is an image, store it
 		end,
 		JsonData)
 	end,
 	mnesia:transaction(Fun); %% execute the transaction
 
-insert_db_entries(youtube, JsonData) when JsonData =/= [] ->
+insert_db_entries(youtube, JsonData) ->
+	Items =  maps:get(<<"items">>, JsonData),
+	extract_item_from_list(Items).
+
+extract_item_from_list(Items) ->
 	Fun = fun() ->	% The function used in a mnesia transaction
 		lists:foreach(	%% for each item in the list
-		fun({DBEntry}) ->
-			Record = from_string_to_json(youtube, DBEntry), %% convert the item to a struct
+		fun(Item) ->
+			Record = create_record(youtube, Item), %% convert the item to a struct
 			mnesia:write(Record)			%% if this is an image, store it
 		end,
-		JsonData)
+		Items)
 	end,
 	mnesia:transaction(Fun). %% execute the transaction
+
 
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fetch_stats() -> 
@@ -409,7 +426,7 @@ get_all_lines(Device) ->
         Line -> Line ++ get_all_lines(Device)
     end.
 
-from_string_to_json(apod, Item) ->
+create_record(apod, Item) ->
 	#apodimagetable{
 				url 			= proplists:get_value(<<"url">>, Item),
 				copyright 		= proplists:get_value(<<"copyright">>, Item, <<"no copyright available">>),
@@ -421,16 +438,20 @@ from_string_to_json(apod, Item) ->
 				title 			=	proplists:get_value(<<"title">>, Item)
 				};
 
-from_string_to_json(youtube, Item) ->
+create_record(youtube, Item) ->
+	Id = maps:get(<<"id">>, Item),
+	Snippet = maps:get(<<"snippet">>, Item),
+	Thumbnails = maps:get(<<"thumbnails">>, Snippet),
+	UrlDescriptor = maps:get(<<"medium">>, Thumbnails),
 	#youtube_channel{
-				channel_id 		= proplists:get_value(<<"channel_id">>, Item),
-				video_id 		= proplists:get_value(<<"video_id">>, Item),
-				date 			= date_to_gregorian_days(proplists:get_value(<<"date">>, Item)),
-				width			=	proplists:get_value(<<"width">>, Item),
-				height			=	proplists:get_value(<<"height">>, Item),
-				title			=	proplists:get_value(<<"title">>, Item),
-				url_medium		=	proplists:get_value(<<"url_medium">>, Item)
-				}.
+			channel_id 		= maps:get(<<"channelId">>, Snippet),
+			video_id 		= maps:get(<<"videoId">>, Id),
+			date 			= date_to_gregorian_days(maps:get(<<"publishTime">>, Snippet)),
+			width			=	maps:get(<<"width">>, UrlDescriptor),
+			height			=	maps:get(<<"height">>, UrlDescriptor),
+			title			=	maps:get(<<"title">>, Snippet),
+			url_medium		=	maps:get(<<"url">>, UrlDescriptor)
+			}.
 
 find_token_in_string(Heystack, [Needle|ListOfNeedles]) ->
 	case string:find(Heystack, Needle) of

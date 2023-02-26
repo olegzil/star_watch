@@ -3,8 +3,11 @@
 -define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
 -define(ASTRONOMY_API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
 -define(YOUTUBE_API_KEY, "AIzaSyBWhaM01ueTAyMIhWf11zbJBo3ulKA89u4").
+-define(YOUTUBE_CHANNEL_IDS, ["UC7_gcs09iThXybpVgjHZ_7g", "UCQfZkf3-Y2RwzdRFWXYsdaQ"]).
 -define(YOUTUBE_CLIENT_KEY, "389b4e36-b3d2-11ed-afa1-0242ac120002").
 -define(ADMINISTRATOR_KEY, "f09a2270-ac19-418c-a443-9f9e4f4c9019").
+-define(YOUTUBE_NEXTPAGE, <<"nextPageToken">>).
+-define(YOUTUBE_MAXRESULTS, "20").
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

@@ -1,13 +1,14 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-23 17:41:27
+% @Last Modified time: 2023-02-25 18:40:18
 
 -module(db_access).
 
 -import(utils, [date_to_gregorian_days/1, gregorian_days_to_binary/1]).
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
+-include("include/youtube_channel.hrl").
 -include("include/apod_record_def.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
@@ -79,19 +80,18 @@ process_date_request(StartDate, EndDate) ->
 process_channel_request(Channel) ->
     Match = ets:fun2ms(
         fun(Record) 
-            when Record#youtube_channel.channel_id =:= Channel
+            when Record#youtube_channel.channel_id =:= Channel ->
                 Record
         end),
     SelectRecords = fun() -> mnesia:select(youtube_channel, Match) end,
     {_, ListOfRecords} = mnesia:transaction(SelectRecords),
     case length(ListOfRecords) of
         0 ->
-            case youtube_data_aquisition:fetch_apod_data(notfound, StartDate, EndDate) of
+            case youtube_data_aquisition:fetch_data(production, Channel) of
                 {error, _} ->
                     io:format("YOUTUBE fetch failed~n"),
                     youtube_channel_data_not_found(Channel);
-                {ok, JsonResult} ->
-                    utils:update_database(youtube, JsonResult),
+                {ok, JsonResult} -> 
                     {ok, JsonResult}
             end;
 
@@ -99,7 +99,6 @@ process_channel_request(Channel) ->
             JsonFreindly = lists:map(fun(DbItem) ->
                                 #{channel_id    => DbItem#youtube_channel.channel_id,
                                   video_id      => DbItem#youtube_channel.video_id,
-                                  explanation   => DbItem#youtube_channel.explanation,
                                   url_medium    => DbItem#youtube_channel.url_medium,
                                   width         => DbItem#youtube_channel.width,
                                   height        => DbItem#youtube_channel.height,
