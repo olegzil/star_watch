@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 17:50:53
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-26 14:55:39
+% @Last Modified time: 2023-02-28 16:52:36
 -module(youtube_data_aquisition).
 -export([fetch_data/2]).
 -include("include/macro_definitions.hrl").
@@ -18,13 +18,14 @@ fetch_channel_data([ChannelID | Tail], MasterMap) ->
 
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
-			{ok, FirstPageMap} = utils:update_database(youtube, Body),				% Commit data from the first fetch to the database
-			PageMap = #{<<"first_page">> => FirstPageMap},
-			PageToken = get_next_page_token(FirstPageMap),							% Extract the next page token
-			{ok, PageMapComplete} = fetch_next_page(ChannelID, PageToken, PageMap), % Atempt to fetch data for the next page, or return
-			MergedMaps = maps:merge(PageMap, PageMapComplete),
-			NewMaster = maps:put(Section, MergedMaps, MasterMap),
-			{ok, MapData} = fetch_channel_data(Tail, maps:put(Section, PageMapComplete, NewMaster)),
+			{ok, FirstPageMap} = utils:update_database(youtube, Body),					% Commit data from the first fetch to the database
+			PageMap = #{<<"first_page">> => FirstPageMap},								% First page does not have a token identifier
+			PageToken = get_next_page_token(FirstPageMap),								% Extract the next page token
+			{ok, RemainderChannelMap} = fetch_next_page(ChannelID, PageToken, PageMap), 	% Atempt to fetch data for the next page, or return
+			CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
+			TempMap = maps:put(Section, CompleteChannelMap, #{}),						% Insert the map of all pages into a new map with the channel id as the key
+			NewMaster = maps:merge(TempMap, MasterMap),
+			{ok, MapData} = fetch_channel_data(Tail, NewMaster),						% Repeat the process with a map that already contains a channel and all its data
 			{ok, jiffy:encode(MapData)};
 
 		{ok,{_,_,ErrorMessage}} ->

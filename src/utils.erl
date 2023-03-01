@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-26 12:48:27
+% @Last Modified time: 2023-02-28 17:10:40
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -11,10 +11,11 @@
 		 update_client_record/1, 
 		 process_file_list/2,
 		 update_db_from_json_file/1,
-		 insert_db_entries/2, 
 		 update_database/2,
 		 find_token_in_string/2,
-		 generate_coparable_list/1]).
+		 generate_coparable_list/1,
+		 write_test_data_to_db_and_dump_to_file/0,
+		 test_multi_channel_data_fetch/0]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -53,10 +54,10 @@ update_database(apod, Data) ->
     try jiffy:decode(Data, []) of
     	Map ->
 		    %% insert the json data into mnesia
-		    io:format("~p~n", [insert_db_entries(apod, Map)])
-
+		    insert_db_entries(apod, Map)
     catch
     	Class:Reason ->
+		    io:format("Filed insert~n"),
     		io:format("~p~n ~p~n", [Class, Reason])
     end;
 
@@ -64,7 +65,7 @@ update_database(youtube, Data) ->
     try jiffy:decode(Data, [return_maps]) of
     	Map ->
 		    %% insert the json data into mnesia
-		    io:format("~p~n", [insert_db_entries(youtube, Map)]),
+    		insert_db_entries(youtube, Map),
 		    {ok, Map}
 
     catch
@@ -102,16 +103,16 @@ time_pair_to_fetch(past, TimeDeltaInSeconds) ->
 	binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[Year, Month, Day]))).
 
 start_cron_job(apod) ->
-	ImageOfTheDayJob = {{daily, {12, 1, am}},
-    {apod_data_aquistion, fetch_data, [periodic]}},
+	ImageOfTheDayJob = {{daily, {12, 15, am}},
+    {apod_data_aquisition, fetch_data, [periodic]}},
 
     erlcron:cron(apod_daily_fetch_job, ImageOfTheDayJob);
 
 start_cron_job(youtube) ->
-	ImageOfTheDayJob = {{daily, {12, 1, am}},
-    {youtube_data_aquistion, fetch_data, [periodic, ?YOUTUBE_CHANNEL_IDS]}},
+	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
+    {youtube_data_aquisition, fetch_data, [periodic, ?YOUTUBE_CHANNEL_IDS]}},
 
-    erlcron:cron(youtube_daily_fetch_job, ImageOfTheDayJob).
+    erlcron:cron(youtube_daily_fetch_job, YoutubeChannelFetchJob).
 
 update_client_record(Telemetry) ->
 	{Uuid, Atom} = Telemetry,
@@ -392,16 +393,24 @@ insert_db_entries(youtube, JsonData) ->
 	Items =  maps:get(<<"items">>, JsonData),
 	extract_item_from_list(Items).
 
-extract_item_from_list(Items) ->
-	Fun = fun() ->	% The function used in a mnesia transaction
-		lists:foreach(	%% for each item in the list
-		fun(Item) ->
-			Record = create_record(youtube, Item), %% convert the item to a struct
-			mnesia:write(Record)			%% if this is an image, store it
-		end,
-		Items)
+extract_item_from_list([Item|Items]) ->
+	Fun = fun() ->
+		Record = create_record(youtube, Item), %% convert the item to a struct
+		mnesia:write(Record)			%% if this is an image, store it
 	end,
-	mnesia:transaction(Fun). %% execute the transaction
+
+	Id = maps:get(<<"id">>, Item),
+	case maps:find(<<"videoId">>, Id) of
+		error ->
+			Etag = maps:get(<<"etag">>, Item),
+			io:format("Video with etag ~p is upcoming.~n", [Etag]);
+		_ -> 
+			mnesia:transaction(Fun)
+	end,
+	extract_item_from_list(Items);
+
+extract_item_from_list([]) ->
+	{ok, done}.
 
 
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -443,15 +452,25 @@ create_record(youtube, Item) ->
 	Snippet = maps:get(<<"snippet">>, Item),
 	Thumbnails = maps:get(<<"thumbnails">>, Snippet),
 	UrlDescriptor = maps:get(<<"medium">>, Thumbnails),
-	#youtube_channel{
-			channel_id 		= maps:get(<<"channelId">>, Snippet),
-			video_id 		= maps:get(<<"videoId">>, Id),
-			date 			= date_to_gregorian_days(maps:get(<<"publishTime">>, Snippet)),
-			width			=	maps:get(<<"width">>, UrlDescriptor),
-			height			=	maps:get(<<"height">>, UrlDescriptor),
-			title			=	maps:get(<<"title">>, Snippet),
-			url_medium		=	maps:get(<<"url">>, UrlDescriptor)
-			}.
+	try maps:get(<<"videoId">>, Id) of
+		VideoID ->
+			Part1 = maps:get(<<"channelId">>, Snippet),
+			Part2 = VideoID,
+			Key = <<Part1/binary,<<":">>/binary, Part2/binary>>,
+			#youtube_channel{
+					key 			= Key,
+					channel_id 		= maps:get(<<"channelId">>, Snippet),
+					video_id 		= VideoID,
+					date 			= date_to_gregorian_days(maps:get(<<"publishTime">>, Snippet)),
+					width			=	maps:get(<<"width">>, UrlDescriptor),
+					height			=	maps:get(<<"height">>, UrlDescriptor),
+					title			=	maps:get(<<"title">>, Snippet),
+					url_medium		=	maps:get(<<"url">>, UrlDescriptor)
+					}
+	catch _:_ ->
+			io:format("Badkey for record: ~p~n", [Id])
+	end.
+
 
 find_token_in_string(Heystack, [Needle|ListOfNeedles]) ->
 	case string:find(Heystack, Needle) of
@@ -471,13 +490,36 @@ list_of_binaries_to_lower_case_list_of_binaries([H|T], Acc) ->
 	
 list_of_binaries_to_lower_case_list_of_binaries([], Acc) -> Acc.
 
-% find_substring(String, Needles) ->
-% 	find_token_in_list_of_binaries(String, Needles).
+%%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+parse_test_json(ChannelKey, JsonData) ->
+	ChannelData = maps:get(ChannelKey, JsonData),
+	Pages = maps:keys(ChannelData),
+	Fun = fun(Page) -> 
+		VideoIdData = maps:get(Page, ChannelData),
+		insert_db_entries(youtube, VideoIdData)
+	end,
+	lists:foreach(Fun, Pages).
 
-% find_token_in_string(Target, [H|T]) ->
-% 	case string:find(H, Target) of 
-% 		nomatch -> find_token_in_string(Target, T);
-% 		_ -> true
-% 	end;
-% find_token_in_string(_Target, []) -> false.
+write_test_data_to_db_and_dump_to_file() ->
+	{ok, FileData} = file:read_file("/home/oleg/temp/multi_channel_test.json"),
+	JsonData = jiffy:decode(FileData, [return_maps]),
+	ChannelKeys = maps:keys(JsonData),
+	Fun = fun(ChannelKey) -> 
+		parse_test_json(ChannelKey, JsonData)
+	end,
+	lists:foreach(Fun, ChannelKeys),
 
+	mnesia:dump_to_textfile("/home/oleg/temp/mnesia_db.txt").
+
+test_multi_channel_data_fetch() ->
+	{ok, FileData} = file:read_file("/home/oleg/temp/multi_channel_test.json"),
+	JsonData = jiffy:decode(FileData, [return_maps]),
+	ChannelKeys = maps:keys(JsonData),
+	Key1 = lists:nth(1, ChannelKeys),
+	Key2 = lists:nth(2, ChannelKeys),
+	MasterMap = #{},
+	Map1a = maps:put(Key1, maps:get(Key1, JsonData), MasterMap),
+	Map2a = maps:put(Key2, maps:get(Key2, JsonData), MasterMap),
+	MergedMap = maps:merge(Map1a, Map2a),
+	JsonResult = jiffy:encode(MergedMap),
+	io:format("MergedMap: ~p~n", [JsonResult]).
