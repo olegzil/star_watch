@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-03 13:17:56
+% @Last Modified time: 2023-03-03 18:54:46
 
 -module(db_access).
 
@@ -91,7 +91,7 @@ process_channel_request(Channel) ->
             end;
 
         _ ->
-            FinalPackage = package_channel_data(Channel),                        % The client expects a Json object containing an array
+            FinalPackage = package_channel_data(ListOfRecords),                        % The client expects a Json object containing an array
             {ok, jiffy:encode(FinalPackage)}
     end.
 
@@ -124,8 +124,15 @@ fetch_channel_data_from_db(Channel) ->
     SelectRecords = fun() -> mnesia:select(youtube_channel, Match) end,
     mnesia:sync_transaction(SelectRecords).
 
-package_channel_data(Channel) ->
-    {_, ListOfRecords} = fetch_channel_data_from_db(Channel),
+package_channel_data(ListOfRecords) ->
+    Predicate = fun(Lhs, Rhs) ->
+        if
+            Rhs#youtube_channel.date =< Lhs#youtube_channel.date ->
+                true;
+            true -> false
+        end
+    end,
+    SortedList = lists:sort(Predicate, ListOfRecords),
 
     MapData = lists:map(fun(DbItem) ->
         #{channel_id    => DbItem#youtube_channel.channel_id,
@@ -134,9 +141,9 @@ package_channel_data(Channel) ->
             width         => DbItem#youtube_channel.width,
             height        => DbItem#youtube_channel.height,
             title         => DbItem#youtube_channel.title,
-            date          => gregorian_days_to_binary(DbItem#youtube_channel.date)
+            date          => DbItem#youtube_channel.date
         }                                 
-        end, ListOfRecords),
+        end, SortedList),
     maps:put(<<"Videos">>, MapData, #{}).
     
 
