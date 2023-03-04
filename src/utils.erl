@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-28 17:10:40
+% @Last Modified time: 2023-03-03 16:19:48
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -15,7 +15,9 @@
 		 find_token_in_string/2,
 		 generate_coparable_list/1,
 		 write_test_data_to_db_and_dump_to_file/0,
-		 test_multi_channel_data_fetch/0]).
+		 test_multi_channel_data_fetch/0,
+		 fetch_youtube_api_key/0, 
+		 reformat_channel_data/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -105,13 +107,15 @@ time_pair_to_fetch(past, TimeDeltaInSeconds) ->
 start_cron_job(apod) ->
 	ImageOfTheDayJob = {{daily, {12, 15, am}},
     {apod_data_aquisition, fetch_data, [periodic]}},
-
     erlcron:cron(apod_daily_fetch_job, ImageOfTheDayJob);
 
 start_cron_job(youtube) ->
+	{{Year, Month, Day},{_, _, _}} = calendar:universal_time(), % get current year/month/day
+	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convertit it to a single number
+	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate - 1),	% back track the current date back one day
+	Date = list_to_binary(io_lib:format("~.4.0w-~.2.0w-~.2.0wT~.2.0w:~.2.0w:~.2.0wZ", [Y, M, D, 0, 0, 0])), % generate 
 	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
-    {youtube_data_aquisition, fetch_data, [periodic, ?YOUTUBE_CHANNEL_IDS]}},
-
+    {youtube_data_aquisition, fetch_data, [periodic, ?YOUTUBE_CHANNEL_IDS, [Date]]}},
     erlcron:cron(youtube_daily_fetch_job, YoutubeChannelFetchJob).
 
 update_client_record(Telemetry) ->
@@ -125,7 +129,6 @@ update_client_record(Telemetry) ->
 			), %make sure atom is lowercase
 	case {Uuid, Action} of 
 		{Uuid, isregistered} -> 
-			io:format("in isregistered~n"),
 			Match = ets:fun2ms(
 			    fun(Record) 
 			        when Record#apodtelemetry.uuid =:= Uuid->
@@ -137,7 +140,6 @@ update_client_record(Telemetry) ->
 		    					uuid => Uuid,
 		    					registered => true
 		    				},
-		    				io:format("record found: ~p~n", [Uuid]),
 		    				ReturnValue;
 			   	{atomic, []} -> 
 		    				ReturnValue = #{
@@ -403,7 +405,7 @@ extract_item_from_list([Item|Items]) ->
 	case maps:find(<<"videoId">>, Id) of
 		error ->
 			Etag = maps:get(<<"etag">>, Item),
-			io:format("Video with etag ~p is upcoming.~n", [Etag]);
+			io:format("Video id for etag: ~p not found~n", [Etag]);
 		_ -> 
 			mnesia:transaction(Fun)
 	end,
@@ -489,6 +491,57 @@ list_of_binaries_to_lower_case_list_of_binaries([H|T], Acc) ->
 	list_of_binaries_to_lower_case_list_of_binaries(T, [string:casefold(H)|Acc]);
 	
 list_of_binaries_to_lower_case_list_of_binaries([], Acc) -> Acc.
+
+fetch_youtube_api_key() ->
+	{ok, [Map]} = file:consult("server_config.cfg"),
+	case maps:find(youtubekey, Map) of
+		{ok, Key} ->
+			{ok, Key};
+		error ->
+			{error, key_not_found}
+	end.
+reformat_channel_data(Map) ->
+	ChannelMap = maps:get(?TOP_KEY, Map),
+	[Channel] = maps:keys(ChannelMap),
+	ChannelMapData = maps:get(Channel, ChannelMap),
+	Pages = maps:keys(ChannelMapData),
+	process_channel_data(Pages, ChannelMapData, []).
+
+process_channel_data([Page|Pages], ChannelMapData, Acc) ->
+	PageMap = maps:get(Page, ChannelMapData),
+	Items = maps:get(?YOUTUBE_VIDEO_ARRAY_KEY, PageMap),
+	ItemsMap = extract_items(Items, Acc),
+	process_channel_data(Pages, ChannelMapData, ItemsMap);
+
+
+process_channel_data([], _ChannelMapData, Acc) ->
+	Acc.
+
+extract_items([Item | Items], Acc) ->
+	Snippet = maps:get(<<"snippet">>, Item),
+	Id = maps:get(<<"id">>, Item),
+	Thumbnails = maps:get( <<"thumbnails">>, Snippet),
+	UrlData = maps:get(<<"medium">>, Thumbnails),
+ 	Date = maps:get(<<"publishTime">>, Snippet),
+ 	case maps:is_key(<<"videoId">>, Id) of
+ 		true ->
+		    DBItem = #{
+			    channel_id    => maps:get(<<"channelId">>, Snippet),
+			    video_id      => maps:get(<<"videoId">>, Id),
+			    url_medium    => maps:get(<<"url">>, UrlData),
+			    width         => maps:get(<<"width">>, UrlData),
+			    height        => maps:get(<<"height">>, UrlData),
+			    title         => maps:get(<<"title">>, Snippet),
+			    date          => utils:date_to_gregorian_days(Date)
+			},
+			extract_items(Items, lists:append(Acc, [DBItem]));
+		_ ->
+			extract_items(Items, Acc)
+ 	end;
+
+extract_items([], Acc) ->
+	Acc.                                 
+
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 parse_test_json(ChannelKey, JsonData) ->

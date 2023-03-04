@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-12 10:11:59
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-25 16:37:12
+% @Last Modified time: 2023-03-02 11:09:10
 -module(nasa_rest_access).
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
@@ -9,8 +9,6 @@
 
 %%% This function makes an http call to retrive the json for the celestial object and page specified
 fetch_root_page(Subject, GregorianStartDays, GregorianEndDays, Page) ->
-    io:format("fetch_root_page:Page = ~p~n", [Page]),
-
 	CelestialObject = string:casefold(Subject),
 	{StartYear, _StartMonth, _StartDay} = calendar:gregorian_days_to_date(GregorianStartDays), 
 	{EndYear, _EndMonth, _EndDay} = calendar:gregorian_days_to_date(GregorianEndDays),
@@ -94,7 +92,6 @@ process_data_item(CelestialObject, [NextItem|T]) ->
 	end;
 
 process_data_item(_CelestialObject, []) -> 
-	io:format("********** process_data_item ZERO LENGTH LIST FOUND~n"),
 	ok.
 
 %%% TODO:CODE return a tuple {notfound, Key, Needles, Heystack} if the offending token has been found.

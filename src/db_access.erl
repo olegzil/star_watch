@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-27 18:47:44
+% @Last Modified time: 2023-03-03 13:17:56
 
 -module(db_access).
 
@@ -12,7 +12,7 @@
 -include("include/apod_record_def.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
--export([process_date_request/2, process_channel_request/1, update_nasa_table/1]).
+-export([process_date_request/2, process_channel_request/1, update_nasa_table/1, package_channel_data/1]).
 -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 
 update_nasa_table(DBItem) -> 
@@ -54,7 +54,7 @@ process_date_request(StartDate, EndDate) ->
             case apod_data_aquisition:fetch_apod_data(notfound, StartDate, EndDate) of
                 {error, _} ->
                     io:format("NASA fetch failed~n"),
-                    date_rage_not_found(StartDate, EndDate);
+                    date_range_not_found(StartDate, EndDate);
                 {ok, JsonResult} ->
                     Start = calendar:gregorian_days_to_date(StartDate),
                     End = calendar:gregorian_days_to_date(EndDate),
@@ -78,16 +78,11 @@ process_date_request(StartDate, EndDate) ->
     end.
 
 process_channel_request(Channel) ->
-    Match = ets:fun2ms(
-        fun(Record) 
-            when Record#youtube_channel.channel_id =:= Channel ->
-                Record
-        end),
-    SelectRecords = fun() -> mnesia:select(youtube_channel, Match) end,
-    {_, ListOfRecords} = mnesia:transaction(SelectRecords),
+   {_, ListOfRecords} = fetch_channel_data_from_db(Channel),
+
     case length(ListOfRecords) of
         0 ->
-            case youtube_data_aquisition:fetch_data(production, Channel) of
+            case youtube_data_aquisition:fetch_data(production, Channel, []) of
                 {error, _} ->
                     io:format("YOUTUBE fetch failed~n"),
                     youtube_channel_data_not_found(Channel);
@@ -96,20 +91,11 @@ process_channel_request(Channel) ->
             end;
 
         _ ->
-            JsonFreindly = lists:map(fun(DbItem) ->
-                                #{channel_id    => DbItem#youtube_channel.channel_id,
-                                  video_id      => DbItem#youtube_channel.video_id,
-                                  url_medium    => DbItem#youtube_channel.url_medium,
-                                  width         => DbItem#youtube_channel.width,
-                                  height        => DbItem#youtube_channel.height,
-                                  title         => DbItem#youtube_channel.title,
-                                  date          => gregorian_days_to_binary(DbItem#youtube_channel.date)
-                                  }                                 
-                                  end, ListOfRecords),
-            {ok, jiffy:encode(JsonFreindly)}
+            FinalPackage = package_channel_data(Channel),                        % The client expects a Json object containing an array
+            {ok, jiffy:encode(FinalPackage)}
     end.
 
-date_rage_not_found(StartDate, EndDate) ->
+date_range_not_found(StartDate, EndDate) ->
     DateStart = gregorian_days_to_binary(StartDate),
     DateEnd = gregorian_days_to_binary(EndDate),
     Message = <<"Date range not found: ">>,
@@ -128,6 +114,33 @@ youtube_channel_data_not_found(Channel) ->
     <<"error_text">> => <<Message/binary, Channel/binary>>
     },
     {not_found, jiffy:encode(ErrorResponse)}.   
+
+fetch_channel_data_from_db(Channel) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#youtube_channel.channel_id =:= Channel ->
+                Record
+        end),
+    SelectRecords = fun() -> mnesia:select(youtube_channel, Match) end,
+    mnesia:sync_transaction(SelectRecords).
+
+package_channel_data(Channel) ->
+    {_, ListOfRecords} = fetch_channel_data_from_db(Channel),
+
+    MapData = lists:map(fun(DbItem) ->
+        #{channel_id    => DbItem#youtube_channel.channel_id,
+            video_id      => DbItem#youtube_channel.video_id,
+            url_medium    => DbItem#youtube_channel.url_medium,
+            width         => DbItem#youtube_channel.width,
+            height        => DbItem#youtube_channel.height,
+            title         => DbItem#youtube_channel.title,
+            date          => gregorian_days_to_binary(DbItem#youtube_channel.date)
+        }                                 
+        end, ListOfRecords),
+    maps:put(<<"Videos">>, MapData, #{}).
+    
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_telemetry_table() ->
@@ -176,14 +189,14 @@ count_media_type(MediaType) ->
         end),
 
     SelectRecords = fun() -> mnesia:select(apodimagetable, Match) end,
-    {_, ListOfRecords} = mnesia:transaction(SelectRecords),
+    {_, ListOfRecords} = mnesia:sync_transaction(SelectRecords),
     length(ListOfRecords).
 
 get_all_keys(TableName) ->
     Transaction = fun() ->
         mnesia:all_keys(TableName)
     end, 
-    {atomic, KeyList} = mnesia:transaction(Transaction),
+    {atomic, KeyList} = mnesia:sync_transaction(Transaction),
     {ok, File} = file:open("/home/oleg/temp/key_list.txt", [write]),
     io:format(File, "~p~n", [KeyList]).
 

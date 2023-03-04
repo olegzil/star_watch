@@ -21,8 +21,7 @@ start(_Type, _Args) ->
     YearStartConstraint = {year_start, [fun validate_year_start/2]},
     YearEndConstraint = {year_end, [fun validate_year_end/2]},
         
-    FetchYoutubeChanneRoute = {"/youtube/channeldirectory/[...]", [YoutubeApiConstraints], youtube_channel_directory_handler, []},
-    % FetchYoutubeChanneRoute = {"/youtube/channelselector/[...]", [YoutubeApiConstraints], youtube_channel_directory_handler, []},
+    FetchYoutubeChanneRoute = {"/youtube/channelselector/[...]", [YoutubeApiConstraints], youtube_channel_directory_handler, []},
     FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
     FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, [1]},
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
