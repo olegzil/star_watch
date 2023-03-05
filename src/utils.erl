@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-03 16:19:48
+% @Last Modified time: 2023-03-04 17:30:42
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -105,16 +105,16 @@ time_pair_to_fetch(past, TimeDeltaInSeconds) ->
 	binary:bin_to_list(list_to_binary(io_lib:format("~.4.0p-~.2.0p-~.2.0p",[Year, Month, Day]))).
 
 start_cron_job(apod) ->
-	ImageOfTheDayJob = {{daily, {12, 15, am}},
+	ImageOfTheDayJob = {{daily, {12, 30, am}},
     {apod_data_aquisition, fetch_data, [periodic]}},
     erlcron:cron(apod_daily_fetch_job, ImageOfTheDayJob);
 
 start_cron_job(youtube) ->
 	{{Year, Month, Day},{_, _, _}} = calendar:universal_time(), % get current year/month/day
-	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convertit it to a single number
-	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate - 1),	% back track the current date back one day
+	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convert it to a single number
+	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate - 10),	% back track the current date back one day
 	Date = list_to_binary(io_lib:format("~.4.0w-~.2.0w-~.2.0wT~.2.0w:~.2.0w:~.2.0wZ", [Y, M, D, 0, 0, 0])), % generate 
-	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
+	YoutubeChannelFetchJob = {{daily, {5, 32, pm}},
     {youtube_data_aquisition, fetch_data, [periodic, ?YOUTUBE_CHANNEL_IDS, [Date]]}},
     erlcron:cron(youtube_daily_fetch_job, YoutubeChannelFetchJob).
 
@@ -500,12 +500,19 @@ fetch_youtube_api_key() ->
 		error ->
 			{error, key_not_found}
 	end.
+
 reformat_channel_data(Map) ->
 	ChannelMap = maps:get(?TOP_KEY, Map),
-	[Channel] = maps:keys(ChannelMap),
+	Channels = maps:keys(ChannelMap),
+	process_single_channel(Channels, ChannelMap, []).
+
+process_single_channel([Channel|Channels], ChannelMap, Acc) ->
 	ChannelMapData = maps:get(Channel, ChannelMap),
 	Pages = maps:keys(ChannelMapData),
-	process_channel_data(Pages, ChannelMapData, []).
+	ListOfItems = process_channel_data(Pages, ChannelMapData, []),
+	process_single_channel(Channels, ChannelMap, lists:append(Acc, ListOfItems));
+
+process_single_channel([], _ChannelMap, Acc) -> Acc.
 
 process_channel_data([Page|Pages], ChannelMapData, Acc) ->
 	PageMap = maps:get(Page, ChannelMapData),

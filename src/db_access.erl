@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-03 18:54:46
+% @Last Modified time: 2023-03-04 15:10:46
 
 -module(db_access).
 
@@ -10,6 +10,7 @@
 -include("include/apodtelemetry.hrl").
 -include("include/youtube_channel.hrl").
 -include("include/apod_record_def.hrl").
+-include("include/macro_definitions.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -export([process_date_request/2, process_channel_request/1, update_nasa_table/1, package_channel_data/1]).
@@ -144,7 +145,7 @@ package_channel_data(ListOfRecords) ->
             date          => DbItem#youtube_channel.date
         }                                 
         end, SortedList),
-    maps:put(<<"Videos">>, MapData, #{}).
+    maps:put(?TOP_KEY, MapData, #{}).
     
 
 

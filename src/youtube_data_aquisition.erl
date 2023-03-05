@@ -1,19 +1,21 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 17:50:53
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-03 17:18:14
+% @Last Modified time: 2023-03-04 17:30:21
 -module(youtube_data_aquisition).
 -export([fetch_data/3]).
 -include("include/macro_definitions.hrl").
 
 fetch_data(production, ChannelId, Date) ->
-	fetch_channel_data_from_db([ChannelId], Date, #{}); 
+	fetch_channel_data(Date, [ChannelId], #{}); 
 
 fetch_data(periodic, ChannelIDs, Date) ->
-	fetch_channel_data_from_db(ChannelIDs, Date, #{}).
+	fetch_channel_data(Date, ChannelIDs, #{}).
 
-fetch_channel_data_from_db([ChannelID | Tail], Date, MasterMap) ->
-	Section = ChannelID,
+fetch_channel_data(_Date, [], Acc) -> 
+	{ok, Acc};
+
+fetch_channel_data(Date, [ChannelID | Tail], MasterMap) ->
 	Request = first_page_query(ChannelID, Date),
 
 	case httpc:request(Request) of
@@ -23,21 +25,20 @@ fetch_channel_data_from_db([ChannelID | Tail], Date, MasterMap) ->
 			PageToken = get_next_page_token(FirstPageMap),										% Extract the next page token
 			{ok, RemainderChannelMap} = fetch_next_page(ChannelID, Date, PageToken, PageMap), 	% Atempt to fetch data for the next page, or return
 			CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
-			SectionMap = maps:put(Section, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
+			SectionMap = maps:put(ChannelID, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
 			NewMaster = maps:merge(SectionMap, MasterMap),
-			{ok, ChannelMap} = fetch_channel_data_from_db(Tail, Date, NewMaster),				% Repeat the process with a map that already contains a channel and all its data
-			FinalPackage = utils:reformat_channel_data(#{?TOP_KEY => ChannelMap}),
+			{ok, CompositeMap} = fetch_channel_data(Date, Tail, NewMaster),						% Repeat the process with a map that already contains a channel and all its data
+			FinalMap = #{?TOP_KEY => CompositeMap},
+			FinalPackage = utils:reformat_channel_data(FinalMap),
 			Json = jiffy:encode(#{?TOP_KEY =>FinalPackage}),
 			{ok, Json};
 
 		{ok,{_,_,ErrorMessage}} ->
-			io:format("fetch_channel_data_from_db failed: ~p~n", [ErrorMessage]),
+			io:format("fetch_channel_data failed: ~p~n", [ErrorMessage]),
 			{error, ErrorMessage};
 		Other ->
 			{error, Other}
-	end;
-
-fetch_channel_data_from_db([], _Date, Acc) -> {ok, Acc}.
+	end.
 
 fetch_next_page(ChannelID, Date, [PageToken], Acc) ->
 	Request = next_page_query(ChannelID, Date, PageToken),
