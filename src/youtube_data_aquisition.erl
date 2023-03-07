@@ -1,37 +1,39 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 17:50:53
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-04 17:30:21
+% @Last Modified time: 2023-03-06 20:12:23
 -module(youtube_data_aquisition).
 -export([fetch_data/3]).
+-include("include/server_config_item.hrl").
 -include("include/macro_definitions.hrl").
+-import(server_config_processor, [fetch_client_config_data/1]).
+           
+fetch_data(production, ClientProfile, Date) ->
+	fetch_channel_data(Date, #{}, ClientProfile); 
 
-fetch_data(production, ChannelId, Date) ->
-	fetch_channel_data(Date, [ChannelId], #{}); 
+fetch_data(periodic, ClientProfile, Date) ->
+	fetch_channel_data(Date, #{}, ClientProfile).
 
-fetch_data(periodic, ChannelIDs, Date) ->
-	fetch_channel_data(Date, ChannelIDs, #{}).
+fetch_channel_data(_Date, NewMaster, []) ->
+	FinalMap = #{?TOP_KEY => NewMaster},
+	FinalPackage = utils:reformat_channel_data(FinalMap),
+	Json = jiffy:encode(#{?TOP_KEY =>FinalPackage}),
+	{ok, Json};
 
-fetch_channel_data(_Date, [], Acc) -> 
-	{ok, Acc};
+fetch_channel_data(Date, MasterMap, [Head|Tail]) ->
+	{YoutubeKey, ChannelID} = Head,
 
-fetch_channel_data(Date, [ChannelID | Tail], MasterMap) ->
-	Request = first_page_query(ChannelID, Date),
-
+	Request = first_page_query(YoutubeKey, ChannelID, Date),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, FirstPageMap} = utils:update_database(youtube, Body),							% Commit data from the first fetch to the database
 			PageMap = #{<<"first_page">> => FirstPageMap},										% First page does not have a token identifier
 			PageToken = get_next_page_token(FirstPageMap),										% Extract the next page token
-			{ok, RemainderChannelMap} = fetch_next_page(ChannelID, Date, PageToken, PageMap), 	% Atempt to fetch data for the next page, or return
+			{ok, RemainderChannelMap} = fetch_next_page(YoutubeKey, ChannelID, Date, PageToken, PageMap), 	% Atempt to fetch data for the next page, or return
 			CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
 			SectionMap = maps:put(ChannelID, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
 			NewMaster = maps:merge(SectionMap, MasterMap),
-			{ok, CompositeMap} = fetch_channel_data(Date, Tail, NewMaster),						% Repeat the process with a map that already contains a channel and all its data
-			FinalMap = #{?TOP_KEY => CompositeMap},
-			FinalPackage = utils:reformat_channel_data(FinalMap),
-			Json = jiffy:encode(#{?TOP_KEY =>FinalPackage}),
-			{ok, Json};
+			fetch_channel_data(Date, NewMaster, Tail);
 
 		{ok,{_,_,ErrorMessage}} ->
 			io:format("fetch_channel_data failed: ~p~n", [ErrorMessage]),
@@ -40,20 +42,20 @@ fetch_channel_data(Date, [ChannelID | Tail], MasterMap) ->
 			{error, Other}
 	end.
 
-fetch_next_page(ChannelID, Date, [PageToken], Acc) ->
-	Request = next_page_query(ChannelID, Date, PageToken),
+fetch_next_page(YoutubeKey, ChannelID, Date, [PageToken], Acc) ->
+	Request = next_page_query(YoutubeKey, ChannelID, Date, PageToken),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, Map} = utils:update_database(youtube, Body),
 			Token = get_next_page_token(Map),
-			fetch_next_page(ChannelID, Date, Token, maps:put(PageToken, Map, Acc)); %%% TODO: last arg should be a map
+			fetch_next_page(YoutubeKey, ChannelID, Date, Token, maps:put(PageToken, Map, Acc)); 
 			
 		{ok,{_,_,ErrorMessage}} ->
 			{error, ErrorMessage};
 		Other ->
 			{error, Other}
 	end;
-fetch_next_page(_ChannelID, _Date, [], Acc) -> {ok, Acc}.
+fetch_next_page(_ClientKey, _ChannelID, _Date, [], Acc) -> {ok, Acc}.
 
 get_next_page_token(Map) ->
 	Keys = maps:keys(Map),
@@ -66,8 +68,7 @@ get_next_page_token(Map) ->
 	end.
 
 
-first_page_query(ChannelID, [Date]) ->
-	{ok, YoutbeApiKey} = utils:fetch_youtube_api_key(),
+first_page_query(YoutbeApiKey, ChannelID, [Date]) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
 									  {"channelId", ChannelID},
 									  {"part", "snippet,id"},
@@ -77,8 +78,7 @@ first_page_query(ChannelID, [Date]) ->
 									  ]),
 	string:join([?YOUTUBE_HOST, Query], "");
 
-first_page_query(ChannelID, []) ->
-	{ok, YoutbeApiKey} = utils:fetch_youtube_api_key(),
+first_page_query(YoutbeApiKey, ChannelID, []) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
 									  {"channelId", ChannelID},
 									  {"part", "snippet,id"},
@@ -88,8 +88,7 @@ first_page_query(ChannelID, []) ->
 									  ]),
 	string:join([?YOUTUBE_HOST, Query], "").
 
-next_page_query(ChannelID, [Date], PageToken) ->
-	{ok, YoutbeApiKey} = utils:fetch_youtube_api_key(),
+next_page_query(YoutbeApiKey, ChannelID, [Date], PageToken) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
 									  {"channelId", ChannelID},
 									  {"part", "snippet,id"},
@@ -100,8 +99,7 @@ next_page_query(ChannelID, [Date], PageToken) ->
 									  ]),
 	string:join([?YOUTUBE_HOST, Query], "");
 
-next_page_query(ChannelID, [], PageToken) ->
-	{ok, YoutbeApiKey} = utils:fetch_youtube_api_key(),
+next_page_query(YoutbeApiKey, ChannelID, [], PageToken) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
 									  {"channelId", ChannelID},
 									  {"part", "snippet,id"},

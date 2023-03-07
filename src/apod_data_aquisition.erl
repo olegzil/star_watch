@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 17:35:41
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-02-24 12:42:32
+% @Last Modified time: 2023-03-05 17:19:46
 -module(apod_data_aquisition).
 -export([fetch_apod_data/3,fetch_data/1]).
 -include("include/macro_definitions.hrl").

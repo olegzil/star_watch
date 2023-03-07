@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-04 15:10:46
+% @Last Modified time: 2023-03-06 20:15:15
 
 -module(db_access).
 
@@ -11,6 +11,7 @@
 -include("include/youtube_channel.hrl").
 -include("include/apod_record_def.hrl").
 -include("include/macro_definitions.hrl").
+-include("include/server_config_item.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -export([process_date_request/2, process_channel_request/1, update_nasa_table/1, package_channel_data/1]).
@@ -78,15 +79,18 @@ process_date_request(StartDate, EndDate) ->
             {ok, jiffy:encode(JsonFreindly)}
     end.
 
-process_channel_request(Channel) ->
-   {_, ListOfRecords} = fetch_channel_data_from_db(Channel),
+process_channel_request(ClientKey) ->
+    ClientConfig = server_config_processor:fetch_client_config_data(ClientKey),
+    ChannelId = ClientConfig#server_config_item.channel_id,
+    YoutubeKey = ClientConfig#server_config_item.youtubekey,
+   {_, ListOfRecords} = fetch_channel_data_from_db(ChannelId),
 
     case length(ListOfRecords) of
         0 ->
-            case youtube_data_aquisition:fetch_data(production, Channel, []) of
+            case youtube_data_aquisition:fetch_data(production, [{YoutubeKey, ChannelId}], []) of
                 {error, _} ->
                     io:format("YOUTUBE fetch failed~n"),
-                    youtube_channel_data_not_found(Channel);
+                    youtube_channel_data_not_found(ChannelId);
                 {ok, JsonResult} -> 
                     {ok, JsonResult}
             end;

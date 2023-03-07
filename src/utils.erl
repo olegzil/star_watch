@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-04 17:30:42
+% @Last Modified time: 2023-03-06 19:57:29
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -16,7 +16,6 @@
 		 generate_coparable_list/1,
 		 write_test_data_to_db_and_dump_to_file/0,
 		 test_multi_channel_data_fetch/0,
-		 fetch_youtube_api_key/0, 
 		 reformat_channel_data/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -112,10 +111,11 @@ start_cron_job(apod) ->
 start_cron_job(youtube) ->
 	{{Year, Month, Day},{_, _, _}} = calendar:universal_time(), % get current year/month/day
 	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convert it to a single number
-	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate - 10),	% back track the current date back one day
+	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate),	% back track the current date back one day
 	Date = list_to_binary(io_lib:format("~.4.0w-~.2.0w-~.2.0wT~.2.0w:~.2.0w:~.2.0wZ", [Y, M, D, 0, 0, 0])), % generate 
-	YoutubeChannelFetchJob = {{daily, {5, 32, pm}},
-    {youtube_data_aquisition, fetch_data, [periodic, ?YOUTUBE_CHANNEL_IDS, [Date]]}},
+	ClientProfiles = server_config_processor:fetch_list_of_channel_ids_and_keys(),
+	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
+    {youtube_data_aquisition, fetch_data, [periodic, ClientProfiles, [Date]]}},
     erlcron:cron(youtube_daily_fetch_job, YoutubeChannelFetchJob).
 
 update_client_record(Telemetry) ->
@@ -491,15 +491,6 @@ list_of_binaries_to_lower_case_list_of_binaries([H|T], Acc) ->
 	list_of_binaries_to_lower_case_list_of_binaries(T, [string:casefold(H)|Acc]);
 	
 list_of_binaries_to_lower_case_list_of_binaries([], Acc) -> Acc.
-
-fetch_youtube_api_key() ->
-	{ok, [Map]} = file:consult("server_config.cfg"),
-	case maps:find(youtubekey, Map) of
-		{ok, Key} ->
-			{ok, Key};
-		error ->
-			{error, key_not_found}
-	end.
 
 reformat_channel_data(Map) ->
 	ChannelMap = maps:get(?TOP_KEY, Map),
