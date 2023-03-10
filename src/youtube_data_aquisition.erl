@@ -1,13 +1,13 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 17:50:53
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-06 20:12:23
+% @Last Modified time: 2023-03-09 13:27:51
 -module(youtube_data_aquisition).
 -export([fetch_data/3]).
 -include("include/server_config_item.hrl").
 -include("include/macro_definitions.hrl").
 -import(server_config_processor, [fetch_client_config_data/1]).
-           
+        
 fetch_data(production, ClientProfile, Date) ->
 	fetch_channel_data(Date, #{}, ClientProfile); 
 
@@ -24,6 +24,7 @@ fetch_channel_data(Date, MasterMap, [Head|Tail]) ->
 	{YoutubeKey, ChannelID} = Head,
 
 	Request = first_page_query(YoutubeKey, ChannelID, Date),
+	io:format("Fetching data for id: ~p~n", [ChannelID]),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, FirstPageMap} = utils:update_database(youtube, Body),							% Commit data from the first fetch to the database

@@ -15,12 +15,14 @@ start(_Type, _Args) ->
     % ppool_supersup:start_link(),  %% Start the pool manager
     % ppool:start_pool(database_server, 10, {database_server, start_link, []}), %% Create a pool of db workers
     
-    YoutubeApiConstraints  = {api_key, [fun validate_youtube_api_key/2]},
+    YoutubeAdminKeyConstraints = {key, [fun validate_admin_key/2]},
+    YoutubeApiConstraints  = {api_key, [fun validate_client_api_key/2]},
     ApiKeyConstraints   = { api_key,    [fun validate_access_key/2] },
     APODDateConstraints     = {start_date,  [fun validate_date_apod/2]},
     YearStartConstraint = {year_start, [fun validate_year_start/2]},
     YearEndConstraint = {year_end, [fun validate_year_end/2]},
         
+    FetchAdminRoute = {"/youtube/admin/[...]", [YoutubeAdminKeyConstraints], youtube_admin_channel_handler, []},
     FetchYoutubeChanneRoute = {"/youtube/channelselector/[...]", [YoutubeApiConstraints], youtube_channel_directory_handler, []},
     FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
     FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, [1]},
@@ -28,7 +30,7 @@ start(_Type, _Args) ->
     TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
     Dispatch = cowboy_router:compile([
-        {'_', [FetchYoutubeChanneRoute, FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
+        {'_', [FetchAdminRoute, FetchYoutubeChanneRoute, FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port,8083}],
@@ -42,10 +44,30 @@ start(_Type, _Args) ->
 stop(_State) ->
 	ok.
 
-validate_youtube_api_key(forward, Value) when Value =:= ?YOUTUBE_CLIENT_KEY ->
+find_user_id([], _Target) -> false;
+
+find_user_id([UserProfile | Tail], Target) ->
+    {ClientID, _, _, _} = UserProfile,
+    case ClientID =:= Target of
+        true -> true;
+        false -> find_user_id(Tail, Target)
+    end.
+
+validate_admin_key(forward, Value) when ?ADMINISTRATOR_KEY =:= Value ->
     {ok, Value};
-validate_youtube_api_key(forward, _) ->
-    {error, bad_youtube_api_key}.
+validate_admin_key(forward, _) ->
+    {error, bad_admin_key}.
+
+validate_client_api_key(forward, Value) ->
+    ChannelList = server_config_processor:fetch_list_of_client_ids_and_channel_ids(),
+    case find_user_id(ChannelList, Value) of 
+        true -> 
+            io:format("validate_client_api_key Success: ~p~n", [Value]),
+            {ok, Value};
+        false -> 
+            io:format("validate_client_api_key Failure bad_youtube_api_key"),
+            {error, bad_youtube_api_key}
+    end.
 
 validate_year_start(forward, Date) ->
     IntDate = binary_to_integer(Date),

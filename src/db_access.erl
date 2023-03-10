@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-06 20:15:15
+% @Last Modified time: 2023-03-09 16:04:08
 
 -module(db_access).
 
@@ -80,11 +80,12 @@ process_date_request(StartDate, EndDate) ->
     end.
 
 process_channel_request(ClientKey) ->
+    io:format("ClientKey: ~p~n", [ClientKey]),
     ClientConfig = server_config_processor:fetch_client_config_data(ClientKey),
     ChannelId = ClientConfig#server_config_item.channel_id,
     YoutubeKey = ClientConfig#server_config_item.youtubekey,
    {_, ListOfRecords} = fetch_channel_data_from_db(ChannelId),
-
+   io:format("Name: ~p~n", [ClientConfig#server_config_item.name]),
     case length(ListOfRecords) of
         0 ->
             case youtube_data_aquisition:fetch_data(production, [{YoutubeKey, ChannelId}], []) of

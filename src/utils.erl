@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-06 19:57:29
+% @Last Modified time: 2023-03-09 13:15:05
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -113,7 +113,7 @@ start_cron_job(youtube) ->
 	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convert it to a single number
 	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate),	% back track the current date back one day
 	Date = list_to_binary(io_lib:format("~.4.0w-~.2.0w-~.2.0wT~.2.0w:~.2.0w:~.2.0wZ", [Y, M, D, 0, 0, 0])), % generate 
-	ClientProfiles = server_config_processor:fetch_list_of_channel_ids_and_keys(),
+	ClientProfiles = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys(),
 	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
     {youtube_data_aquisition, fetch_data, [periodic, ClientProfiles, [Date]]}},
     erlcron:cron(youtube_daily_fetch_job, YoutubeChannelFetchJob).
