@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-13 16:45:38
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-01-25 16:37:24
+% @Last Modified time: 2023-03-11 18:55:10
 
 -module(star_watch_master_sup).
 -behaviour(supervisor).
@@ -16,6 +16,14 @@ init([]) ->
     {ok, {{one_for_one, 10, 3600}, []}}.
 
 %%%%%%%%%%%%%%%%%%%%% Public functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+attach_child(Child, Args) when Child =:= serverconfig ->
+                    ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
+                    Server = {ChildName, 
+                            {config_server, start_link, [Args]}, 
+                            temporary, 5000, worker, [config_server]},
+                    Result = child_start_selector(Server),
+                    {ChildName, Result};
+
 attach_child(Child, Args) when Child =:= apod ->
                     ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
                     Server = {ChildName, 

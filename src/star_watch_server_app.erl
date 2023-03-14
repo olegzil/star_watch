@@ -39,9 +39,20 @@ start(_Type, _Args) ->
     inets:start(),
     utils:start_cron_job(youtube),
     utils:start_cron_job(apod),
-    star_watch_master_sup:start_link().
+    MasterPid = star_watch_master_sup:start_link(),
+    %% Create a child process that will handle all file access to the server_config.cfg file.
+    Response = star_watch_master_sup:attach_child(serverconfig, {"server_config.cfg"}),
+    {_ChildID, {_ChildStartResults, ChildPid}} = Response,
+    if
+        is_pid(ChildPid) ->
+            global:register_name(server_config, ChildPid), %% We have a valid Pid. Register for global access
+            MasterPid;
+        true ->
+            {error, failure_creating_child_process} %% Broke ass server
+    end.
 
 stop(_State) ->
+    global:unregister_name(server_config),
 	ok.
 
 find_user_id([], _Target) -> false;
