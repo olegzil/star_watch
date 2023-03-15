@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 18:51:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-09 11:11:55
+% @Last Modified time: 2023-03-13 19:26:24
 -module(youtube_admin_channel_handler).
 -behaviour(cowboy_handler).
 
@@ -27,7 +27,6 @@ submit_request_for_processing(Request) ->
     } = cowboy_req:match_qs([key, action], Request) of
          _ ->
             RequestResult = administrator:execute_action(Action),
-            io:format("youtube_admin_channel_handler called with action: ~p~n", [Action]),
             case RequestResult of
             {ok, Good} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),

@@ -16,6 +16,7 @@
 -define(YOUTUBE_RETURN_VIEDO_LIST_KEY, <<"Videos">>).
 -define(ADMIN_AVAILABLE_ACTIONS, [<<"delete">>, <<add>>]).
 -define(DEFAULT_YOUTUBE_KEY, <<"AIzaSyDXepMVUKYMdn9ui3Nn9X6rau37r-89t6Q">>).
+-define(YOUTUBE_KEY, <<"youtubekey">>).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

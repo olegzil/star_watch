@@ -1,12 +1,11 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 17:50:53
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-09 13:27:51
+% @Last Modified time: 2023-03-14 10:05:35
 -module(youtube_data_aquisition).
 -export([fetch_data/3]).
 -include("include/server_config_item.hrl").
 -include("include/macro_definitions.hrl").
--import(server_config_processor, [fetch_client_config_data/1]).
         
 fetch_data(production, ClientProfile, Date) ->
 	fetch_channel_data(Date, #{}, ClientProfile); 

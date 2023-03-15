@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-09 13:15:05
+% @Last Modified time: 2023-03-15 12:51:29
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -16,7 +16,8 @@
 		 generate_coparable_list/1,
 		 write_test_data_to_db_and_dump_to_file/0,
 		 test_multi_channel_data_fetch/0,
-		 reformat_channel_data/1]).
+		 reformat_channel_data/1,
+		 compose_error_message/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -113,7 +114,10 @@ start_cron_job(youtube) ->
 	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convert it to a single number
 	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate),	% back track the current date back one day
 	Date = list_to_binary(io_lib:format("~.4.0w-~.2.0w-~.2.0wT~.2.0w:~.2.0w:~.2.0wZ", [Y, M, D, 0, 0, 0])), % generate 
-	ClientProfiles = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys(),
+	FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys("server_config.cfg"),
+	[Key] = maps:keys(FetchResult),
+	Value = maps:get(Key, FetchResult),
+	{ClientProfiles} = Value,
 	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
     {youtube_data_aquisition, fetch_data, [periodic, ClientProfiles, [Date]]}},
     erlcron:cron(youtube_daily_fetch_job, YoutubeChannelFetchJob).
@@ -540,6 +544,11 @@ extract_items([Item | Items], Acc) ->
 extract_items([], Acc) ->
 	Acc.                                 
 
+compose_error_message(ErrorCode, ErrorMessage) ->
+	{Date, Time} = calendar:now_to_local_time(erlang:timestamp()),
+	Timestamp  = calendar:datetime_to_gregorian_seconds({Date, Time}),
+	{[{timestamp, Timestamp}, {errorcode, ErrorCode}, {message, ErrorMessage}]}.
+	
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 parse_test_json(ChannelKey, JsonData) ->

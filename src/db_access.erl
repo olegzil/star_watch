@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-13 12:51:08
+% @Last Modified time: 2023-03-14 12:29:10
 
 -module(db_access).
 
@@ -14,7 +14,7 @@
 -include("include/server_config_item.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
--export([process_date_request/2, process_channel_request/1, update_nasa_table/1, package_channel_data/1]).
+-export([process_date_request/2, process_channel_request/2, update_nasa_table/1, package_channel_data/1]).
 -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 
 update_nasa_table(DBItem) -> 
@@ -79,10 +79,17 @@ process_date_request(StartDate, EndDate) ->
             {ok, jiffy:encode(JsonFreindly)}
     end.
 
-process_channel_request(ClientKey) ->
-    ClientConfig = server_config_processor:fetch_client_config_data(ClientKey),
-    ChannelId = ClientConfig#server_config_item.channel_id,
-    YoutubeKey = ClientConfig#server_config_item.youtubekey,
+
+process_channel_request(File, ClientKey) ->
+    {ok, Record} = server_config_processor:fetch_client_config_data(File, ClientKey),
+    process_channel_request_private(ClientKey, Record).
+
+process_channel_request_private(_ClientKey, {error, Map}) ->
+            FinalPackage = package_channel_data([Map]),
+            {ok, jiffy:encode({error, FinalPackage})};
+
+process_channel_request_private(ClientKey, {ok, Map}) ->
+   {_, [{youtubekey, YoutubeKey}, {channel_id, ChannelId}]} = maps:get(ClientKey, Map),
    {_, ListOfRecords} = fetch_channel_data_from_db(ChannelId),
     case length(ListOfRecords) of
         0 ->
@@ -98,6 +105,7 @@ process_channel_request(ClientKey) ->
             FinalPackage = package_channel_data(ListOfRecords),                        % The client expects a Json object containing an array
             {ok, jiffy:encode(FinalPackage)}
     end.
+
 
 date_range_not_found(StartDate, EndDate) ->
     DateStart = gregorian_days_to_binary(StartDate),

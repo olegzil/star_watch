@@ -12,9 +12,6 @@
 
 start(_Type, _Args) ->
     initialize_mnesia(), %% Start mnesia
-    % ppool_supersup:start_link(),  %% Start the pool manager
-    % ppool:start_pool(database_server, 10, {database_server, start_link, []}), %% Create a pool of db workers
-    
     YoutubeAdminKeyConstraints = {key, [fun validate_admin_key/2]},
     YoutubeApiConstraints  = {api_key, [fun validate_client_api_key/2]},
     ApiKeyConstraints   = { api_key,    [fun validate_access_key/2] },

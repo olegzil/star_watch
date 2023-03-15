@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-11 18:33:02
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-13 16:53:33
+% @Last Modified time: 2023-03-14 13:33:58
 -module(config_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -14,7 +14,7 @@ stop(Pid) ->
     gen_server:call(Pid, stop).
 
 init([{FileName}]) ->
-    {ok, FileName}.
+    {ok, {FileName}}.
    
 
 %%% OTP Callbacks
@@ -27,13 +27,13 @@ handle_call({fetchprofilemap}, _From, State) ->
 	{reply, FetchResult, State};
 
 handle_call({fetchclientconfigdata, ClientID}, _From, State) ->
-	{_FileName} = State,
-    FetchResult = server_config_processor:fetch_client_config_data(ClientID),
+	{FileName} = State,
+    FetchResult = server_config_processor:fetch_client_config_data(FileName, ClientID),
     {reply, FetchResult,  State};
 
 handle_call({fetchlistofchannelidsandyoutubekeys}, _From, State) ->
-	{_FileName} = State, 
-    FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys(),
+	{FileName} = State, 
+    FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys(FileName),
     {reply, FetchResult,  State};
 
 handle_call({fetchlistofclientidsandchannelids}, _From, State) ->
@@ -47,9 +47,9 @@ handle_call({fetchclientidsandnames}, _From, State) ->
     {reply, FetchResult,  State};
 
 handle_call({addconfigrecord, Record}, _From, State) ->
-	{FileName} = State, 
-    FetchResult = server_config_processor:update_config_record(FileName, Record),
-    {reply, FetchResult,  State};
+	FileName = State, 
+    Result = server_config_processor:update_config_record(FileName, Record),
+    {reply, Result,  State};
 
 handle_call({deleteconfigrecord, Record}, _From, State) ->
     {FileName} = State, 
