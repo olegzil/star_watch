@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-15 22:18:19
+% @Last Modified time: 2023-03-16 12:25:57
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
@@ -24,9 +24,14 @@ execute_action(Request) ->
 validate_action(Verb) ->
 	% Request = <<"channel_directory:add:id=cad00c93-b012-49f9-97f9-35e69ae083a0:name=sonomaashram,youtubekey=AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ,channel_id=UCQfZkf3-Y2RwzdRFWXYsdaQ">>.
 	%% if yutubekey is omited, the default is used.
-	[Action, Subject] = string:split(Verb, ":"),
-	%% expected result:  [<<"the action requested">>, "id=the client id,name=the name,youtubekey:the key maybe,channel_id=the channel id"]
-	process_item(string:lowercase(Action), Subject).
+	%% TODO: The code below must be mondified to check each verb for parameters. I.E. fetchclientconfigdata must have a client id, while fetchlistofchannelidsandyoutubekeys does not.
+	case string:find(Verb, ":") of
+		nomatch ->
+			process_item(string:lowercase(Verb), []);
+		_ ->
+			[Action, Subject] = string:split(Verb, ":"),
+			process_item(string:lowercase(Action), Subject)
+	end.
 
 process_item(<<"deleteconfigrecord">>, Actions) -> 
 	Value = Actions,
@@ -77,7 +82,7 @@ process_item(<<"add">>, Actions) ->
 					gen_server:call(global:whereis_name(server_config), {addconfigrecord, NewRecord}, infinity);
 
 				true ->
-					NewRecord = #{IdKey => {NameKey, [{youtubekey, ?DEFAULT_YOUTUBE_KEY}, {channel_id, ChannelID} ] }},
+					NewRecord = #{IdKey => {NameKey, [{youtubekey, server_config_processor:get_default_youtube_key("server_config.cfg")}, {channel_id, ChannelID} ] }},
 					gen_server:call(global:whereis_name(server_config), {addconfigrecord, NewRecord}, infinity)
 			end;
 

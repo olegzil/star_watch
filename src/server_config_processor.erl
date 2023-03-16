@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-06 15:30:12
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-15 22:14:49
+% @Last Modified time: 2023-03-16 12:26:54
 -module(server_config_processor).
 -include("include/server_config_item.hrl").
 -include("include/error_responses.hrl").
@@ -11,7 +11,30 @@
 		 fetch_list_of_client_ids_and_channel_ids/0,
 		 fetch_client_ids_and_names/0,
 		 update_config_record/2,
-		 delete_record/2]).
+		 delete_record/2,
+		 get_default_youtube_key/1]).
+
+parse_server_config_file(File) ->
+	{ok, ServerConfig} = file:consult(File),
+	[ControlBlock|ClientProfiles] = ServerConfig,
+	#{
+		profiles => ClientProfiles,
+		control_block => ControlBlock
+	}.
+
+get_profiles_list(File) ->
+	MasterMap = parse_server_config_file(File),
+	[ProfilesMap|_] = maps:get(profiles, MasterMap),
+	maps:get(client_profiles, ProfilesMap).
+
+get_server_control_block(File) ->
+	MasterMap = parse_server_config_file(File),
+	maps:get(control_block, MasterMap).
+
+get_default_youtube_key(File) ->
+	ControlBlock = get_server_control_block(File),
+	Map = maps:get(server_control_block, ControlBlock),
+	maps:get(default_youtubekey, Map).
 
 fetch_client_config_data(File,ClientKey) ->
 	Result = fetch_client_config_data_private(File, ClientKey),
@@ -23,7 +46,7 @@ fetch_client_config_data(File,ClientKey) ->
 	end.
 
 fetch_client_config_data_private(File, ClientKey) ->
-	{ok, List} = file:consult(File),
+	List = get_profiles_list(File),
 	Result = fetch_data_for_key(ClientKey, List),
 	case Result of
 		error ->
@@ -39,7 +62,7 @@ fetch_client_config_data_private(File, ClientKey) ->
 	end.
 
 fetch_profile_map() ->
-	{ok, List} = file:consult("server_config.cfg"),
+	List = get_profiles_list("server_config.cfg"),
 	#{ok => fetch_all_items(List, [])}.
 
 fetch_all_items([], Acc) -> Acc;
@@ -57,7 +80,7 @@ fetch_all_items([Client|Tail], Acc) ->
 		merge_maps(Tail, maps:merge(Acc, Head)).
 
 fetch_list_of_channel_ids_and_youtube_keys(FileName) ->
-	{ok, List} = file:consult(FileName),
+	List = get_profiles_list(FileName),
 	#{ok => fetch_client_and_youtube_ids(List, [])}.
 
 fetch_client_and_youtube_ids([], Acc) -> {Acc};
@@ -94,11 +117,11 @@ fetch_list_of_client_channel_tuples([Client|Tail], Acc) ->
 
 
 fetch_list_of_client_ids_and_channel_ids() ->
-	{ok, List} = file:consult("server_config.cfg"),
+	List = get_profiles_list("server_config.cfg"),
 	fetch_list_of_client_channel_tuples(List, []).
 
 fetch_client_ids_and_names() ->
-	{ok, List} = file:consult("server_config.cfg"),
+	List = get_profiles_list("server_config.cfg"),
 	fetch_ids_and_names(List, []).	
 
 fetch_ids_and_names([], Acc) -> Acc;
@@ -111,7 +134,7 @@ fetch_ids_and_names([Client|Tail], Acc) ->
 	fetch_ids_and_names(Tail, NewList).
 
 delete_record(File, ClientID) ->
-	{ok, List} = file:consult(File),
+	List = get_profiles_list("server_config.cfg"),
 	delete_record_find_key(File, ClientID, List).
 
 delete_record_find_key(File, ClientID, List) ->
@@ -152,7 +175,8 @@ delete_record_update_file(File, [Map|Tail]) ->
 	delete_record_update_file(File, Tail).
 
 fetch_profile_map_private() ->
-	{ok, List} = file:consult("server_config.cfg"),
+	ServerControl = get_profiles_list("server_config.cfg"),
+	List = maps:get(profiles, ServerControl),
 	generate_config_list(List, []).
 
 generate_config_list([], Acc) ->Acc;
