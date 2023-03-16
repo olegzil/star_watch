@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-15 12:51:29
+% @Last Modified time: 2023-03-15 15:37:54
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -551,6 +551,7 @@ compose_error_message(ErrorCode, ErrorMessage) ->
 	
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 parse_test_json(ChannelKey, JsonData) ->
 	ChannelData = maps:get(ChannelKey, JsonData),
 	Pages = maps:keys(ChannelData),

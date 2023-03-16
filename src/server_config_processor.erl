@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-06 15:30:12
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-14 21:14:26
+% @Last Modified time: 2023-03-15 22:14:49
 -module(server_config_processor).
 -include("include/server_config_item.hrl").
 -include("include/error_responses.hrl").
@@ -148,8 +148,25 @@ delete_record_find_key(File, ClientID, List) ->
 delete_record_update_file(_File, []) -> ok;
 delete_record_update_file(File, [Map|Tail]) ->
 	[Key] = maps:keys(Map),
-	update_config_file(File, Key, Map),
+	update_config_file(delete_record, File, Key, Map),
 	delete_record_update_file(File, Tail).
+
+fetch_profile_map_private() ->
+	{ok, List} = file:consult("server_config.cfg"),
+	generate_config_list(List, []).
+
+generate_config_list([], Acc) ->Acc;
+generate_config_list([Map|Tail], Acc) ->
+	[Value] = maps:values(Map),
+	[Key] = maps:keys(Map),
+	{Name, [{_, YoutubeKey}, {_, ChannelId} ]} = Value,
+	ListItem = #server_config_item{
+		name = Name,
+		client_id = Key, 
+		youtubekey = YoutubeKey,
+		channel_id = ChannelId
+	},
+	generate_config_list(Tail, lists:append(Acc, [ListItem])).
 
 
 update_config_record(File, NewRecord) ->
@@ -157,26 +174,33 @@ update_config_record(File, NewRecord) ->
     #{Key := {Name, [{youtubekey, YoutubeKey}, {channel_id, ChannelID} ] }} = NewRecord,
     ListResult = io_lib:format("#{~p => {~p, [{youtubekey, ~p}, {channel_id, ~p} ] }}.~n", [Key, Name, YoutubeKey, ChannelID]),
     ConfigRecord = list_to_binary(ListResult),
-
 	case fetch_client_config_data_private(File, Key) of
 		error -> %% This key does not exist. Add it.
 			file:write_file(File, ConfigRecord, [append]),
-			{ok, NewRecord};
+			compose_success_message(<<"New entry added">>, NewRecord);
 		_OldRecord ->
-			Map = fetch_profile_map(),
-			Record = {Name, YoutubeKey, ChannelID},
-			NewMap = maps:put(Key, Record, Map),
-			file:delete(File),
-			write_map(File, NewMap, maps:keys(NewMap)),
-			{ok, NewRecord}
+			ListOfRecords = fetch_profile_map_private(),
+			file:write_file(File, ConfigRecord),
+			write_map(File, ListOfRecords),
+			compose_success_message(<<"Existing record updated">>, NewRecord)
 	end.
-write_map(_File, _NewMap, []) -> ok;
+write_map(_File, []) -> ok;
 
-write_map(File, NewMap, [Key|Tail]) ->
-	update_config_file(File, Key, NewMap),
-	write_map(File, NewMap, Tail).
+write_map(File, [Record|Tail]) ->
+	update_config_file(update_record, File, Record, []),
+	write_map(File, Tail).
 	
-update_config_file(File, Key, NewMap) ->
+
+update_config_file(update_record, File, Record, _Arg2) ->
+	ListResult = io_lib:format("#{~p => {~p, [{youtubekey, ~p}, {channel_id, ~p} ] }}.~n", 
+								[Record#server_config_item.client_id, 
+								Record#server_config_item.name, 
+								Record#server_config_item.youtubekey, 
+								Record#server_config_item.channel_id]),
+	ConfigRecord = list_to_binary(ListResult),
+	file:write_file(File, ConfigRecord,[append]);
+
+update_config_file(delete_record, File, Key, NewMap) ->
 	case maps:find(Key, NewMap) of
 		{ok,{Name,YoutubeKey, ChannelID}} ->
 		    ListResult = io_lib:format("#{~p => {~p, [{youtubekey, ~p}, {channel_id, ~p} ] }}.~n", [Key, Name, YoutubeKey, ChannelID]),
@@ -187,3 +211,14 @@ update_config_file(File, Key, NewMap) ->
 		    ConfigRecord = list_to_binary(ListResult),
 			file:write_file(File, ConfigRecord,[append])
 	end.
+compose_success_message(Message, Map) ->
+	[Key] = maps:keys(Map),
+	Value = maps:get(Key, Map),
+	{Name,[{youtubekey,YoutubeKey},{channel_id,ChannelID}]} = Value,
+	Result = #{client_id => Key,
+		name => Name,
+		youtubekey => YoutubeKey,
+		channel_id => ChannelID
+	},
+	#{Message => Result}.
+

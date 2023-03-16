@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-11 18:33:02
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-14 13:33:58
+% @Last Modified time: 2023-03-15 22:19:53
 -module(config_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -14,7 +14,7 @@ stop(Pid) ->
     gen_server:call(Pid, stop).
 
 init([{FileName}]) ->
-    {ok, {FileName}}.
+    {ok, FileName}.
    
 
 %%% OTP Callbacks
@@ -52,7 +52,7 @@ handle_call({addconfigrecord, Record}, _From, State) ->
     {reply, Result,  State};
 
 handle_call({deleteconfigrecord, Record}, _From, State) ->
-    {FileName} = State, 
+    FileName = State, 
     FetchResult = server_config_processor:delete_record(FileName, Record),
     {reply, FetchResult,  State};
 

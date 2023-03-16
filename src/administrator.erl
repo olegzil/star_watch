@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-14 20:15:17
+% @Last Modified time: 2023-03-15 22:18:19
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
@@ -22,22 +22,20 @@ execute_action(Request) ->
 	end.
 
 validate_action(Verb) ->
-	% Request = <<"channel_directory:add:id=cad00c93-b012-49f9-97f9-35e69ae083a0:name=sonomaashram:youtubekey=AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ:channel_id=UCQfZkf3-Y2RwzdRFWXYsdaQ">>.
+	% Request = <<"channel_directory:add:id=cad00c93-b012-49f9-97f9-35e69ae083a0:name=sonomaashram,youtubekey=AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ,channel_id=UCQfZkf3-Y2RwzdRFWXYsdaQ">>.
 	%% if yutubekey is omited, the default is used.
-	Parts = string:split(Verb, ":", all),
-	%% expected result:  [<<"the action requested">>, "id=the client id", "name=the name", "youtubekey:the key, maybe", "channel_id=the channel id"]
-	process_verb(Parts).
+	[Action, Subject] = string:split(Verb, ":"),
+	%% expected result:  [<<"the action requested">>, "id=the client id,name=the name,youtubekey:the key maybe,channel_id=the channel id"]
+	process_item(string:lowercase(Action), Subject).
 
-process_verb([Head|Tail]) ->
-	process_item(string:lowercase(Head), Tail).
-
-process_item(<<"delete">>, Actions) -> 
-	[Value] = Actions,
+process_item(<<"deleteconfigrecord">>, Actions) -> 
+	Value = Actions,
 	Parts = string:split(Value, "="),
 	ClientID = lists:nth(2, Parts),
-	server_config_processor:delete_record(?SERVER_CONFIG_FILE, ClientID);
+	Pid = global:whereis_name(server_config),
+	gen_server:call(Pid, {deleteconfigrecord, ClientID}, infinity);
 
-process_item(<<"fetchchannel_ids_youtube_keys">>, _Actions) ->
+process_item(<<"fetchlistofchannelidsandyoutubekeys">>, _Actions) ->
 	Pid = global:whereis_name(server_config),
 	gen_server:call(Pid, {fetchlistofchannelidsandyoutubekeys}, infinity);
 
@@ -45,14 +43,30 @@ process_item(<<"fetchprofilemap">>, _Actions) ->
 	Pid = global:whereis_name(server_config),
 	gen_server:call(Pid, {fetchprofilemap}, infinity);
 
+process_item(<<"fetchclientconfigdata">>, Actions) ->
+	[Value] = Actions,
+	Parts = string:split(Value, "="),
+	ClientID = lists:nth(2, Parts),
+	Pid = global:whereis_name(server_config),
+	gen_server:call(Pid, {fetchclientconfigdata, ClientID}, infinity);
+
+process_item(<<"fetchlistofclientidsandchannelids">>, _Actions) ->
+	Pid = global:whereis_name(server_config),
+	gen_server:call(Pid, {fetchlistofclientidsandchannelids}, infinity);
+
+process_item(<<"fetchclientidsandnames">>, _Actions) ->
+	Pid = global:whereis_name(server_config),
+	gen_server:call(Pid, {fetchclientidsandnames}, infinity);
+
 process_item(<<"fetch">>, _Actions) ->
 	server_config_processor:fetch_client_ids_and_names();
 
 process_item(<<"add">>, Actions) ->
-	Result = validate_command_string(Actions, #{}),
+	Parts = string:split(Actions, ",", all),
+	Result = validate_add_command(Actions, Parts, #{}),
 	case Result of
 		{ok, Map} ->
-			IdKey = maps:get(<<"id">>, Map),
+			IdKey = maps:get(<<"client_id">>, Map),
 			NameKey = binary_to_atom(maps:get(<<"name">>, Map)), 
 			ChannelID = maps:get(<<"channel_id">>, Map),
 
@@ -65,37 +79,49 @@ process_item(<<"add">>, Actions) ->
 				true ->
 					NewRecord = #{IdKey => {NameKey, [{youtubekey, ?DEFAULT_YOUTUBE_KEY}, {channel_id, ChannelID} ] }},
 					gen_server:call(global:whereis_name(server_config), {addconfigrecord, NewRecord}, infinity)
-
 			end;
 
 		{error, Message} ->
-			{error, Message}
+			jiffy:encode(#{error => Message})
 	end.
 	
-validate_command_string([], Acc) -> 
-	Test = maps:is_key(<<"id">>, Acc) andalso
-		maps:is_key(<<"name">>, Acc) andalso
-		maps:is_key(<<"channel_id">>, Acc),
-	if
-		 Test =:= true ->
-			{ok, Acc};
-		true -> 
-			Keys=maps:keys(Acc),
-			format_error(<<"Missing required key: ">>, list_to_binary(Keys))
-	end;
+validate_commands([], _Arg2, Map) ->
+	{ok, Map};
+validate_commands([Command|Tail], CommandList, Map) ->
+	case lists:member(Command, CommandList) of
+		true ->
+			validate_commands(Tail, CommandList, Map);
+		false ->
+			format_error(<<"Missing parameter: ">>, Command)
+	end.
 
-validate_command_string([Head|Tail], Acc) ->
+validate_add_command(_Arg1, [], Map) -> 
+	CommandList = [<<"client_id">>, <<"name">>, <<"channel_id">>],
+	validate_commands(CommandList, maps:keys(Map), Map);
+
+validate_add_command(Actions, [Head|Tail], Map) ->
 	Items = string:split(Head, <<"=">>),
-	Key = lists:nth(1, Items),
+	Label = lists:nth(1, Items),
 	if
 		length(Items) < 2 ->
-			format_error(<<"Missing key: ">>, list_to_binary(Items));
+			format_error(<<"Malformed command: ">>, Head);
 			true -> 
-				case maps:is_key(Key, Acc) of
-					true -> format_error(<<"Duplicate key">>, Key);
-					false -> 
-						NewMap = maps:put(Key, lists:nth(2, Items), Acc),
-						validate_command_string(Tail, NewMap)		
+				Value = lists:nth(2, Items),
+				case Label of
+					<<"client_id">> ->
+						NewMap = maps:put(Label, Value, Map),
+						validate_add_command(Actions, Tail, NewMap);
+					<<"name">> ->
+						NewMap = maps:put(Label, Value, Map),
+						validate_add_command(Actions, Tail, NewMap);
+					<<"youtubekey">> ->
+						NewMap = maps:put(Label, Value, Map),
+						validate_add_command(Actions, Tail, NewMap);
+					<<"channel_id">> ->
+						NewMap = maps:put(Label, Value, Map),
+						validate_add_command(Actions, Tail, NewMap);
+					_ ->
+						validate_add_command(Actions, Tail, Map)
 				end
 	end.
 
