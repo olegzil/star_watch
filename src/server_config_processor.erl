@@ -1,22 +1,23 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-06 15:30:12
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-16 12:26:54
+% @Last Modified time: 2023-03-16 20:37:38
 -module(server_config_processor).
 -include("include/server_config_item.hrl").
 -include("include/error_responses.hrl").
 -export([fetch_client_config_data/2, 
 		 fetch_list_of_channel_ids_and_youtube_keys/1,
-		 fetch_profile_map/0,
+		 fetch_profile_map/1,
 		 fetch_list_of_client_ids_and_channel_ids/0,
 		 fetch_client_ids_and_names/0,
 		 update_config_record/2,
 		 delete_record/2,
-		 get_default_youtube_key/1]).
+		 get_default_youtube_key/1, 
+		 fetch_list_of_channel_ids_and_youtube_keys_jsonified/1]).
 
 parse_server_config_file(File) ->
 	{ok, ServerConfig} = file:consult(File),
-	[ControlBlock|ClientProfiles] = ServerConfig,
+	[ControlBlock, ClientProfiles] = ServerConfig,
 	#{
 		profiles => ClientProfiles,
 		control_block => ControlBlock
@@ -24,8 +25,8 @@ parse_server_config_file(File) ->
 
 get_profiles_list(File) ->
 	MasterMap = parse_server_config_file(File),
-	[ProfilesMap|_] = maps:get(profiles, MasterMap),
-	maps:get(client_profiles, ProfilesMap).
+	Map = maps:get(profiles, MasterMap),
+	maps:get(client_profiles, Map).
 
 get_server_control_block(File) ->
 	MasterMap = parse_server_config_file(File),
@@ -40,9 +41,11 @@ fetch_client_config_data(File,ClientKey) ->
 	Result = fetch_client_config_data_private(File, ClientKey),
 	case Result of
 		error ->
-			{error, #{ClientKey => {unknown, [{youtubekey, unknown}, {channel_id, unknown} ] }}};
+			Message = utils:jsonify_list_of_tuples([error, client_key], [{<<"client id not found">>, ClientKey}]),
+			{error, Message};
 		Value ->
-			{ok, #{ClientKey => {Value#server_config_item.name, [{youtubekey, Value#server_config_item.youtubekey}, {channel_id, Value#server_config_item.channel_id} ] }}}
+			Message = utils:jsonify_list_of_tuples([client_key, name, youtubekey, channel_id], [{ClientKey, Value#server_config_item.name, Value#server_config_item.youtubekey, Value#server_config_item.channel_id}]),
+			{ok, Message}
 	end.
 
 fetch_client_config_data_private(File, ClientKey) ->
@@ -61,9 +64,9 @@ fetch_client_config_data_private(File, ClientKey) ->
 			}
 	end.
 
-fetch_profile_map() ->
-	List = get_profiles_list("server_config.cfg"),
-	#{ok => fetch_all_items(List, [])}.
+fetch_profile_map(FileName) ->
+	List = get_profiles_list(FileName),
+	{ok, #{items => fetch_all_items(List, [])}}.
 
 fetch_all_items([], Acc) -> Acc;
 fetch_all_items([Client|Tail], Acc) ->
@@ -82,6 +85,12 @@ fetch_all_items([Client|Tail], Acc) ->
 fetch_list_of_channel_ids_and_youtube_keys(FileName) ->
 	List = get_profiles_list(FileName),
 	#{ok => fetch_client_and_youtube_ids(List, [])}.
+
+
+fetch_list_of_channel_ids_and_youtube_keys_jsonified(FileName) ->
+	List = get_profiles_list(FileName),
+	{TupleList} = fetch_client_and_youtube_ids(List, []),
+	{ok, utils:jsonify_list_of_tuples([youtube_key, channel_id], TupleList)}.
 
 fetch_client_and_youtube_ids([], Acc) -> {Acc};
 
@@ -118,11 +127,13 @@ fetch_list_of_client_channel_tuples([Client|Tail], Acc) ->
 
 fetch_list_of_client_ids_and_channel_ids() ->
 	List = get_profiles_list("server_config.cfg"),
-	fetch_list_of_client_channel_tuples(List, []).
+	TupleList = fetch_list_of_client_channel_tuples(List, []),
+	io:format("TupleList: ~p~n", [TupleList]),
+	{ok, #{items => utils:jsonify_list_of_tuples([client_id, channel_id], TupleList)}}.
 
 fetch_client_ids_and_names() ->
 	List = get_profiles_list("server_config.cfg"),
-	fetch_ids_and_names(List, []).	
+	{ok, #{items => fetch_ids_and_names(List, [])}}.	
 
 fetch_ids_and_names([], Acc) -> Acc;
 fetch_ids_and_names([Client|Tail], Acc) ->
@@ -135,7 +146,7 @@ fetch_ids_and_names([Client|Tail], Acc) ->
 
 delete_record(File, ClientID) ->
 	List = get_profiles_list("server_config.cfg"),
-	delete_record_find_key(File, ClientID, List).
+	{ok, delete_record_find_key(File, ClientID, List)}.
 
 delete_record_find_key(File, ClientID, List) ->
 	OriginalSize = length(List),
@@ -156,15 +167,17 @@ delete_record_find_key(File, ClientID, List) ->
 		    Item = fetch_client_config_data_private(File, ClientID),
 		    file:delete(File),
 			delete_record_update_file(File, NewList),
-		    #{deleted => {[
-		    			{client_id,  Item#server_config_item.channel_id}, 
-		    			{name, 		 Item#server_config_item.name}, 
-		    			{youtubekey, Item#server_config_item.youtubekey}, 
-		    			{channel_id, Item#server_config_item.channel_id}
-		    		  ]}};
+			Message = utils:jsonify_list_of_tuples([success, client_id, name, youtubekey, channel_id], [{
+																								<<"Record deleted">>,
+																								Item#server_config_item.channel_id, 
+																								Item#server_config_item.name,
+																								Item#server_config_item.youtubekey,
+																								Item#server_config_item.channel_id
+																							   }]),
+			{ok, Message};
 		false ->
-			Message = <<"Could not find client id: ">>,
-			#{error => utils:compose_error_message(<<"client_id_not_found">>, <<Message/binary, ClientID/binary>>)}
+			Message = utils:jsonify_list_of_tuples([error, client_key], [{<<"client id not found">>, ClientID}]),
+			{error, Message}
 	end.
 
 
@@ -201,12 +214,12 @@ update_config_record(File, NewRecord) ->
 	case fetch_client_config_data_private(File, Key) of
 		error -> %% This key does not exist. Add it.
 			file:write_file(File, ConfigRecord, [append]),
-			compose_success_message(<<"New entry added">>, NewRecord);
+			{ok, compose_success_message(<<"New entry added">>, NewRecord)};
 		_OldRecord ->
 			ListOfRecords = fetch_profile_map_private(),
 			file:write_file(File, ConfigRecord),
 			write_map(File, ListOfRecords),
-			compose_success_message(<<"Existing record updated">>, NewRecord)
+			{ok, compose_success_message(<<"Existing record updated">>, NewRecord)}
 	end.
 write_map(_File, []) -> ok;
 

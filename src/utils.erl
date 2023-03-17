@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-15 15:37:54
+% @Last Modified time: 2023-03-16 19:42:38
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -17,7 +17,8 @@
 		 write_test_data_to_db_and_dump_to_file/0,
 		 test_multi_channel_data_fetch/0,
 		 reformat_channel_data/1,
-		 compose_error_message/2]).
+		 compose_error_message/2,
+		 jsonify_list_of_tuples/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -549,6 +550,21 @@ compose_error_message(ErrorCode, ErrorMessage) ->
 	Timestamp  = calendar:datetime_to_gregorian_seconds({Date, Time}),
 	{[{timestamp, Timestamp}, {errorcode, ErrorCode}, {message, ErrorMessage}]}.
 	
+jsonify_list_of_tuples(NamesList, TupleList) ->
+	% NameList must contain the same number of items as each tuple in the TupleList
+	jsonify_items(NamesList, TupleList, []).
+
+jsonify_items(_Arg1, [], Acc) -> 
+	lists:reverse(Acc);
+jsonify_items(NamesList, [Tuple|Tail], Acc) ->
+	Item = create_tuple(NamesList, Tuple, 1, #{}),
+	NewList = lists:append(Acc,[Item]),
+	jsonify_items(NamesList, Tail, NewList).
+
+create_tuple([], _Tuple, _Count, Acc) -> Acc;
+create_tuple([Name|Tail], Tuple, Count, Acc) ->
+	Map = maps:put(Name, element(Count, Tuple), Acc),
+	create_tuple(Tail, Tuple, Count+1, Map).
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

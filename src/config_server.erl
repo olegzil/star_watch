@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-11 18:33:02
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-15 22:37:17
+% @Last Modified time: 2023-03-16 20:43:34
 -module(config_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -22,8 +22,8 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
 handle_call({fetchprofilemap}, _From, State) ->
-	_FileName = State,
-	FetchResult = server_config_processor:fetch_profile_map(),
+	FileName = State,
+	FetchResult = server_config_processor:fetch_profile_map(FileName),
 	{reply, FetchResult, State};
 
 handle_call({fetchclientconfigdata, ClientID}, _From, State) ->
@@ -33,7 +33,7 @@ handle_call({fetchclientconfigdata, ClientID}, _From, State) ->
 
 handle_call({fetchlistofchannelidsandyoutubekeys}, _From, State) ->
 	FileName = State, 
-    FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys(FileName),
+    FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys_jsonified(FileName),
     {reply, FetchResult,  State};
 
 handle_call({fetchlistofclientidsandchannelids}, _From, State) ->
@@ -44,6 +44,11 @@ handle_call({fetchlistofclientidsandchannelids}, _From, State) ->
 handle_call({fetchclientidsandnames}, _From, State) ->
 	_FileName = State, 
     FetchResult = server_config_processor:fetch_list_of_client_ids_and_channel_ids(),
+    {reply, FetchResult,  State};
+
+handle_call({fetch}, _From, State) ->
+    _FileName = State, 
+    FetchResult = server_config_processor:fetch_client_ids_and_names(),
     {reply, FetchResult,  State};
 
 handle_call({addconfigrecord, Record}, _From, State) ->

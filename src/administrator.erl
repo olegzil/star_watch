@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-16 12:25:57
+% @Last Modified time: 2023-03-16 20:46:17
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
@@ -11,10 +11,8 @@ execute_action(Request) ->
 	[A, Subject] = string:split(Request, ":"),
 	Verb = binary_to_atom(A),
 	case {Verb, Subject} of
-		{channel_directory, <<"fetch">>} ->
-			{ok, jiffy:encode( server_config_processor:fetch_client_ids_and_names())};
 		{channel_directory, Subject} ->
-			Result = validate_action(Subject),
+			{_, Result} = validate_action(Subject),
 			{ok, jiffy:encode(Result)};
 		_ ->
 			Message = <<"No such action: ">>,
@@ -24,21 +22,27 @@ execute_action(Request) ->
 validate_action(Verb) ->
 	% Request = <<"channel_directory:add:id=cad00c93-b012-49f9-97f9-35e69ae083a0:name=sonomaashram,youtubekey=AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ,channel_id=UCQfZkf3-Y2RwzdRFWXYsdaQ">>.
 	%% if yutubekey is omited, the default is used.
-	%% TODO: The code below must be mondified to check each verb for parameters. I.E. fetchclientconfigdata must have a client id, while fetchlistofchannelidsandyoutubekeys does not.
-	case string:find(Verb, ":") of
+	NormalizedVerb = string:lowercase(Verb),
+	case string:find(NormalizedVerb, ":") of
 		nomatch ->
-			process_item(string:lowercase(Verb), []);
+			process_item(string:lowercase(NormalizedVerb), []);
 		_ ->
-			[Action, Subject] = string:split(Verb, ":"),
+			[Action, Subject] = string:split(NormalizedVerb, ":"),
 			process_item(string:lowercase(Action), Subject)
 	end.
 
 process_item(<<"deleteconfigrecord">>, Actions) -> 
 	Value = Actions,
 	Parts = string:split(Value, "="),
-	ClientID = lists:nth(2, Parts),
-	Pid = global:whereis_name(server_config),
-	gen_server:call(Pid, {deleteconfigrecord, ClientID}, infinity);
+	if
+		length(Parts) < 2 ->
+			{error, Message} = format_error(<<"deleteconfigrecord">>, <<" requires a client id ">>),
+			{error, #{error => Message}};
+		true ->
+			ClientID = lists:nth(2, Parts),
+			Pid = global:whereis_name(server_config),
+			gen_server:call(Pid, {deleteconfigrecord, ClientID}, infinity)
+	end;
 
 process_item(<<"fetchlistofchannelidsandyoutubekeys">>, _Actions) ->
 	Pid = global:whereis_name(server_config),
@@ -49,11 +53,17 @@ process_item(<<"fetchprofilemap">>, _Actions) ->
 	gen_server:call(Pid, {fetchprofilemap}, infinity);
 
 process_item(<<"fetchclientconfigdata">>, Actions) ->
-	[Value] = Actions,
-	Parts = string:split(Value, "="),
-	ClientID = lists:nth(2, Parts),
-	Pid = global:whereis_name(server_config),
-	gen_server:call(Pid, {fetchclientconfigdata, ClientID}, infinity);
+	if
+		length(Actions) =:= 0 ->
+			{error, Message} = format_error(<<"fetchclientconfigdata">>, <<" requires a client id ">>),
+			{error, #{error => Message}};
+		true ->
+			Value = Actions,
+			Parts = string:split(Value, "="),
+			ClientID = lists:nth(2, Parts),
+			Pid = global:whereis_name(server_config),
+			gen_server:call(Pid, {fetchclientconfigdata, ClientID}, infinity)
+	end;
 
 process_item(<<"fetchlistofclientidsandchannelids">>, _Actions) ->
 	Pid = global:whereis_name(server_config),
@@ -64,7 +74,8 @@ process_item(<<"fetchclientidsandnames">>, _Actions) ->
 	gen_server:call(Pid, {fetchclientidsandnames}, infinity);
 
 process_item(<<"fetch">>, _Actions) ->
-	server_config_processor:fetch_client_ids_and_names();
+	Pid = global:whereis_name(server_config),
+	gen_server:call(Pid, {fetch}, infinity);
 
 process_item(<<"add">>, Actions) ->
 	Parts = string:split(Actions, ",", all),
@@ -88,7 +99,11 @@ process_item(<<"add">>, Actions) ->
 
 		{error, Message} ->
 			jiffy:encode(#{error => Message})
-	end.
+	end;
+process_item(InvalidCommand, _Arg) ->
+	{error, Message} = format_error(<<"invalid command: ">>, InvalidCommand),
+	{error, #{error => Message}}.
+
 	
 validate_commands([], _Arg2, Map) ->
 	{ok, Map};
