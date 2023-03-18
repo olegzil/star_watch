@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-14 12:29:10
+% @Last Modified time: 2023-03-17 19:09:59
 
 -module(db_access).
 
@@ -81,22 +81,24 @@ process_date_request(StartDate, EndDate) ->
 
 
 process_channel_request(File, ClientKey) ->
-    {ok, Record} = server_config_processor:fetch_client_config_data(File, ClientKey),
-    process_channel_request_private(ClientKey, Record).
+    {Code, List} = server_config_processor:fetch_client_config_data(File, ClientKey),
+    [Record|_] = List,
+    process_channel_request_private({Code, Record}).
 
-process_channel_request_private(_ClientKey, {error, Map}) ->
+process_channel_request_private({error, Map}) ->
             FinalPackage = package_channel_data([Map]),
             {ok, jiffy:encode({error, FinalPackage})};
 
-process_channel_request_private(ClientKey, {ok, Map}) ->
-   {_, [{youtubekey, YoutubeKey}, {channel_id, ChannelId}]} = maps:get(ClientKey, Map),
-   {_, ListOfRecords} = fetch_channel_data_from_db(ChannelId),
+process_channel_request_private({ok, Map}) ->
+    ChannelID = maps:get(channel_id, Map),
+    YoutubeKey = maps:get(youtubekey, Map),
+   {_, ListOfRecords} = fetch_channel_data_from_db(ChannelID),
     case length(ListOfRecords) of
         0 ->
-            case youtube_data_aquisition:fetch_data(production, [{YoutubeKey, ChannelId}], []) of
+            case youtube_data_aquisition:fetch_data(production, [{YoutubeKey, ChannelID}], []) of
                 {error, _} ->
                     io:format("YOUTUBE fetch failed~n"),
-                    youtube_channel_data_not_found(ChannelId);
+                    youtube_channel_data_not_found(ChannelID);
                 {ok, JsonResult} -> 
                     {ok, JsonResult}
             end;

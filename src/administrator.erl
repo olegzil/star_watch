@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-16 20:46:17
+% @Last Modified time: 2023-03-18 12:47:35
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
@@ -22,12 +22,11 @@ execute_action(Request) ->
 validate_action(Verb) ->
 	% Request = <<"channel_directory:add:id=cad00c93-b012-49f9-97f9-35e69ae083a0:name=sonomaashram,youtubekey=AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ,channel_id=UCQfZkf3-Y2RwzdRFWXYsdaQ">>.
 	%% if yutubekey is omited, the default is used.
-	NormalizedVerb = string:lowercase(Verb),
-	case string:find(NormalizedVerb, ":") of
+	case string:find(Verb, ":") of
 		nomatch ->
-			process_item(string:lowercase(NormalizedVerb), []);
+			process_item(Verb, []);
 		_ ->
-			[Action, Subject] = string:split(NormalizedVerb, ":"),
+			[Action, Subject] = string:split(Verb, ":"),
 			process_item(string:lowercase(Action), Subject)
 	end.
 
@@ -41,7 +40,8 @@ process_item(<<"deleteconfigrecord">>, Actions) ->
 		true ->
 			ClientID = lists:nth(2, Parts),
 			Pid = global:whereis_name(server_config),
-			gen_server:call(Pid, {deleteconfigrecord, ClientID}, infinity)
+			Result = gen_server:call(Pid, {deleteconfigrecord, ClientID}, infinity),
+			Result
 	end;
 
 process_item(<<"fetchlistofchannelidsandyoutubekeys">>, _Actions) ->
@@ -98,7 +98,7 @@ process_item(<<"add">>, Actions) ->
 			end;
 
 		{error, Message} ->
-			jiffy:encode(#{error => Message})
+			{error, #{error => Message}}
 	end;
 process_item(InvalidCommand, _Arg) ->
 	{error, Message} = format_error(<<"invalid command: ">>, InvalidCommand),
