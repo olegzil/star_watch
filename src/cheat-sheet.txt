@@ -1,0 +1,35 @@
+A client ID is mapped to exactly one youtube channel.
+Endpoints:
+youtube/admin/ -- administrative endpoint that has read/write/delete privilages.
+youtube/channelselector -- app endpoint. Returns Metadata describing the youtube channel contents.
+astronomy/apod/ -- this endpoint servicess requests for the StarWatch app
+telemetry/request -- used only by the StarWatch app to report telementry events.
+telemetry/stats -- same as telemetry/request except when different.
+astronomy/celestialbody -- can be used to retrive images of verious celestial bodies. Not active.
+
+To add a client to the server:
+http://<your IP + Port>/youtube/admin/?key=<self-generated administrator id>&action=channel_directory:add:client_id=<self-generated client id>,name=<channel name>,channel_id=UC7_gcs09iThXybpVgjHZ_7g,youtubekey=<your private youtube key>
+
+To remove a client from the server:
+http://<your IP + Port>/youtube/admin/?key=<self-generated administrator id>&action=channel_directory:deleteconfigrecord:client_id=<self-generated client id>
+
+Returns a list of Channel IDs and the youtube key that is used to access the chanel. Any valid key can be used to access a video channel
+http://<your IP + Port>/youtube/admin/?key=<self-generated administrator id>&action=channel_directory:fetchlistofchannelidsandyoutubekeys
+
+
+Returns all known data for the client id
+http://<your IP + Port>/youtube/admin/?key=<self-generated administrator id>&action=channel_directory:fetchclientconfigdata:id=<self-generated client id>
+
+Returns a list of clients and associated channels
+http://<your IP + Port>/youtube/admin/?key=<self-generated administrator id>&action=channel_directory:fetchlistofclientidsandchannelids
+
+Returns a list of client ids and the names of youtube channels associated with them
+http://<your IP + Port>/youtube/admin/?key=<self-generated administrator id>&action=channel_directory:fetchclientidsandnames
+
+
+Returns a list of client ids, and channel ids.
+http://<your IP + Port>/youtube/admin/?action=channel_directory:fetch&key=<self-generated administrator id>&action=channel_directory:fetchlistofclientidsandchannelids
+
+
+//Used by the app to retrieve images, names and video ids for the youtube channel associated with this client.
+http://<your IP + Port>/youtube/channelselector/?key=<self-generated client key>
