@@ -33,3 +33,11 @@ http://<your IP + Port>/youtube/admin/?action=channel_directory:fetch&key=<self-
 
 //Used by the app to retrieve images, names and video ids for the youtube channel associated with this client.
 http://<your IP + Port>/youtube/channelselector/?key=<self-generated client key>
+
+
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:add:client_id=3d4dbbe0-d589-458f-b9f6-b40c09641e4d,name=nikki,channel_id=UCCydBRF6RjrT58FV6KO-wwg
+
+
+http://10.0.0.18:8083/youtube/channelselector/?key=3d4dbbe0-d589-458f-b9f6-b40c09641e4d
+
+http://10.0.0.18:8083/youtube/admin/?action=channel_directory:fetch&key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:fetchlistofclientidsandchannelids

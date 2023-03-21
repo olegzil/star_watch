@@ -42,14 +42,12 @@ start(_Type, _Args) ->
     {_ChildID, {_ChildStartResults, ChildPid}} = Response,
     if
         is_pid(ChildPid) ->
-            global:register_name(server_config, ChildPid), %% We have a valid Pid. Register for global access
             MasterPid;
         true ->
             {error, failure_creating_child_process} %% Broke ass server
     end.
 
 stop(_State) ->
-    global:unregister_name(server_config),
 	ok.
 
 find_user_id([], _Target) -> false;

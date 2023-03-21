@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-13 16:45:38
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-11 18:55:10
+% @Last Modified time: 2023-03-18 18:18:08
 
 -module(star_watch_master_sup).
 -behaviour(supervisor).

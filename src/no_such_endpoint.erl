@@ -1,11 +1,10 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-10 15:14:47
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2022-11-25 21:42:55
+% @Last Modified time: 2023-03-20 17:29:49
 
 -module(no_such_endpoint).
 -export([init/2]).
--include("include/error_responses.hrl").
 init(Req0, State) ->
     Req = handle(Req0, State),
     {ok, Req, State}.

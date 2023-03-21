@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-17 19:09:59
+% @Last Modified time: 2023-03-20 19:14:01
 
 -module(db_access).
 
@@ -85,9 +85,15 @@ process_channel_request(File, ClientKey) ->
     [Record|_] = List,
     process_channel_request_private({Code, Record}).
 
+parse_map_into_message([], _Map, Acc) -> list_to_binary(Acc);
+parse_map_into_message([Key|Tail], Map, Acc) ->
+    Value = maps:get(Key, Map),
+    Message = string:concat(Acc, io_lib:format("~p => ~p ", [Key, Value])),
+    parse_map_into_message(Tail, Map, Message).
+
 process_channel_request_private({error, Map}) ->
-            FinalPackage = package_channel_data([Map]),
-            {ok, jiffy:encode({error, FinalPackage})};
+    ErrorMessage = parse_map_into_message(maps:keys(Map), Map, ""),
+    {error, jiffy:encode(#{error => utils:compose_error_message(500, ErrorMessage)})};
 
 process_channel_request_private({ok, Map}) ->
     ChannelID = maps:get(channel_id, Map),
@@ -147,7 +153,6 @@ package_channel_data(ListOfRecords) ->
         end
     end,
     SortedList = lists:sort(Predicate, ListOfRecords),
-
     MapData = lists:map(fun(DbItem) ->
         #{channel_id    => DbItem#youtube_channel.channel_id,
             video_id      => DbItem#youtube_channel.video_id,

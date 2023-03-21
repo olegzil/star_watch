@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-02-23 15:56:46
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-17 21:43:53
+% @Last Modified time: 2023-03-20 19:40:45
 
 -module(youtube_channel_directory_handler).
 -behaviour(cowboy_handler).
@@ -27,6 +27,7 @@ submit_request_for_processing(Request) ->
     } = cowboy_req:match_qs([key], Request) of
          _ ->
             RequestResult = db_access:process_channel_request(?SERVER_CONFIG_FILE, ClientKey),
+            io:format("RequestResult: ~p~n", [RequestResult]),
             case RequestResult of
             {ok, Good} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),

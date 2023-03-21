@@ -1,10 +1,11 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-18 12:47:35
+% @Last Modified time: 2023-03-20 23:30:47
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
+-include("include/invalid_request.hrl").
 -export([execute_action/1]).
 
 execute_action(Request) ->
@@ -39,18 +40,15 @@ process_item(<<"deleteconfigrecord">>, Actions) ->
 			{error, #{error => Message}};
 		true ->
 			ClientID = lists:nth(2, Parts),
-			Pid = global:whereis_name(server_config),
-			Result = gen_server:call(Pid, {deleteconfigrecord, ClientID}, infinity),
+			Result = gen_server:call(config_server, {deleteconfigrecord, ClientID}, infinity),
 			Result
 	end;
 
 process_item(<<"fetchlistofchannelidsandyoutubekeys">>, _Actions) ->
-	Pid = global:whereis_name(server_config),
-	gen_server:call(Pid, {fetchlistofchannelidsandyoutubekeys}, infinity);
+	gen_server:call(config_server, {fetchlistofchannelidsandyoutubekeys}, infinity);
 
 process_item(<<"fetchprofilemap">>, _Actions) ->
-	Pid = global:whereis_name(server_config),
-	gen_server:call(Pid, {fetchprofilemap}, infinity);
+	gen_server:call(config_server, {fetchprofilemap}, infinity);
 
 process_item(<<"fetchclientconfigdata">>, Actions) ->
 	if
@@ -61,21 +59,17 @@ process_item(<<"fetchclientconfigdata">>, Actions) ->
 			Value = Actions,
 			Parts = string:split(Value, "="),
 			ClientID = lists:nth(2, Parts),
-			Pid = global:whereis_name(server_config),
-			gen_server:call(Pid, {fetchclientconfigdata, ClientID}, infinity)
+			gen_server:call(config_server, {fetchclientconfigdata, ClientID}, infinity)
 	end;
 
 process_item(<<"fetchlistofclientidsandchannelids">>, _Actions) ->
-	Pid = global:whereis_name(server_config),
-	gen_server:call(Pid, {fetchlistofclientidsandchannelids}, infinity);
+	gen_server:call(config_server, {fetchlistofclientidsandchannelids}, infinity);
 
 process_item(<<"fetchclientidsandnames">>, _Actions) ->
-	Pid = global:whereis_name(server_config),
-	gen_server:call(Pid, {fetchclientidsandnames}, infinity);
+	gen_server:call(config_server, {fetchclientidsandnames}, infinity);
 
 process_item(<<"fetch">>, _Actions) ->
-	Pid = global:whereis_name(server_config),
-	gen_server:call(Pid, {fetch}, infinity);
+	gen_server:call(config_server, {fetch}, infinity);
 
 process_item(<<"add">>, Actions) ->
 	Parts = string:split(Actions, ",", all),
@@ -90,18 +84,18 @@ process_item(<<"add">>, Actions) ->
 			if
 				Test =:= true ->
 					NewRecord = #{IdKey => {NameKey, [{youtubekey, maps:get(?YOUTUBE_KEY, Map)}, {channel_id, ChannelID} ] }},
-					gen_server:call(global:whereis_name(server_config), {addconfigrecord, NewRecord}, infinity);
+					gen_server:call(server_config, {addconfigrecord, NewRecord}, infinity);
 
 				true ->
 					NewRecord = #{IdKey => {NameKey, [{youtubekey, server_config_processor:get_default_youtube_key("server_config.cfg")}, {channel_id, ChannelID} ] }},
-					gen_server:call(global:whereis_name(server_config), {addconfigrecord, NewRecord}, infinity)
+					gen_server:call(server_config, {addconfigrecord, NewRecord}, infinity)
 			end;
 
 		{error, Message} ->
 			{error, #{error => Message}}
 	end;
 process_item(InvalidCommand, _Arg) ->
-	{error, Message} = format_error(<<"invalid command: ">>, InvalidCommand),
+	{error, Message} = format_error(<<"invalid command: ">>, list_to_binary(InvalidCommand)),
 	{error, #{error => Message}}.
 
 	
@@ -112,7 +106,7 @@ validate_commands([Command|Tail], CommandList, Map) ->
 		true ->
 			validate_commands(Tail, CommandList, Map);
 		false ->
-			format_error(<<"Missing parameter: ">>, Command)
+			format_error(<<"Missing parameter: ">>, list_to_binary(Command))
 	end.
 
 validate_add_command(_Arg1, [], Map) -> 
@@ -146,5 +140,10 @@ validate_add_command(Actions, [Head|Tail], Map) ->
 	end.
 
 format_error(ErrorType, ErrorMessage) ->
-	{error, <<ErrorType/binary, ErrorMessage/binary>>}.
+	 Error = #{
+		date_time => utils:current_time_string(),
+		error_code => -1,
+		error_text => <<ErrorType/binary, ErrorMessage/binary>>
+	},
+	{error, Error}.
 
