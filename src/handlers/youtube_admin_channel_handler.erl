@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 18:51:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-20 20:48:28
+% @Last Modified time: 2023-03-21 11:32:25
 -module(youtube_admin_channel_handler).
 -behaviour(cowboy_handler).
 
@@ -26,8 +26,7 @@ submit_request_for_processing(Request) ->
         key := _Key
     } = cowboy_req:match_qs([key, action], Request) of
          _ ->
-            RequestResult = administrator:execute_action(Action),
-            case RequestResult of
+            case administrator:execute_action(Action) of
             {ok, Good} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
                 Good;

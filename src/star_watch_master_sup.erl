@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-13 16:45:38
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-18 18:18:08
+% @Last Modified time: 2023-03-21 11:04:35
 
 -module(star_watch_master_sup).
 -behaviour(supervisor).
@@ -37,6 +37,14 @@ attach_child(Child, Args) when Child =:= nasageneralapi ->
                     Server = {ChildName, 
                             {nasa_data_aquisition_server, start_link, [Args]}, 
                             transient, 5000, worker, [nasa_data_aquisition_server]},
+                    Result = child_start_selector(Server),
+                    {ChildName, Result};
+
+attach_child(Child, Args) when Child =:= db_access_server ->
+                    ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
+                    Server = {ChildName, 
+                            {db_access_server, start_link, [Args]}, 
+                            transient, 5000, worker, [db_access_server]},
                     Result = child_start_selector(Server),
                     {ChildName, Result};
 

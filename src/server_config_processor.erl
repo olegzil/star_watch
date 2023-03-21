@@ -1,21 +1,19 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-06 15:30:12
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-17 22:01:24
+% @Last Modified time: 2023-03-21 11:29:57
 -module(server_config_processor).
 -include("include/server_config_item.hrl").
--include("include/error_responses.hrl").
-% -export([fetch_client_config_data/2, 
-% 		 fetch_list_of_channel_ids_and_youtube_keys/1,
-% 		 fetch_profile_map/1,
-% 		 fetch_list_of_client_ids_and_channel_ids/0,
-% 		 fetch_client_ids_and_names/0,
-% 		 update_config_record/2,
-% 		 delete_record/2,
-% 		 get_default_youtube_key/1, 
-% 		 fetch_list_of_channel_ids_and_youtube_keys_jsonified/1,
-% 		 update_client_profiles/2]).
--compile(export_all).
+-export([fetch_client_config_data/2, 
+		 fetch_list_of_channel_ids_and_youtube_keys/1,
+		 fetch_profile_map/1,
+		 fetch_list_of_client_ids_and_channel_ids/0,
+		 fetch_client_ids_and_names/0,
+		 update_config_record/2,
+		 delete_record/2,
+		 get_default_youtube_key/1, 
+		 fetch_list_of_channel_ids_and_youtube_keys_jsonified/1,
+		 update_client_profiles/2]).
 
 parse_server_config_file(File) ->
 	{ok, ServerConfig} = file:consult(File),
@@ -143,7 +141,6 @@ fetch_list_of_client_channel_tuples([Client|Tail], Acc) ->
 fetch_list_of_client_ids_and_channel_ids() ->
 	List = get_profiles_list("server_config.cfg"),
 	TupleList = fetch_list_of_client_channel_tuples(List, []),
-	io:format("TupleList: ~p~n", [TupleList]),
 	{ok, #{items => utils:jsonify_list_of_tuples([client_id, channel_id], TupleList)}}.
 
 fetch_client_ids_and_names() ->

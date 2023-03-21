@@ -38,10 +38,10 @@ start(_Type, _Args) ->
     utils:start_cron_job(apod),
     MasterPid = star_watch_master_sup:start_link(),
     %% Create a child process that will handle all file access to the server_config.cfg file.
-    Response = star_watch_master_sup:attach_child(serverconfig, {"server_config.cfg"}),
-    {_ChildID, {_ChildStartResults, ChildPid}} = Response,
+    {_, {_, DbServerPid}} = star_watch_master_sup:attach_child(db_access_server, {"server_config.cfg"}),
+    {_, {_, ServerConfigPid}} = star_watch_master_sup:attach_child(serverconfig, {"server_config.cfg"}),
     if
-        is_pid(ChildPid) ->
+        is_pid(ServerConfigPid) andalso is_pid(DbServerPid) ->
             MasterPid;
         true ->
             {error, failure_creating_child_process} %% Broke ass server
@@ -68,10 +68,8 @@ validate_client_api_key(forward, Value) ->
     ChannelList = server_config_processor:fetch_list_of_client_ids_and_channel_ids(),
     case find_user_id(ChannelList, Value) of 
         true -> 
-            io:format("validate_client_api_key Success: ~p~n", [Value]),
             {ok, Value};
         false -> 
-            io:format("validate_client_api_key Failure bad_youtube_api_key"),
             {error, bad_youtube_api_key}
     end.
 
