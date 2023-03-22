@@ -9,6 +9,7 @@
 -include("include/youtube_channel.hrl").
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
+-include("include/client_profile_table.hrl").
 
 start(_Type, _Args) ->
     initialize_mnesia(), %% Start mnesia
@@ -102,6 +103,8 @@ initialize_mnesia() ->
     init_table(apodtelemetry),
     init_table(celestial_object_table),
     init_table(youtube_channel),
+    init_table(client_profile_table_pending),
+    init_table(client_profile_table),
     mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel], 5000).
 
 init_table(TableName) ->
@@ -113,6 +116,24 @@ init_table(TableName) ->
             io:format("DB Table: ~p exists with size: ~p~n", [TableName, InitData]),
             ok
     end.
+
+create_table(client_profile_table_pending) ->
+    mnesia:create_table(
+        client_profile_table_pending,
+        [
+            {attributes, record_info(fields, client_profile_table_pending)},
+            {type, ordered_set},
+            {disc_copies, [node()]}
+        ]);
+    
+create_table(client_profile_table) ->
+    mnesia:create_table(
+        client_profile_table,
+        [
+            {attributes, record_info(fields, client_profile_table)},
+            {type, ordered_set},
+            {disc_copies, [node()]}
+        ]);
 
 create_table(apodtelemetry) ->
     mnesia:create_table(

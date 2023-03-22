@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-21 11:05:14
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-21 11:18:31
+% @Last Modified time: 2023-03-21 14:08:08
 -module(db_access_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -22,6 +22,11 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
 handle_call({fetchchannelvideos, ClientKey}, _From, State) ->
+	FileName = State,
+    RequestResult = db_access:process_channel_request(FileName, ClientKey),
+	{reply, RequestResult, State};
+
+handle_call({addyoutubechannel, ClientKey, ChannelName}, _From, State) ->
 	FileName = State,
     RequestResult = db_access:process_channel_request(FileName, ClientKey),
 	{reply, RequestResult, State};

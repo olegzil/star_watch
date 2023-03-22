@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-18 18:28:59
+% @Last Modified time: 2023-03-21 12:59:24
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -18,7 +18,8 @@
 		 test_multi_channel_data_fetch/0,
 		 reformat_channel_data/1,
 		 compose_error_message/2,
-		 jsonify_list_of_tuples/2]).
+		 jsonify_list_of_tuples/2, 
+		 format_error/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -565,6 +566,13 @@ create_tuple([], _Tuple, _Count, Acc) -> Acc;
 create_tuple([Name|Tail], Tuple, Count, Acc) ->
 	Map = maps:put(Name, element(Count, Tuple), Acc),
 	create_tuple(Tail, Tuple, Count+1, Map).
+format_error(ErrorType, ErrorMessage) ->
+	 Error = #{
+		date_time => utils:current_time_string(),
+		error_code => -1,
+		error_text => <<ErrorType/binary, ErrorMessage/binary>>
+	},
+	{error, Error}.
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

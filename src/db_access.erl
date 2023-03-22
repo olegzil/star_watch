@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-20 19:14:01
+% @Last Modified time: 2023-03-21 16:42:45
 
 -module(db_access).
 
@@ -12,9 +12,11 @@
 -include("include/apod_record_def.hrl").
 -include("include/macro_definitions.hrl").
 -include("include/server_config_item.hrl").
+-include("include/client_profile_table.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
+-compile(export_all).
 
--export([process_date_request/2, process_channel_request/2, update_nasa_table/1, package_channel_data/1]).
+-export([process_date_request/2, process_channel_request/2, update_nasa_table/1, package_channel_data/1, add_channel_request/2]).
 -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 
 update_nasa_table(DBItem) -> 
@@ -79,6 +81,71 @@ process_date_request(StartDate, EndDate) ->
             {ok, jiffy:encode(JsonFreindly)}
     end.
 
+
+add_channel_request(ClientKey, Name) ->
+    ChannelName = list_to_binary(string:replace(string:lowercase(Name), " ", "", all)), %%% Normalize
+    {_, ListOfRecords} = fetch_client_data(client_profile_table_pending, ClientKey), %%% Get the record if it exists
+    case length(ListOfRecords) of %%% should be a list of one item
+        0 ->
+            %%% this client does not have this youtube channel in their profile. Add it.
+            add_channel_name_to_pending_channel_table(emptylist, ClientKey, ListOfRecords, ChannelName),
+            ok;
+        _ ->
+            %%% this client already has this youtube channel in their profile. Let them know.
+            add_channel_name_to_pending_channel_table(nonemptylist, ClientKey, ListOfRecords, ChannelName)
+    end.
+
+add_channel_name_to_pending_channel_table(emptylist, ClientID, [], ChannelName) ->
+    UpdatedRecord = #client_profile_table_pending{
+        client_id = ClientID,
+        channel_list = [ChannelName]    
+    },
+
+    Fun = 
+        fun() ->
+            mnesia:write(UpdatedRecord)
+        end,
+    mnesia:transaction(Fun); %% execute the transaction
+
+add_channel_name_to_pending_channel_table(nonemptylist, _ClientKey, [ClientRecord], ChannelName) ->
+    Found = lists:member(ChannelName, ClientRecord#client_profile_table_pending.channel_list),
+    case Found  of
+        false ->
+            NewList = lists:append(ClientRecord#client_profile_table_pending.channel_list, [ChannelName]),
+            UpdatedRecord = #client_profile_table_pending{
+                client_id = ClientRecord#client_profile_table_pending.client_id,
+                channel_list = NewList    
+            },
+            Fun = 
+                fun() ->
+                    mnesia:write(UpdatedRecord)
+                end,
+            mnesia:transaction(Fun),
+            {ok, #{channel_added => ChannelName }};
+        true ->
+            {ok, #{channel_exists => ChannelName }}
+
+    end.
+
+
+
+fetch_client_data(client_profile_table, ClientID) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#client_profile_table.client_id =:= ClientID ->
+                Record
+        end),
+    SelectRecords = fun() -> mnesia:select(client_profile_table, Match) end,
+    mnesia:sync_transaction(SelectRecords);
+
+fetch_client_data(client_profile_table_pending, ClientID) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#client_profile_table_pending.client_id =:= ClientID ->
+                Record
+        end),
+    SelectRecords = fun() -> mnesia:select(client_profile_table_pending, Match) end,
+    mnesia:sync_transaction(SelectRecords).
 
 process_channel_request(File, ClientKey) ->
     {Code, List} = server_config_processor:fetch_client_config_data(File, ClientKey),

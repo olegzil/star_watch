@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-20 23:30:47
+% @Last Modified time: 2023-03-21 13:14:10
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
@@ -36,7 +36,7 @@ process_item(<<"deleteconfigrecord">>, Actions) ->
 	Parts = string:split(Value, "="),
 	if
 		length(Parts) < 2 ->
-			{error, Message} = format_error(<<"deleteconfigrecord">>, <<" requires a client id ">>),
+			{error, Message} = utils:format_error(<<"deleteconfigrecord">>, <<" requires a client id ">>),
 			{error, #{error => Message}};
 		true ->
 			ClientID = lists:nth(2, Parts),
@@ -53,7 +53,7 @@ process_item(<<"fetchprofilemap">>, _Actions) ->
 process_item(<<"fetchclientconfigdata">>, Actions) ->
 	if
 		length(Actions) =:= 0 ->
-			{error, Message} = format_error(<<"fetchclientconfigdata">>, <<" requires a client id ">>),
+			{error, Message} = utils:format_error(<<"fetchclientconfigdata">>, <<" requires a client id ">>),
 			{error, #{error => Message}};
 		true ->
 			Value = Actions,
@@ -67,9 +67,6 @@ process_item(<<"fetchlistofclientidsandchannelids">>, _Actions) ->
 
 process_item(<<"fetchclientidsandnames">>, _Actions) ->
 	gen_server:call(config_server, {fetchclientidsandnames}, infinity);
-
-process_item(<<"fetch">>, _Actions) ->
-	gen_server:call(config_server, {fetch}, infinity);
 
 process_item(<<"add">>, Actions) ->
 	Parts = string:split(Actions, ",", all),
@@ -95,7 +92,7 @@ process_item(<<"add">>, Actions) ->
 			{error, #{error => Message}}
 	end;
 process_item(InvalidCommand, _Arg) ->
-	{error, Message} = format_error(<<"invalid command: ">>, list_to_binary(InvalidCommand)),
+	{error, Message} = utils:format_error(<<"invalid command: ">>, list_to_binary(InvalidCommand)),
 	{error, #{error => Message}}.
 
 	
@@ -106,7 +103,7 @@ validate_commands([Command|Tail], CommandList, Map) ->
 		true ->
 			validate_commands(Tail, CommandList, Map);
 		false ->
-			format_error(<<"Missing parameter: ">>, list_to_binary(Command))
+			utils:format_error(<<"Missing parameter: ">>, list_to_binary(Command))
 	end.
 
 validate_add_command(_Arg1, [], Map) -> 
@@ -118,7 +115,7 @@ validate_add_command(Actions, [Head|Tail], Map) ->
 	Label = lists:nth(1, Items),
 	if
 		length(Items) < 2 ->
-			format_error(<<"Malformed command: ">>, Head);
+			utils:format_error(<<"Malformed command: ">>, Head);
 			true -> 
 				Value = lists:nth(2, Items),
 				case Label of
@@ -138,12 +135,3 @@ validate_add_command(Actions, [Head|Tail], Map) ->
 						validate_add_command(Actions, Tail, Map)
 				end
 	end.
-
-format_error(ErrorType, ErrorMessage) ->
-	 Error = #{
-		date_time => utils:current_time_string(),
-		error_code => -1,
-		error_text => <<ErrorType/binary, ErrorMessage/binary>>
-	},
-	{error, Error}.
-
