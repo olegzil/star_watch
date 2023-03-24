@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-06 15:30:12
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-23 18:59:02
+% @Last Modified time: 2023-03-23 21:13:23
 -module(server_config_processor).
 -include("include/server_config_item.hrl").
 % -export([fetch_client_config_data/2, 
@@ -81,21 +81,24 @@ generate_list_of_records(ClientID, [Item|Records], Acc) ->
 
 fetch_profile_map(FileName) ->
 	List = get_profiles_list(FileName),
-	{ok, #{items => fetch_all_items(List, [])}}.
+	{ok, #{items => extract_record(FileName, Result, [])}}.
+
+extract_record(_Arg1, [], Acc) -> ok;
+extract_record(FileName, [Map|Maps], Acc) ->
+	[ClientID] = maps:keys(Map),
+	ListOfRecords = fetch_client_config_data_private(FileName, ClientID),
+	MapOfRecords = fetch_all_items(ListOfRecords, #{}),
+	extract_record(FileName, Maps, MapOfRecords).
 
 fetch_all_items([], Acc) -> Acc;
-fetch_all_items([Client|Tail], Acc) ->
-	%%% Client = #{<<"cad00c93-b012-49f9-97f9-35e69ae083a0">> => {sonomaashram, [{youtubekey, <<"AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ">>}, {channel_id, <<"UCQfZkf3-Y2RwzdRFWXYsdaQ">>} ]}}.
-	[Key] = maps:keys(Client),
-	{ok, Value} = maps:find(Key, Client),
-	{Name,[{_, YoutubeID},{_,ChannelID}]} = Value,
-	MapList = [maps:put(client_id, Key, #{}), maps:put(name, Name, #{}), maps:put(youtube_id, YoutubeID, #{}), maps:put(channel_id, ChannelID, #{})],
+fetch_all_items([R|Tail], Acc) ->
+	MapList = [maps:put(client_id, R#client_id, #{}), maps:put(name, R#name, #{}), maps:put(youtube_id, R#youtubkey, #{}), maps:put(channel_id, R#channel_id, #{})],
 	NewMap = merge_maps(MapList, #{}),
 	fetch_all_items(Tail, lists:append(Acc, [NewMap])).
 
-	merge_maps([], Acc) -> Acc;
-	merge_maps([Head|Tail], Acc) ->
-		merge_maps(Tail, maps:merge(Acc, Head)).
+merge_maps([], Acc) -> Acc;
+merge_maps([Head|Tail], Acc) ->
+	merge_maps(Tail, maps:merge(Acc, Head)).
 
 fetch_list_of_channel_ids_and_youtube_keys(FileName) ->
 	List = get_profiles_list(FileName),
