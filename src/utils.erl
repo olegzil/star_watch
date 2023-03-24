@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-21 12:59:24
+% @Last Modified time: 2023-03-23 19:15:19
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -111,14 +111,13 @@ start_cron_job(apod) ->
     {apod_data_aquisition, fetch_data, [periodic]}},
     erlcron:cron(apod_daily_fetch_job, ImageOfTheDayJob);
 
-start_cron_job(youtube) ->
+start_cron_job(youtube) -> 
 	{{Year, Month, Day},{_, _, _}} = calendar:universal_time(), % get current year/month/day
 	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convert it to a single number
 	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate),	% back track the current date back one day
 	Date = list_to_binary(io_lib:format("~.4.0w-~.2.0w-~.2.0wT~.2.0w:~.2.0w:~.2.0wZ", [Y, M, D, 0, 0, 0])), % generate 
 	FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys("server_config.cfg"),
-	[Key] = maps:keys(FetchResult),
-	Value = maps:get(Key, FetchResult),
+	[Value] = maps:values(FetchResult),
 	{ClientProfiles} = Value,
 	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
     {youtube_data_aquisition, fetch_data, [periodic, ClientProfiles, [Date]]}},

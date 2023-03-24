@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-11 18:33:02
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-16 20:43:34
+% @Last Modified time: 2023-03-23 17:24:59
 -module(config_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -53,13 +53,17 @@ handle_call({fetch}, _From, State) ->
 
 handle_call({addconfigrecord, Record}, _From, State) ->
 	FileName = State, 
-    Result = server_config_processor:update_config_record(FileName, Record),
+    % TODO: Replace call with call to mnesia to update client_profile_table
+    % Result = server_config_processor:update_config_record(FileName, Record),
+    Result = #{error => <<"not implemented">>},
     {reply, Result,  State};
 
 handle_call({deleteconfigrecord, Record}, _From, State) ->
     FileName = State, 
-    FetchResult = server_config_processor:delete_record(FileName, Record),
-    {reply, FetchResult,  State};
+    % TODO: Replace this call with call to mnesia to remove this record from the client_profile_table
+    % FetchResult = server_config_processor:delete_record(FileName, Record),
+    Result = #{error => <<"not implemented">>},
+    {reply, Result,  State};
 
 
 handle_call(_Msg, _From, State) ->
