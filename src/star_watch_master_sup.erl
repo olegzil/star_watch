@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-13 16:45:38
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-21 11:04:35
+% @Last Modified time: 2023-03-28 10:36:13
 
 -module(star_watch_master_sup).
 -behaviour(supervisor).
@@ -20,7 +20,7 @@ attach_child(Child, Args) when Child =:= serverconfig ->
                     ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
                     Server = {ChildName, 
                             {config_server, start_link, [Args]}, 
-                            temporary, 5000, worker, [config_server]},
+                            permanent, 5000, worker, [config_server]},
                     Result = child_start_selector(Server),
                     {ChildName, Result};
 
@@ -28,7 +28,7 @@ attach_child(Child, Args) when Child =:= apod ->
                     ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
                     Server = {ChildName, 
                             {database_server, start_link, [Args]}, 
-                            temporary, 5000, worker, [database_server]},
+                            permanent, 5000, worker, [database_server]},
                     Result = child_start_selector(Server),
                     {ChildName, Result};
 
@@ -36,7 +36,7 @@ attach_child(Child, Args) when Child =:= nasageneralapi ->
                     ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
                     Server = {ChildName, 
                             {nasa_data_aquisition_server, start_link, [Args]}, 
-                            transient, 5000, worker, [nasa_data_aquisition_server]},
+                            permanent, 5000, worker, [nasa_data_aquisition_server]},
                     Result = child_start_selector(Server),
                     {ChildName, Result};
 
@@ -44,7 +44,7 @@ attach_child(Child, Args) when Child =:= db_access_server ->
                     ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
                     Server = {ChildName, 
                             {db_access_server, start_link, [Args]}, 
-                            transient, 5000, worker, [db_access_server]},
+                            permanent, 5000, worker, [db_access_server]},
                     Result = child_start_selector(Server),
                     {ChildName, Result};
 

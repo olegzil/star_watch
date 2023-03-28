@@ -5,7 +5,7 @@
 -define(YOUTUBE_API_KEY, "AIzaSyBWhaM01ueTAyMIhWf11zbJBo3ulKA89u4").
 -define(YOUTUBE_CHANNEL_IDS, [<<"UC7_gcs09iThXybpVgjHZ_7g">>, <<"UCQfZkf3-Y2RwzdRFWXYsdaQ">>]).
 -define(YOUTUBE_CLIENT_KEY, "389b4e36-b3d2-11ed-afa1-0242ac120002").
--define(ADMINISTRATOR_KEY, "f09a2270-ac19-418c-a443-9f9e4f4c9019").
+-define(ADMINISTRATOR_KEY, <<"f09a2270-ac19-418c-a443-9f9e4f4c9019">>).
 -define(YOUTUBE_MAXRESULTS, "50").
 -define(FIRST_PUBLISH_DATE, "1990-01-01T00:00:00Z").
 -define(SERVER_CONFIG_FILE, <<"server_config.cfg">>).

@@ -38,6 +38,6 @@ http://<your IP + Port>/youtube/channelselector/?key=<self-generated client key>
 http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:add:client_id=3d4dbbe0-d589-458f-b9f6-b40c09641e4d,name=nikki,channel_id=UCCydBRF6RjrT58FV6KO-wwg
 
 
-http://10.0.0.18:8083/youtube/channelselector/?key=3d4dbbe0-d589-458f-b9f6-b40c09641e4d
-
 http://10.0.0.18:8083/youtube/admin/?action=channel_directory:fetch&key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:fetchlistofclientidsandchannelids
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:fetchclientconfigdata:id=389b4e36-b3d2-11ed-afa1-0242ac120002
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:add:client_id=three_e125-4888-9d57-ac702bc20966,name=the_cool_channel,channel_id=CoolChannelID

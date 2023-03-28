@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-23 19:15:19
+% @Last Modified time: 2023-03-24 19:57:51
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -19,6 +19,7 @@
 		 reformat_channel_data/1,
 		 compose_error_message/2,
 		 jsonify_list_of_tuples/2, 
+		 jsonify_client_profile_table/1,
 		 format_error/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -26,6 +27,7 @@
 -include("include/apod_record_def.hrl").
 -include("include/youtube_channel.hrl").
 -include("include/macro_definitions.hrl").
+-include("include/client_profile_table.hrl").
 -include("src/include/registration_query.hrl").
 
 date_to_gregorian_days(<<A,B,C,D,E,F,G,H,I,J>>) ->
@@ -549,7 +551,30 @@ compose_error_message(ErrorCode, ErrorMessage) ->
 	{Date, Time} = calendar:now_to_local_time(erlang:timestamp()),
 	Timestamp  = calendar:datetime_to_gregorian_seconds({Date, Time}),
 	{[{timestamp, Timestamp}, {errorcode, ErrorCode}, {message, ErrorMessage}]}.
-	
+
+jsonify_client_profile_table(MapOfRecords) ->
+	ListOfKeys = maps:keys(MapOfRecords), %% get a list of records.
+	RecordExtractor = fun(Key, MapAcc) ->
+		[Record] = maps:get(Key, MapOfRecords),
+		#client_profile_table{
+			client_id = _ClientID,
+			channel_list = ClientChannels
+		} = Record,
+
+		ListExtractor = fun(Item, ListAcc) ->
+			{ChannelName,[{youtubekey,YoutubeKey},{channel_id,ChannelID}]} = Item,
+			Map = #{
+				channel_name => ChannelName,
+				youtubekey => YoutubeKey,
+	        	channel_id => ChannelID
+			},
+			lists:append(ListAcc, [Map])
+		end,
+		List = lists:foldr(ListExtractor, [], ClientChannels),
+		maps:put(Key, List, MapAcc)
+	end,
+	lists:foldr(RecordExtractor, #{}, ListOfKeys).
+
 jsonify_list_of_tuples(NamesList, TupleList) ->
 	% NameList must contain the same number of items as each tuple in the TupleList
 	jsonify_items(NamesList, TupleList, []).

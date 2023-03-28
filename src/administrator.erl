@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-21 13:14:10
+% @Last Modified time: 2023-03-28 10:33:54
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
@@ -21,7 +21,6 @@ execute_action(Request) ->
 	end.
 
 validate_action(Verb) ->
-	% Request = <<"channel_directory:add:id=cad00c93-b012-49f9-97f9-35e69ae083a0:name=sonomaashram,youtubekey=AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ,channel_id=UCQfZkf3-Y2RwzdRFWXYsdaQ">>.
 	%% if yutubekey is omited, the default is used.
 	case string:find(Verb, ":") of
 		nomatch ->
@@ -44,9 +43,6 @@ process_item(<<"deleteconfigrecord">>, Actions) ->
 			Result
 	end;
 
-process_item(<<"fetchlistofchannelidsandyoutubekeys">>, _Actions) ->
-	gen_server:call(config_server, {fetchlistofchannelidsandyoutubekeys}, infinity);
-
 process_item(<<"fetchprofilemap">>, _Actions) ->
 	gen_server:call(config_server, {fetchprofilemap}, infinity);
 
@@ -58,8 +54,15 @@ process_item(<<"fetchclientconfigdata">>, Actions) ->
 		true ->
 			Value = Actions,
 			Parts = string:split(Value, "="),
+			Action = string:lowercase(lists:nth(1, Parts)),
 			ClientID = lists:nth(2, Parts),
-			gen_server:call(config_server, {fetchclientconfigdata, ClientID}, infinity)
+			case Action =:= <<"client_id">> of
+				false ->
+					{error, Message} = utils:format_error(<<Action/binary, "=">>, <<ClientID/binary, " is not a valid request. Must be client_id=", ClientID/binary>>),
+					{error, #{error => Message}};
+				true ->
+					gen_server:call(config_server, {fetchclientconfigdata, ClientID}, infinity)
+			end
 	end;
 
 process_item(<<"fetchlistofclientidsandchannelids">>, _Actions) ->
@@ -68,31 +71,49 @@ process_item(<<"fetchlistofclientidsandchannelids">>, _Actions) ->
 process_item(<<"fetchclientidsandnames">>, _Actions) ->
 	gen_server:call(config_server, {fetchclientidsandnames}, infinity);
 
+process_item(<<"promoteconfigrecord">>, Actions) ->
+	if
+		length(Actions) =:= 0 ->
+			{error, Message} = utils:format_error(<<"promoteconfigrecord">>, <<" requires a client id ">>),
+			{error, #{error => Message}};
+		true ->
+			Value = Actions,
+			Parts = string:split(Value, "="),
+			Action = string:lowercase(lists:nth(1, Parts)),
+			ClientID = lists:nth(2, Parts),
+			case Action =:= <<"client_id">> of
+				false ->
+					{error, Message} = utils:format_error(<<Action/binary, "=">>, <<ClientID/binary, " is not a valid request. Must be client_id=", ClientID/binary>>),
+					{error, #{error => Message}};
+				true ->
+					gen_server:call(config_server, {promoteconfigrecord, ClientID}, infinity)
+			end
+	end;
+
 process_item(<<"add">>, Actions) ->
 	Parts = string:split(Actions, ",", all),
 	Result = validate_add_command(Actions, Parts, #{}),
 	case Result of
 		{ok, Map} ->
-			IdKey = maps:get(<<"client_id">>, Map),
-			NameKey = binary_to_atom(maps:get(<<"name">>, Map)), 
+			ClientID = maps:get(<<"client_id">>, Map),
+			Name = binary_to_atom(maps:get(<<"name">>, Map)), 
 			ChannelID = maps:get(<<"channel_id">>, Map),
 
 			Test = maps:is_key(?YOUTUBE_KEY, Map),
 			if
 				Test =:= true ->
-					NewRecord = #{IdKey => {NameKey, [{youtubekey, maps:get(?YOUTUBE_KEY, Map)}, {channel_id, ChannelID} ] }},
-					gen_server:call(server_config, {addconfigrecord, NewRecord}, infinity);
-
+					YoutubeKey = maps:get(?YOUTUBE_KEY, Map),
+					gen_server:call(config_server, {addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, infinity);
 				true ->
-					NewRecord = #{IdKey => {NameKey, [{youtubekey, server_config_processor:get_default_youtube_key("server_config.cfg")}, {channel_id, ChannelID} ] }},
-					gen_server:call(server_config, {addconfigrecord, NewRecord}, infinity)
+					YoutubeKey = server_config_processor:get_default_youtube_key("server_config.cfg"),
+					gen_server:call(config_server, {addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, infinity)
 			end;
 
 		{error, Message} ->
 			{error, #{error => Message}}
 	end;
 process_item(InvalidCommand, _Arg) ->
-	{error, Message} = utils:format_error(<<"invalid command: ">>, list_to_binary(InvalidCommand)),
+	{error, Message} = utils:format_error(<<"invalid command: ">>, InvalidCommand),
 	{error, #{error => Message}}.
 
 	
@@ -103,7 +124,7 @@ validate_commands([Command|Tail], CommandList, Map) ->
 		true ->
 			validate_commands(Tail, CommandList, Map);
 		false ->
-			utils:format_error(<<"Missing parameter: ">>, list_to_binary(Command))
+			utils:format_error(<<"Missing parameter: ">>, Command)
 	end.
 
 validate_add_command(_Arg1, [], Map) -> 

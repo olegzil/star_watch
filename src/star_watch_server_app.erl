@@ -10,6 +10,8 @@
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
 -include("include/client_profile_table.hrl").
+-include("include/server_config_item.hrl").
+-compile(export_all).
 
 start(_Type, _Args) ->
     initialize_mnesia(), %% Start mnesia
@@ -104,17 +106,19 @@ initialize_mnesia() ->
     init_table(celestial_object_table),
     init_table(youtube_channel),
     init_table(client_profile_table_pending),
-    init_table(client_profile_table),
-    mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel], 5000).
+    Empty = init_table(client_profile_table),
+    mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel, client_profile_table, client_profile_table_pending], 20000),
+    server_config_processor:populate_client_profile_table(Empty).
 
 init_table(TableName) ->
     case mnesia:table_info(TableName, size) of
         0 ->
             io:format("Initializing empty table: ~p~n", [TableName]),
-            create_table(TableName);
+            create_table(TableName),
+            true;
         InitData ->
             io:format("DB Table: ~p exists with size: ~p~n", [TableName, InitData]),
-            ok
+            false
     end.
 
 create_table(client_profile_table_pending) ->
@@ -168,3 +172,4 @@ create_table(celestial_object_table) ->
             {type, bag},
             {disc_copies, [node()]}
         ]).
+
