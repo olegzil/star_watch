@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-08 19:03:08
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-28 10:33:54
+% @Last Modified time: 2023-03-28 17:27:37
 -module(administrator).
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
@@ -11,6 +11,7 @@
 execute_action(Request) ->
 	[A, Subject] = string:split(Request, ":"),
 	Verb = binary_to_atom(A),
+	io:format("~nRequest: ~p~nSubject: ~p~nVerb: ~p~n", [Request, Subject, Verb]),	
 	case {Verb, Subject} of
 		{channel_directory, Subject} ->
 			{_, Result} = validate_action(Subject),

@@ -11,19 +11,17 @@
 -include("include/celestial_object_table.hrl").
 -include("include/client_profile_table.hrl").
 -include("include/server_config_item.hrl").
--compile(export_all).
+ % cowboy_req:match_qs([{action, nonempty}, {client_key, [], ?CLIENT_ACCESS_KEY}], Request) of
 
 start(_Type, _Args) ->
     initialize_mnesia(), %% Start mnesia
-    YoutubeAdminKeyConstraints = {key, [fun validate_admin_key/2]},
-    YoutubeApiConstraints  = {api_key, [fun validate_client_api_key/2]},
-    ApiKeyConstraints   = { api_key,    [fun validate_access_key/2] },
-    APODDateConstraints     = {start_date,  [fun validate_date_apod/2]},
-    YearStartConstraint = {year_start, [fun validate_year_start/2]},
-    YearEndConstraint = {year_end, [fun validate_year_end/2]},
+    ApiKeyConstraints           = {api_key,    [fun validate_access_key/2]},
+    APODDateConstraints         = {start_date,  [fun validate_date_apod/2]},
+    YearStartConstraint         = {year_start, [fun validate_year_start/2]},
+    YearEndConstraint           = {year_end, [fun validate_year_end/2]},
         
-    FetchAdminRoute = {"/youtube/admin/[...]", [YoutubeAdminKeyConstraints], youtube_admin_channel_handler, []},
-    FetchYoutubeChanneRoute = {"/youtube/channelselector/[...]", [YoutubeApiConstraints], youtube_channel_directory_handler, []},
+    FetchAdminRoute = {"/youtube/admin/[...]", [], youtube_admin_channel_handler, []},
+    FetchYoutubeChanneRoute = {"/youtube/channelselector/[...]", [], youtube_channel_directory_handler, []},
     FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
     FetchApodRoute = {"/astronomy/apod/[...]", [ApiKeyConstraints, APODDateConstraints], star_watch_handler, [1]},
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
@@ -52,29 +50,6 @@ start(_Type, _Args) ->
 
 stop(_State) ->
 	ok.
-
-find_user_id([], _Target) -> false;
-
-find_user_id([UserProfile | Tail], Target) ->
-    {ClientID, _, _, _} = UserProfile,
-    case ClientID =:= Target of
-        true -> true;
-        false -> find_user_id(Tail, Target)
-    end.
-
-validate_admin_key(forward, Value) when ?ADMINISTRATOR_KEY =:= Value ->
-    {ok, Value};
-validate_admin_key(forward, _) ->
-    {error, bad_admin_key}.
-
-validate_client_api_key(forward, Value) ->
-    ChannelList = server_config_processor:fetch_list_of_client_ids_and_channel_ids(),
-    case find_user_id(ChannelList, Value) of 
-        true -> 
-            {ok, Value};
-        false -> 
-            {error, bad_youtube_api_key}
-    end.
 
 validate_year_start(forward, Date) ->
     IntDate = binary_to_integer(Date),
@@ -108,7 +83,7 @@ initialize_mnesia() ->
     init_table(client_profile_table_pending),
     Empty = init_table(client_profile_table),
     mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel, client_profile_table, client_profile_table_pending], 20000),
-    server_config_processor:populate_client_profile_table(Empty).
+    timer:apply_after(1000, server_config_processor, populate_client_profile_table, [Empty]).
 
 init_table(TableName) ->
     case mnesia:table_info(TableName, size) of
@@ -116,6 +91,11 @@ init_table(TableName) ->
             io:format("Initializing empty table: ~p~n", [TableName]),
             create_table(TableName),
             true;
+        undefined ->
+            io:format("Initializing empty table: ~p~n", [TableName]),
+            create_table(TableName),
+            true;
+
         InitData ->
             io:format("DB Table: ~p exists with size: ~p~n", [TableName, InitData]),
             false

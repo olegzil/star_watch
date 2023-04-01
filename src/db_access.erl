@@ -1,7 +1,7 @@
 % @Author: oleg
 % @Date:   2022-09-27 14:59:44
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-21 16:42:45
+% @Last Modified time: 2023-03-31 18:21:24
 
 -module(db_access).
 
@@ -14,9 +14,8 @@
 -include("include/server_config_item.hrl").
 -include("include/client_profile_table.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
--compile(export_all).
 
--export([process_date_request/2, process_channel_request/2, update_nasa_table/1, package_channel_data/1, add_channel_request/2]).
+-export([process_date_request/2, fetch_channel_videos/1, update_nasa_table/1, package_channel_data/1, add_channel_request/2, fetch_videos_for_channel_id/1, purge_table/1]).
 -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 
 update_nasa_table(DBItem) -> 
@@ -128,6 +127,14 @@ add_channel_name_to_pending_channel_table(nonemptylist, _ClientKey, [ClientRecor
     end.
 
 
+fetch_videos_for_channel_id(ChannelID) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#youtube_channel.channel_id =:= ChannelID ->
+                Record
+        end),
+    SelectRecords = fun() -> mnesia:select(youtube_channel, Match) end,
+    mnesia:sync_transaction(SelectRecords).
 
 fetch_client_data(client_profile_table, ClientID) ->
     Match = ets:fun2ms(
@@ -147,40 +154,29 @@ fetch_client_data(client_profile_table_pending, ClientID) ->
     SelectRecords = fun() -> mnesia:select(client_profile_table_pending, Match) end,
     mnesia:sync_transaction(SelectRecords).
 
-process_channel_request(File, ClientKey) ->
-    {Code, List} = server_config_processor:fetch_client_config_data(File, ClientKey),
-    [Record|_] = List,
-    process_channel_request_private({Code, Record}).
+fetch_channel_videos(ClientKey) ->
+    {Code, Map} = server_config_processor:fetch_client_config_data_db(json, ClientKey),
+    format_channel_videos(ClientKey, {Code, Map}).
 
-parse_map_into_message([], _Map, Acc) -> list_to_binary(Acc);
-parse_map_into_message([Key|Tail], Map, Acc) ->
-    Value = maps:get(Key, Map),
-    Message = string:concat(Acc, io_lib:format("~p => ~p ", [Key, Value])),
-    parse_map_into_message(Tail, Map, Message).
+format_channel_videos(ClientKey, {error, _Map}) ->
+    Message = <<"client id: ", ClientKey/binary, "not found">>,
+    {error, jiffy:encode(#{error => utils:compose_error_message(500, Message)})};
 
-process_channel_request_private({error, Map}) ->
-    ErrorMessage = parse_map_into_message(maps:keys(Map), Map, ""),
-    {error, jiffy:encode(#{error => utils:compose_error_message(500, ErrorMessage)})};
+format_channel_videos(_ClientKey, {ok, Map}) -> 
+    [ListOfMaps] = maps:values(Map),
+    ListOfChannelIDS = format_channel_videos_helper(ListOfMaps, []),
+    collect_all_videos(ListOfChannelIDS, []).
 
-process_channel_request_private({ok, Map}) ->
-    ChannelID = maps:get(channel_id, Map),
-    YoutubeKey = maps:get(youtubekey, Map),
-   {_, ListOfRecords} = fetch_channel_data_from_db(ChannelID),
-    case length(ListOfRecords) of
-        0 ->
-            case youtube_data_aquisition:fetch_data(production, [{YoutubeKey, ChannelID}], []) of
-                {error, _} ->
-                    io:format("YOUTUBE fetch failed~n"),
-                    youtube_channel_data_not_found(ChannelID);
-                {ok, JsonResult} -> 
-                    {ok, JsonResult}
-            end;
+collect_all_videos([ChannelID|Tail], Acc) ->
+    {_, ListOfRecords} = fetch_channel_data_from_db(ChannelID),
+    collect_all_videos(Tail, lists:append(Acc, ListOfRecords)).
 
-        _ ->
-            FinalPackage = package_channel_data(ListOfRecords),                        % The client expects a Json object containing an array
-            {ok, jiffy:encode(FinalPackage)}
-    end.
 
+format_channel_videos_helper([], Acc) -> Acc;
+format_channel_videos_helper([ChannelDescriptor|Tail], Acc) ->
+    ChannelID = maps:get(channel_id, ChannelDescriptor),
+    NewList = lists:append(Acc, [ChannelID]),
+    format_channel_videos_helper(Tail, NewList).
 
 date_range_not_found(StartDate, EndDate) ->
     DateStart = gregorian_days_to_binary(StartDate),
@@ -190,15 +186,6 @@ date_range_not_found(StartDate, EndDate) ->
         <<"date_time">> => utils:current_time_string(),
         <<"error_code">> => 404,
         <<"error_text">> => <<Message/binary, DateStart/binary, <<" -- ">>/binary, DateEnd/binary>>
-    },
-    {not_found, jiffy:encode(ErrorResponse)}.   
-
-youtube_channel_data_not_found(Channel) ->
-    Message = <<"Youtube channel not found: ">>,
-    ErrorResponse = #{
-    <<"date_time">> => utils:current_time_string(),
-    <<"error_code">> => 404,
-    <<"error_text">> => <<Message/binary, Channel/binary>>
     },
     {not_found, jiffy:encode(ErrorResponse)}.   
 
@@ -233,7 +220,28 @@ package_channel_data(ListOfRecords) ->
     maps:put(?TOP_KEY, MapData, #{}).
     
 
+%%% Given a table name, delete every record
+purge_table(TableName) ->
+try 
+  Keys = mnesia:activity(transaction, 
+    fun() -> 
+      mnesia:all_keys(TableName) 
+    end), 
 
+  lists:foreach( 
+    fun(Key) -> 
+      mnesia:activity(transaction, 
+        fun() -> 
+          mnesia:delete({TableName, Key}) 
+          end) 
+    end, Keys)
+catch
+    _Class:{aborted,{Reason,{TableName,_}}} ->
+        io:format("Failed to purge table name: ~p with reason: ~p~n", [TableName, Reason]);
+
+    Class:Exception ->
+        io:format("Class: ~p~nException: ~p~n", [Class, Exception])
+end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_telemetry_table() ->

@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-21 11:05:14
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-24 18:37:18
+% @Last Modified time: 2023-03-30 17:21:40
 -module(db_access_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -21,25 +21,15 @@ init([{FileName}]) ->
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
-handle_call({fetch}, _From, State) ->
+handle_call({fetchchanneldirectory, ClientID}, _From, State) ->
     _FileName = State, 
-    FetchResult = server_config_processor:fetch_client_ids_and_names(),
+    FetchResult = server_config_processor:fetch_channel_directory(ClientID),
     {reply, FetchResult,  State};
 
-handle_call({fetchchannelvideos, ClientKey}, _From, State) ->
-	FileName = State,
-    RequestResult = db_access:process_channel_request(FileName, ClientKey),
+handle_call({fetchchannelvideos, ChannelID}, _From, State) ->
+    {_, MapOfListOfRecords} = db_access:fetch_videos_for_channel_id(ChannelID),
+    RequestResult = utils:package_channel_record_list(MapOfListOfRecords),
 	{reply, RequestResult, State};
-
-handle_call({addyoutubechannel, ClientKey, _ChannelName}, _From, State) ->
-	FileName = State,
-    RequestResult = db_access:process_channel_request(FileName, ClientKey),
-	{reply, RequestResult, State};
-
-handle_call({deleteyoutubechannel, ClientKey, _ChannelName}, _From, State) ->
-    FileName = State,
-    RequestResult = db_access:process_channel_request(FileName, ClientKey),
-    {reply, RequestResult, State};
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.

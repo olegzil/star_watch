@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-01-12 10:11:59
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-02 11:09:10
+% @Last Modified time: 2023-03-30 17:28:07
 -module(nasa_rest_access).
 -include("include/macro_definitions.hrl").
 -include("include/celestial_object_table.hrl").
@@ -27,7 +27,6 @@ fetch_root_page(Subject, GregorianStartDays, GregorianEndDays, Page) ->
 									  {"page", integer_to_list(Page)}
 									  ]),
 	Request = string:join([?NASA_IMAGES_HOST, Query], ""),
-	io:format("Request ~p~n", [Request]),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, Body};

@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-11 18:33:02
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-27 14:33:30
+% @Last Modified time: 2023-03-28 19:26:51
 -module(config_server).
 -behaviour(gen_server).
 -export([start_link/1, stop/1]).
@@ -27,7 +27,7 @@ handle_call({fetchprofilemap}, _From, State) ->
 	{reply, {ok, FetchResult}, State};
 
 handle_call({fetchclientconfigdata, ClientID}, _From, State) ->
-    FetchResult = server_config_processor:fetch_client_config_data(json, ClientID),
+    FetchResult = server_config_processor:fetch_client_config_data_db(json, ClientID),
     {reply, FetchResult,  State};
 
 handle_call({addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, _From, State) ->
@@ -39,7 +39,7 @@ handle_call({promoteconfigrecord, ClientID}, _From, State) ->
     {reply, FetchResult,  State};
 
 handle_call({deleteconfigrecord, ClientID}, _From, State) ->
-    FetchResult = server_config_processor:fetch_client_config_data(json, ClientID),
+    FetchResult = server_config_processor:fetch_client_config_data_db(json, ClientID),
     {reply, FetchResult,  State};
 
 handle_call(_Msg, _From, State) ->

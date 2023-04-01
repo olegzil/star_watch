@@ -1,20 +1,25 @@
 % @Author: Oleg Zilberman
 % @Date:   2023-03-06 15:30:12
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-27 21:47:53
+% @Last Modified time: 2023-03-31 18:03:23
 -module(server_config_processor).
 -include("include/server_config_item.hrl").
 -include("include/client_profile_table.hrl").
-% -export([fetch_client_config_data/2, 
-% 		 fetch_list_of_channel_ids_and_youtube_keys/1,
-% 		 fetch_profile_map_from_file/1,
-% 		 fetch_list_of_client_ids_and_channel_ids/0,
-% 		 fetch_client_ids_and_names/0,
-% 		 get_default_youtube_key/1, 
-% 		 fetch_list_of_channel_ids_and_youtube_keys_jsonified/1,
-% 		 update_client_profiles/2,
-%		 populate_client_profile_table/1]).
--compile(export_all).
+-include("include/youtube_channel.hrl").
+-export([fetch_client_config_data_db/2, 
+		 fetch_list_of_channel_ids_and_youtube_keys_db/0,
+		 fetch_profile_map_from_file/1,
+		 fetch_channel_directory/1,
+		 process_channel_request/3,
+		 add_client_pending_config_data/4,
+		 promote_client_pending_config_data/1,
+		 update_client_profile_channels/3,
+		 update_client_record/3,
+		 fetch_profile_map_from_db/0,
+		 generate_profile_map/1,
+		 get_default_youtube_key/1, 
+		 get_client_key/1,
+		 populate_client_profile_table/1]).
 
 parse_server_config_file(File) ->
 	{ok, ServerConfig} = file:consult(File),
@@ -39,11 +44,45 @@ get_default_youtube_key(File) ->
 	Map = maps:get(server_control_block, ControlBlock),
 	maps:get(default_youtubekey, Map).
 
+get_client_key(File) ->
+	ControlBlock = get_server_control_block(File),
+	Map = maps:get(server_control_block, ControlBlock),
+	maps:get(client_key, Map).
+
+
+%%% Returns a map: #{directoryrecords => [Item1, ..., ItemN] }, where Item is itself a map: #{channel_id => a, client => b, name => c}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%% Begin fetch_channel_directory logic %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fetch_channel_directory(ClientID) ->
+	case mnesia:activity(transaction, fun() -> mnesia:read(client_profile_table, ClientID) end) of
+		[] ->
+			Message = utils:jsonify_list_of_tuples([error, client_key], [{<<"client id not found">>, ClientID}]),
+			{error, Message};
+		[ClientRecord] ->
+			ChannelList = ClientRecord#client_profile_table.channel_list,
+			process_channel_request(ClientID, ChannelList, [])
+	end.
+
+process_channel_request(_Arg1, [], ListOfMaps) -> 
+	Final = maps:put(directoryrecords, ListOfMaps, #{}),
+	{ok, jiffy:encode(Final)};
+
+process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
+	{ChannelName,[{_,_},{_,ChannelID}]} = Channel,
+	A = maps:merge(maps:put(channel_id, ChannelID, #{}), maps:put(client, ClientID, #{})),
+	Final = maps:merge(A, maps:put(name, ChannelName, A)),
+	List = lists:append(Acc, [Final]),
+	process_channel_request(ClientID, ChannelList, List).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%% End fetch_channel_directory logic %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %%% Returns a tuple whose second item is a json-friendly list of 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% Begin fetch_client_config_data logic %%%%%%%%%%%%%
+%%%%%%%%%% Begin fetch_client_config_data_db logic %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fetch_client_config_data(json, ClientID) ->
+fetch_client_config_data_db(json, ClientID) ->
 	ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end,
 	Result = mnesia:activity(transaction, ReaderFun),
 	case Result of
@@ -60,7 +99,7 @@ fetch_client_config_data(json, ClientID) ->
 			{ok, Message}
 	end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% End fetch_client_config_data logic %%%%%%%%%%%%%%%
+%%%%%%%%%% End fetch_client_config_data_db logic %%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -84,16 +123,17 @@ promote_client_pending_config_data(ClientID) ->
 	ReaderFun = fun() -> mnesia:read(client_profile_table_pending, ClientID)	end,
 	case mnesia:activity(transaction, ReaderFun) of
 	 	[] ->
-	 		io:format("client_profile_table_pending: does not contain: ~p~n", [ClientID]),
 	 		Message = <<"client id: ">>,
 	 		utils:format_error(<<"not found">>, <<Message/binary,ClientID/binary, " does not exist in the pending config table">>);
 	 	[R] ->
-	 		io:format("client_profile_table_pending: Found: ~p~n", [ClientID]),
 			ClientProfile = mnesia:activity(transaction, fun() -> mnesia:read(client_profile_table, ClientID) end),
 			NewClientID = R#client_profile_table_pending.client_id,
 			NewChannelList = R#client_profile_table_pending.channel_list,
 			NewRecord = #client_profile_table_pending{client_id = NewClientID, channel_list = NewChannelList},
-			update_client_profile_channels(ClientID, ClientProfile, NewRecord)
+			update_client_profile_channels(ClientID, ClientProfile, NewRecord),
+			mnesia:activity(transaction, fun() -> mnesia:delete({client_profile_table_pending, ClientID}) end),
+			Message = <<"client id: ">>,
+	 		utils:format_error(<<"not found">>, <<Message/binary,ClientID/binary, " promoted to production and deleted from pending table">>)
 	 end .
 
 %%% The production profile table does not have this client. Add it unconditionally
@@ -178,64 +218,48 @@ generate_profile_map(Keys) ->
 	lists:foldr(AccumulatorFun, #{}, Keys).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%% End fetch_profile_map_from_file logic %%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% End fetch_profile_map_from_file logic %%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fetch_list_of_channel_ids_and_youtube_keys_jsonified(FileName) ->
-	ListOfMaps = get_profiles_list(FileName),
-	{TupleList} = fetch_client_and_youtube_ids(ListOfMaps, []),
-	{ok, utils:jsonify_list_of_tuples([youtube_key, channel_id], TupleList)}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% Begin fetch_list_of_channel_ids_and_youtube_keys_db logic %%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fetch_list_of_channel_ids_and_youtube_keys_db() ->
+	KeyList = mnesia:activity(transaction, fun() -> mnesia:all_keys(client_profile_table) end),
+	ChannelList = for_each_key(KeyList, []),
+	ListOfTuples = key_pair_extractor(ChannelList, []),
+	SortFun = fun(Lhs, Rhs) ->  element(2, Lhs) > element(2, Rhs) end,
+	lists:sort(SortFun, ListOfTuples),
+	#{ok => ListOfTuples}.
 
-fetch_list_of_channel_ids_and_youtube_keys(FileName) ->
-	List = get_profiles_list(FileName),
-	#{ok => fetch_client_and_youtube_ids(List, [])}.
-
-
-fetch_client_and_youtube_ids([], Acc) -> {Acc};
-
-fetch_client_and_youtube_ids([Client|Tail], Acc) ->
-	[Value] = maps:values(Client),
-	UpdatedList = extract_profile_entry_from_list(Value, []),
-	fetch_client_and_youtube_ids(Tail, lists:append(Acc, UpdatedList)).
+for_each_key([], Acc) -> 
+	SortFun = fun({_, Key}) -> Key end,
+	lists:uniq(SortFun, Acc);
 	
-extract_profile_entry_from_list([], Acc) -> Acc;
-extract_profile_entry_from_list([Item|List], Acc) ->
-	{_, [{_, YoutubeKey}, {_, ChannelId} ]} = Item,
-	UpdatedList = lists:append(Acc, [{YoutubeKey, ChannelId}]),
-	extract_profile_entry_from_list(List, UpdatedList).
+for_each_key([Key|KeyList], Acc) ->
+	RecordReader = fun() -> mnesia:read(client_profile_table, Key) end,
+	[ClientChannelList] = mnesia:activity(transaction, RecordReader),
+	NewList = lists:append(Acc, ClientChannelList#client_profile_table.channel_list),
+	for_each_key(KeyList, NewList).
 
-fetch_list_of_client_channel_tuples([], Acc) -> Acc;
+key_pair_extractor([], Acc) -> Acc;
+key_pair_extractor([Record|Remainder], Acc) ->
+	{_,[{youtubekey,YoutubeKey},{channel_id,ChannelID}]} = Record,
+	NewList = lists:append(Acc, [{YoutubeKey, ChannelID}]),
+	key_pair_extractor(Remainder, NewList).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% End fetch_list_of_channel_ids_and_youtube_keys_db logic %%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fetch_list_of_client_channel_tuples([Client|Tail], Acc) ->
-	% #{Client => {sonomaashram, [{youtubekey, <<"AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ">>}, {channel_id, <<"UCQfZkf3-Y2RwzdRFWXYsdaQ">>} ]}}.
-	[ClientID] = maps:keys(Client),
-	{ok, Value} = maps:find(ClientID, Client),
-	{_, [{_, _}, {_, ChannelId} ]} = Value,
-	UpdatedList = lists:merge(Acc, [{ClientID, ChannelId}]),
-	fetch_list_of_client_channel_tuples(Tail, UpdatedList).
 
-
-fetch_list_of_client_ids_and_channel_ids() ->
-	List = get_profiles_list("server_config.cfg"),
-	TupleList = fetch_list_of_client_channel_tuples(List, []),
-	{ok, #{items => utils:jsonify_list_of_tuples([client_id, channel_id], TupleList)}}.
-
-fetch_client_ids_and_names() ->
-	List = get_profiles_list("server_config.cfg"),
-	{ok, #{directoryrecords => fetch_ids_and_names(List, [])}}.	
-
-fetch_ids_and_names([], Acc) -> Acc;
-fetch_ids_and_names([Client|Tail], Acc) ->
-	% #{Client => {sonomaashram, [{youtubekey, <<"AIzaSyAHvRD_wu1xR8D_fmJwkiPO0jqw_rnhvHQ">>}, {channel_id, <<"UCQfZkf3-Y2RwzdRFWXYsdaQ">>} ]}}.
-	[ClientID] = maps:keys(Client),
-	{ok, Value} = maps:find(ClientID, Client),
-	{Name, [{_, _}, {_, ChannelId} ]} = Value,
-	UpdatedList = lists:merge(Acc, [#{<<"name">> => atom_to_binary(Name), <<"client">> => ClientID, <<"channel_id">> => ChannelId}]),
-	fetch_ids_and_names(Tail, UpdatedList).
-
-populate_client_profile_table(false) -> ok;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% Begin populate_client_profile_table logic %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+populate_client_profile_table(false) -> 
+	io:format("Shouldn't be here~n"),
+	ok;
 populate_client_profile_table(true) -> 
-    mnesia:wait_for_tables([client_profile_table], 30000),	
+	io:format("Updating client_profile_table~n"),
     {ok, ClientProfilesMap} = fetch_profile_map_from_file("server_config.cfg"),
     [ProfileMap] = maps:values(ClientProfilesMap),
     Keys = maps:keys(ProfileMap),
@@ -253,15 +277,6 @@ update_db_with_client_profile(Keys, ProfileMap) ->
         mnesia:activity(transaction, UpdateFun)
     end,
     lists:foreach(Fun, Keys).
-
-compose_success_message(Message, Map) ->
-	[Key] = maps:keys(Map),
-	Value = maps:get(Key, Map),
-	{Name,[{youtubekey,YoutubeKey},{channel_id,ChannelID}]} = Value,
-	Result = #{client_id => Key,
-		name => Name,
-		youtubekey => YoutubeKey,
-		channel_id => ChannelID
-	},
-	#{Message => Result}.
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% End populate_client_profile_table logic %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

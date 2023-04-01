@@ -1,7 +1,7 @@
 % @Author: Oleg Zilberman
 % @Date:   2022-10-08 13:34:16
 % @Last Modified by:   Oleg Zilberman
-% @Last Modified time: 2023-03-24 19:57:51
+% @Last Modified time: 2023-03-31 16:58:16
 -module(utils).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
@@ -20,7 +20,8 @@
 		 compose_error_message/2,
 		 jsonify_list_of_tuples/2, 
 		 jsonify_client_profile_table/1,
-		 format_error/2]).
+		 format_error/2,
+		 package_channel_record_list/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -118,9 +119,8 @@ start_cron_job(youtube) ->
 	GregorianDate = calendar:date_to_gregorian_days({Year, Month, Day}), % convert it to a single number
 	{Y, M, D} = calendar:gregorian_days_to_date(GregorianDate),	% back track the current date back one day
 	Date = list_to_binary(io_lib:format("~.4.0w-~.2.0w-~.2.0wT~.2.0w:~.2.0w:~.2.0wZ", [Y, M, D, 0, 0, 0])), % generate 
-	FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys("server_config.cfg"),
-	[Value] = maps:values(FetchResult),
-	{ClientProfiles} = Value,
+	FetchResult = server_config_processor:fetch_list_of_channel_ids_and_youtube_keys_db(),
+	[ClientProfiles] = maps:values(FetchResult),
 	YoutubeChannelFetchJob = {{daily, {12, 30, am}},
     {youtube_data_aquisition, fetch_data, [periodic, ClientProfiles, [Date]]}},
     erlcron:cron(youtube_daily_fetch_job, YoutubeChannelFetchJob).
@@ -577,7 +577,8 @@ jsonify_client_profile_table(MapOfRecords) ->
 
 jsonify_list_of_tuples(NamesList, TupleList) ->
 	% NameList must contain the same number of items as each tuple in the TupleList
-	jsonify_items(NamesList, TupleList, []).
+	[String] = jsonify_items(NamesList, TupleList, []),
+	String.
 
 jsonify_items(_Arg1, [], Acc) -> 
 	lists:reverse(Acc);
@@ -597,6 +598,22 @@ format_error(ErrorType, ErrorMessage) ->
 		error_text => <<ErrorType/binary, ErrorMessage/binary>>
 	},
 	{error, Error}.
+
+package_channel_record_list(RecordList) ->
+	List = package_records(RecordList, []),
+	{ok, jiffy:encode(#{videos => List})}.
+
+package_records([], Acc) -> Acc;
+package_records([Record|Records], List) ->
+	A = maps:put(width, Record#youtube_channel.width, #{}),
+	B = maps:put(video_id, Record#youtube_channel.video_id, A),
+	C = maps:put(url_medium, Record#youtube_channel.url_medium, B),
+	D = maps:put(title, Record#youtube_channel.title, C),
+	E = maps:put(height, Record#youtube_channel.height, D),
+	F = maps:put(date, Record#youtube_channel.date, E),
+	Final = maps:put(channel_id, Record#youtube_channel.channel_id, F),
+	NewList = lists:append(List, [Final]),
+	package_records(Records, NewList).
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
