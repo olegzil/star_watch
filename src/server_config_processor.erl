@@ -226,9 +226,6 @@ fetch_list_of_channel_ids_and_youtube_keys_db() ->
 	KeyList = mnesia:activity(transaction, fun() -> mnesia:all_keys(client_profile_table) end),
 	List = key_pair_extractor(KeyList, []),
 	ListOfTuples = lists:uniq(fun(Item) -> element(2, Item) end, List),
-	io:format("~n*********************************************~n"),
-	io:format("ListOfTuples: ~p~n", [ListOfTuples]),
-	io:format("*********************************************~n"),
 	#{ok => ListOfTuples}.
 
 key_pair_extractor([], Acc) -> Acc;
