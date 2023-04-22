@@ -15,8 +15,18 @@
 -include("include/client_profile_table.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
--export([process_date_request/2, fetch_channel_videos/1, update_nasa_table/1, package_channel_data/1, add_channel_request/2, fetch_videos_for_channel_id/1, purge_table/1]).
--export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
+ -export([process_date_request/2, 
+           fetch_channel_videos/1, 
+           update_nasa_table/1, 
+           package_channel_data/1, 
+           add_channel_request/2, 
+           fetch_videos_for_channel_id/1, 
+           purge_table/1, 
+           get_channel_descriptors_for_client/1,
+           get_client_youtube_key/1]).
+
+ -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
+-compile(export_all).
 
 update_nasa_table(DBItem) -> 
     Fun = 
@@ -242,6 +252,28 @@ catch
     Class:Exception ->
         io:format("Class: ~p~nException: ~p~n", [Class, Exception])
 end.
+
+get_channel_descriptors_for_client(ClientID) ->
+    ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end, 
+    case mnesia:transaction(ReaderFun) of
+        {aborted,{Reson,_}} -> 
+            {error, Reson};
+        {atomic, []} ->
+            {error, no_records};
+        {_, [Record]} ->
+            {ok, Record#client_profile_table.channel_list}
+    end.
+
+get_client_youtube_key(ClientID) ->
+    ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end, 
+    case mnesia:transaction(ReaderFun) of
+        {aborted,{Reson,_}} -> 
+            {error, Reson};
+        {atomic, []} ->
+            {error, no_records};
+        {_, [Record]} ->
+            {ok, Record#client_profile_table.youtube_key}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_telemetry_table() ->

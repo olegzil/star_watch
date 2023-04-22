@@ -21,6 +21,20 @@
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
 -define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchchanneldirectory">>,<<"fetchchannelvideos">>]).
 
+-define(SERVER_ERROR_OK, 				16#FFAA00).
+-define(SERVER_ERROR_BAD_CLIENT_ID, 	16#FFAA01).
+-define(SERVER_ERROR_MISSING_ACTION, 	16#FFAA02).
+-define(SERVER_ERROR_MISSING_PARAMETER, 16#FFAA03).
+-define(SERVER_ERROR_MALFORMED_COMMAND, 16#FFAA04).
+-define(SERVER_ERROR_INVALID_COMMAND, 	16#FFAA05).
+-define(SERVER_ERROR_DB_ERROR, 			16#FFAA06).
+-define(SERVER_ERROR_NOT_FOUND, 		16#FFAA07).
+-define(SERVER_ERROR_AUTHENTICATION, 	16#FFAA08).
+-define(SERVER_ERROR_INVALID_ACTION,	16#FFAA09).
+-define(SERVER_ERROR_MISSING_CHANNEL,	16#FFAA0A).
+-define(SERVER_ERROR_MISSING_CLIENT,	16#FFAA0B).
+-define(SERVER_ERROR_INVALID_CLIENT,	16#FFAA0C).
+
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 
 							{venus, {keywords, [<<"venus">>]}}, 

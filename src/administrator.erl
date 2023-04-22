@@ -36,7 +36,7 @@ process_item(<<"deleteconfigrecord">>, Actions) ->
 	Parts = string:split(Value, "="),
 	if
 		length(Parts) < 2 ->
-			{error, Message} = utils:format_error(<<"deleteconfigrecord">>, <<" requires a client id ">>),
+			{error, Message} = utils:format_error(?SERVER_ERROR_BAD_CLIENT_ID, <<"requires a client id ">>),
 			{error, #{error => Message}};
 		true ->
 			ClientID = lists:nth(2, Parts),
@@ -50,7 +50,7 @@ process_item(<<"fetchprofilemap">>, _Actions) ->
 process_item(<<"fetchclientconfigdata">>, Actions) ->
 	if
 		length(Actions) =:= 0 ->
-			{error, Message} = utils:format_error(<<"fetchclientconfigdata">>, <<" requires a client id ">>),
+			{error, Message} = utils:format_error(?SERVER_ERROR_MISSING_ACTION, requires_action_token),
 			{error, #{error => Message}};
 		true ->
 			Value = Actions,
@@ -59,23 +59,17 @@ process_item(<<"fetchclientconfigdata">>, Actions) ->
 			ClientID = lists:nth(2, Parts),
 			case Action =:= <<"client_id">> of
 				false ->
-					{error, Message} = utils:format_error(<<Action/binary, "=">>, <<ClientID/binary, " is not a valid request. Must be client_id=", ClientID/binary>>),
+					{error, Message} = utils:format_error(?SERVER_ERROR_BAD_CLIENT_ID, requires_client_id),
 					{error, #{error => Message}};
 				true ->
 					gen_server:call(config_server, {fetchclientconfigdata, ClientID}, infinity)
 			end
 	end;
 
-process_item(<<"fetchlistofclientidsandchannelids">>, _Actions) ->
-	gen_server:call(config_server, {fetchlistofclientidsandchannelids}, infinity);
-
-process_item(<<"fetchclientidsandnames">>, _Actions) ->
-	gen_server:call(config_server, {fetchclientidsandnames}, infinity);
-
 process_item(<<"promoteconfigrecord">>, Actions) ->
 	if
 		length(Actions) =:= 0 ->
-			{error, Message} = utils:format_error(<<"promoteconfigrecord">>, <<" requires a client id ">>),
+			{error, Message} = utils:format_error(?SERVER_ERROR_MISSING_ACTION, requires_action_token),
 			{error, #{error => Message}};
 		true ->
 			Value = Actions,
@@ -84,7 +78,7 @@ process_item(<<"promoteconfigrecord">>, Actions) ->
 			ClientID = lists:nth(2, Parts),
 			case Action =:= <<"client_id">> of
 				false ->
-					{error, Message} = utils:format_error(<<Action/binary, "=">>, <<ClientID/binary, " is not a valid request. Must be client_id=", ClientID/binary>>),
+					{error, Message} = utils:format_error(?SERVER_ERROR_BAD_CLIENT_ID, requires_client_id),
 					{error, #{error => Message}};
 				true ->
 					gen_server:call(config_server, {promoteconfigrecord, ClientID}, infinity)
@@ -114,7 +108,7 @@ process_item(<<"add">>, Actions) ->
 			{error, #{error => Message}}
 	end;
 process_item(InvalidCommand, _Arg) ->
-	{error, Message} = utils:format_error(<<"invalid command: ">>, InvalidCommand),
+	{error, Message} = utils:format_error(?SERVER_ERROR_INVALID_COMMAND, InvalidCommand),
 	{error, #{error => Message}}.
 
 	
@@ -125,7 +119,7 @@ validate_commands([Command|Tail], CommandList, Map) ->
 		true ->
 			validate_commands(Tail, CommandList, Map);
 		false ->
-			utils:format_error(<<"Missing parameter: ">>, Command)
+			utils:format_error(?SERVER_ERROR_MALFORMED_COMMAND, Command)
 	end.
 
 validate_add_command(_Arg1, [], Map) -> 
@@ -137,7 +131,7 @@ validate_add_command(Actions, [Head|Tail], Map) ->
 	Label = lists:nth(1, Items),
 	if
 		length(Items) < 2 ->
-			utils:format_error(<<"Malformed command: ">>, Head);
+			utils:format_error(?SERVER_ERROR_MALFORMED_COMMAND, add);
 			true -> 
 				Value = lists:nth(2, Items),
 				case Label of

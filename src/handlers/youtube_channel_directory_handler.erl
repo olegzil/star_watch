@@ -44,18 +44,18 @@ submit_request_for_processing(Request) ->
 execute_request(Action, ClientID, ChannelID) ->
 case Action of
      <<"fetchchannelvideos">> ->
-        gen_server:call(db_access_server, {fetchchannelvideos, ChannelID}, infinity);
+        gen_server:call(db_access_server, {fetchchannelvideos, ClientID, ChannelID}, infinity);
     <<"fetchchanneldirectory">> ->
         gen_server:call(db_access_server, {fetchchanneldirectory, ClientID}, infinity);
     _ ->
-        utils:format_error(<<"Unrecognized Action: ">>, Action)
+        utils:format_error(?SERVER_ERROR_INVALID_ACTION, Action)
 end.
 
 validate_channel_id(Request) ->
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
         false ->
-            {error, Message}  = utils:format_error(<<"missing channel id token ">>, <<"channel_id=<your channel id>">>),
+            {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
             {error, jiffy:encode(Message)};
         {_, ChannelID} ->
             {ok, ChannelID}
@@ -82,7 +82,7 @@ validate_request(channel_id, Request) ->
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_ACTION_TOKEN, 1, TokenList) of 
         false ->
-            {error, Message}  = utils:format_error(<<"missing channel id token ">>, <<"channel_id=<your channel id>">>),
+            {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
             {error, jiffy:encode(Message)};
         {_, Action} ->
             if
@@ -97,12 +97,12 @@ validate_request(key, Request) ->
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_CLIENT_KEY_TOKEN, 1, TokenList) of 
         false -> 
-            {error, Message}  = utils:format_error(<<"missing client key ">>, <<"<key=your client key>">>),
+            {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CLIENT, <<"<key=your client key>">>),
             {error, jiffy:encode(Message)};
         {_, Key} ->        
             if
                 Key =/= ?CLIENT_ACCESS_KEY ->
-                {error, Message}  = utils:format_error(<<"invalid client key ">>, Key),
+                {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_CLIENT, Key),
                 {error, jiffy:encode(Message)};                    
             true ->
                 {ok, Key}
@@ -112,14 +112,14 @@ validate_request(action, Request) ->
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_ACTION_TOKEN, 1, TokenList) of 
         false -> 
-            {error, Message}  = utils:format_error(<<"missing ">>, <<"action=<fetchchanneldirectory|fetchchannelvideos>">>),
+            {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"action=<fetchchanneldirectory|fetchchannelvideos>">>),
             {error, jiffy:encode(Message)};
         {_, Action} ->      
             Found = lists:member(Action, ?AVAILABLE_CHANNEL_ACTIONS),  
             if Found =:= true ->
                     {ok, Action};
                 true ->
-                    {error, Message}  = utils:format_error(<<"invalid action ">>, Action),
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, Action),
                     {error, jiffy:encode(Message)}
             end
         end;

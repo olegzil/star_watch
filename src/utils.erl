@@ -552,28 +552,12 @@ compose_error_message(ErrorCode, ErrorMessage) ->
 	Timestamp  = calendar:datetime_to_gregorian_seconds({Date, Time}),
 	{[{timestamp, Timestamp}, {errorcode, ErrorCode}, {message, ErrorMessage}]}.
 
-jsonify_client_profile_table(MapOfRecords) ->
-	ListOfKeys = maps:keys(MapOfRecords), %% get a list of records.
-	RecordExtractor = fun(Key, MapAcc) ->
-		[Record] = maps:get(Key, MapOfRecords),
-		#client_profile_table{
-			client_id = _ClientID,
-			channel_list = ClientChannels
-		} = Record,
-
-		ListExtractor = fun(Item, ListAcc) ->
-			{ChannelName,[{youtubekey,YoutubeKey},{channel_id,ChannelID}]} = Item,
-			Map = #{
-				channel_name => ChannelName,
-				youtubekey => YoutubeKey,
-	        	channel_id => ChannelID
-			},
-			lists:append(ListAcc, [Map])
-		end,
-		List = lists:foldr(ListExtractor, [], ClientChannels),
-		maps:put(Key, List, MapAcc)
-	end,
-	lists:foldr(RecordExtractor, #{}, ListOfKeys).
+jsonify_client_profile_table(Record) ->
+	#{
+		client_id => Record#client_profile_table.client_id,
+		youtube_key => Record#client_profile_table.youtube_key,
+		channel_list => Record#client_profile_table.channel_list
+	}.
 
 jsonify_list_of_tuples(NamesList, TupleList) ->
 	% NameList must contain the same number of items as each tuple in the TupleList
@@ -591,11 +575,19 @@ create_tuple([], _Tuple, _Count, Acc) -> Acc;
 create_tuple([Name|Tail], Tuple, Count, Acc) ->
 	Map = maps:put(Name, element(Count, Tuple), Acc),
 	create_tuple(Tail, Tuple, Count+1, Map).
-format_error(ErrorType, ErrorMessage) ->
+format_error(ErrorCode, ErrorMessage) ->
+	Message = if
+				is_atom(ErrorMessage) ->
+					atom_to_binary(ErrorMessage);
+				is_binary(ErrorMessage) ->
+					ErrorMessage;
+				true ->
+					<<"undefined">>
+			end,
 	 Error = #{
 		date_time => utils:current_time_string(),
-		error_code => -1,
-		error_text => <<ErrorType/binary, ErrorMessage/binary>>
+		error_code => ErrorCode,
+		error_text => Message
 	},
 	{error, Error}.
 

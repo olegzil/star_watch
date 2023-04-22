@@ -6,6 +6,7 @@
 -include("include/server_config_item.hrl").
 -include("include/client_profile_table.hrl").
 -include("include/youtube_channel.hrl").
+-include("include/macro_definitions.hrl").
 -export([fetch_client_config_data_db/2, 
 		 fetch_list_of_channel_ids_and_youtube_keys_db/0,
 		 fetch_profile_map_from_file/1,
@@ -62,7 +63,7 @@ process_channel_request(_Arg1, [], ListOfMaps) ->
 	{ok, jiffy:encode(Final)};
 
 process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
-	{ChannelName,[{_,_},{_,ChannelID}]} = Channel,
+	{ChannelName,ChannelID} = Channel,
 	A = maps:merge(maps:put(channel_id, ChannelID, #{}), maps:put(client, ClientID, #{})),
 	Final = maps:merge(A, maps:put(name, ChannelName, A)),
 	List = lists:append(Acc, [Final]),
@@ -82,13 +83,8 @@ fetch_client_config_data_db(json, ClientID) ->
 		[] ->
 			Message = utils:jsonify_list_of_tuples([error, client_key], [{<<"client id not found">>, ClientID}]),
 			{error, Message};
-		ConfigRecord ->
-			[Record] = ConfigRecord,
-			#client_profile_table{
-				client_id = ClientID
-			} = Record,
-
-			Message = utils:jsonify_client_profile_table(#{ClientID => ConfigRecord}),
+		[Record] ->
+			Message = utils:jsonify_client_profile_table(Record),
 			{ok, Message}
 	end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +113,7 @@ promote_client_pending_config_data(ClientID) ->
 	case mnesia:activity(transaction, ReaderFun) of
 	 	[] ->
 	 		Message = <<"client id: ">>,
-	 		utils:format_error(<<"not found">>, <<Message/binary,ClientID/binary, " does not exist in the pending config table">>);
+	 		utils:format_error(?SERVER_ERROR_MALFORMED_COMMAND, <<Message/binary,ClientID/binary, " does not exist in the pending config table">>);
 	 	[R] ->
 			ClientProfile = mnesia:activity(transaction, fun() -> mnesia:read(client_profile_table, ClientID) end),
 			NewClientID = R#client_profile_table_pending.client_id,
@@ -126,7 +122,7 @@ promote_client_pending_config_data(ClientID) ->
 			update_client_profile_channels(ClientID, ClientProfile, NewRecord),
 			mnesia:activity(transaction, fun() -> mnesia:delete({client_profile_table_pending, ClientID}) end),
 			Message = <<"client id: ">>,
-	 		utils:format_error(<<"not found">>, <<Message/binary,ClientID/binary, " promoted to production and deleted from pending table">>)
+	 		utils:format_error(?SERVER_ERROR_OK, <<Message/binary,ClientID/binary, " promoted to production and deleted from pending table">>)
 	 end .
 
 %%% The production profile table does not have this client. Add it unconditionally
