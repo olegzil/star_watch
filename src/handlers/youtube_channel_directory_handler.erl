@@ -47,6 +47,8 @@ case Action of
         gen_server:call(db_access_server, {fetchchannelvideos, ClientID, ChannelID}, infinity);
     <<"fetchchanneldirectory">> ->
         gen_server:call(db_access_server, {fetchchanneldirectory, ClientID}, infinity);
+    <<"updatechannel">> ->
+        get_server:call(db_access_server, {updatechannel, ClientID, ChannelID}, infinity);
     _ ->
         utils:format_error(?SERVER_ERROR_INVALID_ACTION, Action)
 end.

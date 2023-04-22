@@ -48,4 +48,4 @@ validate_admin_key(Key, Action, Request) when ?ADMINISTRATOR_KEY =:= Key ->
 
 validate_admin_key(Key, _Arg1, _Arg2) ->
     Message = <<"invalid Administrator key: ">>,
-    utils:format_error(<<"authetication error">>, <<Message/binary, Key/binary>>).
+    utils:format_error(?SERVER_ERROR_AUTHENTICATION, <<Message/binary, Key/binary>>).

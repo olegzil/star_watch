@@ -28,8 +28,12 @@ handle_call({fetchchanneldirectory, ClientID}, _From, State) ->
     {reply, FetchResult,  State};
 
 handle_call({fetchchannelvideos, ClientID, ChannelID}, _From, State) ->
-    RequestResult = fetch_from_db_or_remote(ClientID, ChannelID),
+    RequestResult = update_channel(dbfirst, ClientID, ChannelID),
 	{reply, RequestResult, State};
+
+handle_call({updatechannel, ClientID, ChannelID}, _From, State) ->
+    RequestResult = update_channel(serverfirst, ClientID, ChannelID),
+    {reply, RequestResult, State};
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
@@ -47,7 +51,11 @@ terminate(_Reason, _State) -> ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fetch_from_db_or_remote(ClientID, ChannelID) ->
+update_channel(serverfirst, ClientID, ChannelID) ->
+        {_, ListOfRecords} = db_access:fetch_videos_for_channel_id(ChannelID),
+        respond_to_video_fetch_request(ClientID, ChannelID, []);
+
+update_channel(dbfirst, ClientID, ChannelID) ->
         {_, ListOfRecords} = db_access:fetch_videos_for_channel_id(ChannelID),
         respond_to_video_fetch_request(ClientID, ChannelID, ListOfRecords).
 
