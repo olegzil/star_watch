@@ -46,6 +46,7 @@
 -define(SERVER_ERROR_INVALID_PARAMETER,		16#FFAA16).
 -define(SERVER_ERROR_NOT_IMPLEMENTED,		16#FFAA17).
 -define(SERVER_ERROR_NO_SUCH_CHANNEL,		16#FFAA18).
+-define(SERVER_ERROR_NO_SUCH_COMMAND,		16#FFAA19).
 
 -define(RESPONSE_CODES, [{link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
 						 {link_pending, ?SERVER_ERROR_LINK_PENDING}, 
@@ -59,7 +60,8 @@
 						 {channel_id_required, ?SERVER_ERROR_MISSING_CHANNEL},
 						 {not_implemented, ?SERVER_ERROR_NOT_IMPLEMENTED},
 						 {client_id_required, ?SERVER_ERROR_MISSING_CLIENT},
-						 {no_such_channel, ?SERVER_ERROR_NO_SUCH_CHANNEL}]).
+						 {no_such_channel, ?SERVER_ERROR_NO_SUCH_CHANNEL},
+						 {no_such_command, ?SERVER_ERROR_NO_SUCH_COMMAND}]).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

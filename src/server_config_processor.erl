@@ -286,10 +286,5 @@ delete_youtube_channel(ClientID, ChannelID) ->
 	NewProfile=Profile#client_profile_table{
 		channel_list = NewList
 	},
-	case mnesia:transaction(fun()-> mnesia:write(NewProfile) end) of 
-		{atomic, ok} ->
-			utils:format_success(<<"deleted: ", ChannelID/binary, " for client ", ClientID/binary>>);
-		_ ->
-			utils:format_error(-1, unknow)
-	end.
+	mnesia:transaction(fun()-> mnesia:write(NewProfile) end).
 

@@ -24,7 +24,8 @@
 		 format_error/2,
 		 package_channel_record_list/1,
 		 log_message/1,
-		 is_key_present/3]).
+		 is_key_present/3,
+		 tuple_list_to_list_of_maps/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -650,6 +651,16 @@ is_key_present(Key, Index, List) ->
 		_ ->
 			true
 	end.
+%%%
+%% Given a tupe of {Name1, Name2} and a list of tuples [{part1, part2} ... {partN, partN+1}] 
+%% returns a list of maps: [#{Name1 => part1, Name2 => part2} ... #{Name1 => partN, Name2 => partN+1}]
+%%% 
+tuple_list_to_list_of_maps({Tag1, Tag2}, ListOfTuples) ->
+	lists:foldl(fun(Tuple, Acc)-> 
+		Map = #{Tag1 => element(1, Tuple), Tag2 => element(2, Tuple)},
+		Acc ++ [Map]
+	end, [], ListOfTuples).
+
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

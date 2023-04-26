@@ -129,9 +129,11 @@ validate_action(Action, TokenList) ->
         <<"promoteconfigrecord">> ->  % Format: {action, promoteconfigrecord}, {client_id, <Client id>}
             {error, not_implemented};
         <<"fetchprofilemap">> ->
-            {error, not_implemented};
+            {ok, <<"fetchprofilemap">>};
         <<"fetchclientconfigdata">> ->
-            {error, not_implemented}
+            {error, not_implemented};
+        _ ->
+            {error, no_such_command}
     end.
 
 validate_admin_key(Key) when ?ADMINISTRATOR_KEY =:= Key -> ok;

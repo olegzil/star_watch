@@ -6,6 +6,7 @@
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
 -include("include/invalid_request.hrl").
+-include("include/client_profile_table.hrl").
 -export([execute_action/1, handle_admin_action/1]).
 
 execute_action(Request) ->
@@ -156,9 +157,29 @@ handle_admin_action(Action)	->
 	case Action of
 		{ <<"deleteconfigrecord">>, ClientID} ->
 			server_config_processor:delete_config_record(ClientID),
-			{ok, #{deleted => ClientID}};
+			utils:format_success(<<"deleted client ", ClientID/binary, " from profile db">>);
 		{<<"deleteyoutubechannel">>, {ClientID, ChannelID}} ->
-			server_config_processor:delete_youtube_channel(ClientID, ChannelID);
+			case server_config_processor:delete_youtube_channel(ClientID, ChannelID) of 
+				{atomic, ok} ->
+					utils:format_success(<<"deleted: ", ChannelID/binary, " for client ", ClientID/binary>>);
+				_ ->
+					utils:format_error(-1, unknow)
+			end;
+
+		<<"fetchprofilemap">> ->
+			MapOfRecords = server_config_processor:fetch_profile_map_from_db(),
+			Keys = maps:keys(MapOfRecords),
+			ProfileMap = lists:foldl(fun(Key, Acc)-> 
+				[R] = maps:get(Key, MapOfRecords),
+				RecordMap = #{
+					client_id => Key,
+					youtube_key => R#client_profile_table.youtube_key,
+					channel_list => utils:tuple_list_to_list_of_maps({channel_name, channel_id}, R#client_profile_table.channel_list)
+				},				
+				Acc ++ [RecordMap]
+			end,
+			[], Keys),
+			{ok, ProfileMap};
 		_ ->
 			utils:format_error(?SERVER_ERROR_OK, command_not_found)
 	end.
