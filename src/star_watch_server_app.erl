@@ -83,7 +83,8 @@ initialize_mnesia() ->
     init_table(client_profile_table_pending),
     Empty = init_table(client_profile_table),
     mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel, client_profile_table, client_profile_table_pending], 10000),
-    timer:apply_after(1000, server_config_processor, populate_client_profile_table, [Empty]).
+    timer:apply_after(1000, server_config_processor, populate_client_profile_table, [Empty]),
+    mnesia:add_table_index(youtube_channel, video_id).
 
 init_table(TableName) ->
     case mnesia:table_info(TableName, size) of

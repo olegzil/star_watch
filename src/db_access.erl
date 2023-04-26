@@ -19,7 +19,6 @@
            fetch_channel_videos/1, 
            update_nasa_table/1, 
            package_channel_data/1, 
-           add_channel_request/2, 
            fetch_videos_for_channel_id/1, 
            purge_table/1, 
            get_channel_descriptors_for_client/1,
@@ -91,52 +90,6 @@ process_date_request(StartDate, EndDate) ->
     end.
 
 
-add_channel_request(ClientKey, Name) ->
-    ChannelName = list_to_binary(string:replace(string:lowercase(Name), " ", "", all)), %%% Normalize
-    {_, ListOfRecords} = fetch_client_data(client_profile_table_pending, ClientKey), %%% Get the record if it exists
-    case length(ListOfRecords) of %%% should be a list of one item
-        0 ->
-            %%% this client does not have this youtube channel in their profile. Add it.
-            add_channel_name_to_pending_channel_table(emptylist, ClientKey, ListOfRecords, ChannelName),
-            ok;
-        _ ->
-            %%% this client already has this youtube channel in their profile. Let them know.
-            add_channel_name_to_pending_channel_table(nonemptylist, ClientKey, ListOfRecords, ChannelName)
-    end.
-
-add_channel_name_to_pending_channel_table(emptylist, ClientID, [], ChannelName) ->
-    UpdatedRecord = #client_profile_table_pending{
-        client_id = ClientID,
-        channel_list = [ChannelName]    
-    },
-
-    Fun = 
-        fun() ->
-            mnesia:write(UpdatedRecord)
-        end,
-    mnesia:transaction(Fun); %% execute the transaction
-
-add_channel_name_to_pending_channel_table(nonemptylist, _ClientKey, [ClientRecord], ChannelName) ->
-    Found = lists:member(ChannelName, ClientRecord#client_profile_table_pending.channel_list),
-    case Found  of
-        false ->
-            NewList = lists:append(ClientRecord#client_profile_table_pending.channel_list, [ChannelName]),
-            UpdatedRecord = #client_profile_table_pending{
-                client_id = ClientRecord#client_profile_table_pending.client_id,
-                channel_list = NewList    
-            },
-            Fun = 
-                fun() ->
-                    mnesia:write(UpdatedRecord)
-                end,
-            mnesia:transaction(Fun),
-            {ok, #{channel_added => ChannelName }};
-        true ->
-            {ok, #{channel_exists => ChannelName }}
-
-    end.
-
-
 fetch_videos_for_channel_id(ChannelID) ->
     Match = ets:fun2ms(
         fun(Record) 
@@ -153,19 +106,10 @@ fetch_client_data(client_profile_table, ClientID) ->
                 Record
         end),
     SelectRecords = fun() -> mnesia:select(client_profile_table, Match) end,
-    mnesia:sync_transaction(SelectRecords);
-
-fetch_client_data(client_profile_table_pending, ClientID) ->
-    Match = ets:fun2ms(
-        fun(Record) 
-            when Record#client_profile_table_pending.client_id =:= ClientID ->
-                Record
-        end),
-    SelectRecords = fun() -> mnesia:select(client_profile_table_pending, Match) end,
     mnesia:sync_transaction(SelectRecords).
 
 fetch_channel_videos(ClientKey) ->
-    {Code, Map} = server_config_processor:fetch_client_config_data_db(json, ClientKey),
+    {Code, Map} = server_config_processor:fetch_client_config_data_db(ClientKey),
     format_channel_videos(ClientKey, {Code, Map}).
 
 format_channel_videos(ClientKey, {error, _Map}) ->
@@ -256,8 +200,8 @@ end.
 get_channel_descriptors_for_client(ClientID) ->
     ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end, 
     case mnesia:transaction(ReaderFun) of
-        {aborted,{Reson,_}} -> 
-            {error, Reson};
+        {aborted,{Reason,_}} -> 
+            {error, Reason};
         {atomic, []} ->
             {error, no_records};
         {_, [Record]} ->
@@ -267,12 +211,76 @@ get_channel_descriptors_for_client(ClientID) ->
 get_client_youtube_key(ClientID) ->
     ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end, 
     case mnesia:transaction(ReaderFun) of
-        {aborted,{Reson,_}} -> 
-            {error, Reson};
+        {aborted,{Reason,_}} -> 
+            {error, Reason};
         {atomic, []} ->
             {error, no_records};
         {_, [Record]} ->
             {ok, Record#client_profile_table.youtube_key}
+    end.
+
+add_video_link(ClientID, Link) ->
+    IsPending = is_channel_id_pending(ClientID, Link),
+    IsPresent = is_channel_id_in_youtube_channel(ClientID, Link),
+    if 
+        IsPending ->
+            {error, link_pending};
+        IsPresent ->
+            {error, link_exists};
+        true ->
+            {atomic, [Record]} = mnesia:transaction(fun() -> mnesia:read(client_profile_table_pending, ClientID) end),
+            NewList = Record#client_profile_table_pending.video_id_list ++ [Link],
+            NewRecord = Record#client_profile_table_pending{video_id_list = NewList},
+            mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+           {ok, video_link_added}
+    end.
+
+%%%
+%%% Determine if the peding table contains the target video link. First determine
+%%% if the table contains the specified client. If not, report false. If the cient is found
+%%% Search the list of its video links. If found to contain the target link report true.
+%%%
+is_channel_id_pending(ClientID, Link) ->
+    Fun = fun() -> mnesia:read(client_profile_table_pending, ClientID) end,
+    {atomic, Records} = mnesia:transaction(Fun),
+    case length(Records) of
+        0 ->
+            false;
+        _ ->
+            [Record] = Records,
+            Found = lists:member(Link, Record#client_profile_table_pending.video_id_list),
+            if 
+                Found =:= false ->
+                    false;
+                true -> true 
+            end
+    end.
+
+%%%
+%%% Determine if the client has this video link. First, use and indexed read to determine if the link exits at all.
+%%% If it does not, report false.
+%%% If it does, read each record and extract the channel id from its key. Compare the channel id to the value in 
+%%% the config record of the client. If they match return true, false otherwise.
+%%%
+is_channel_id_in_youtube_channel(ClientID, Link) ->
+    Parts = string:split(Link, "/", all),
+    VideoID = lists:nth(4, Parts),
+    ReaderFun = fun() -> mnesia:index_read(youtube_channel, VideoID, #youtube_channel.video_id) end,
+    {atomic, Records} = mnesia:transaction(ReaderFun),
+    case length(Records) of
+        0 ->
+            false;
+        _->
+            [Record] = Records,
+            [ChannelID, _VideoID] = string:split(Record#youtube_channel.key, ":", all),
+            {ok, ClientRecord} = server_config_processor:fetch_client_config_data_db(ClientID),
+            ChannelList = maps:get(channel_list, ClientRecord),
+            Found = lists:keyfind(ChannelID, 2, ChannelList),
+            if
+                Found =:= false ->
+                false;
+                true -> true
+            end
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -28,12 +28,40 @@ handle_call({fetchchanneldirectory, ClientID}, _From, State) ->
     {reply, FetchResult,  State};
 
 handle_call({fetchchannelvideos, ClientID, ChannelID}, _From, State) ->
-    RequestResult = update_channel(dbfirst, ClientID, ChannelID),
+    RequestResult = fetch_channel_data(dbfirst, ClientID, ChannelID),
 	{reply, RequestResult, State};
 
 handle_call({updatechannel, ClientID, ChannelID}, _From, State) ->
-    RequestResult = update_channel(serverfirst, ClientID, ChannelID),
+    RequestResult = fetch_channel_data(serverfirst, ClientID, ChannelID),
     {reply, RequestResult, State};
+
+handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
+    RequestResult = db_access:add_video_link(ClientID, VideoLink),
+    Response = case RequestResult of
+        {error, Code} ->
+            Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
+            if
+                Result =:= false ->
+                    {error , Return} = utils:format_error(Code, Code),
+                    {error, jiffy:encode(#{error => Return})};
+                true ->
+                    {AtomicCode, ServerErrorCode} = Result,
+                    {error , Return} = utils:format_error(ServerErrorCode, AtomicCode),
+                    {error, jiffy:encode(#{error => Return})}
+            end;
+        {ok, Code} ->
+            Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
+            if
+                Result =:= false ->
+                    {error , Return} = utils:format_error(Code, Code),
+                    {ok, jiffy:encode(#{success => Return})};
+                true ->
+                    {AtomicCode, ServerErrorCode} = Result,
+                    {error , Return} = utils:format_error(ServerErrorCode, AtomicCode),
+                    {ok, jiffy:encode(#{success => Return})}
+            end
+    end,
+    {reply, Response, State};
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
@@ -51,11 +79,10 @@ terminate(_Reason, _State) -> ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-update_channel(serverfirst, ClientID, ChannelID) ->
-        {_, ListOfRecords} = db_access:fetch_videos_for_channel_id(ChannelID),
+fetch_channel_data(serverfirst, ClientID, ChannelID) ->
         respond_to_video_fetch_request(ClientID, ChannelID, []);
 
-update_channel(dbfirst, ClientID, ChannelID) ->
+fetch_channel_data(dbfirst, ClientID, ChannelID) ->
         {_, ListOfRecords} = db_access:fetch_videos_for_channel_id(ChannelID),
         respond_to_video_fetch_request(ClientID, ChannelID, ListOfRecords).
 
@@ -79,7 +106,7 @@ respond_to_video_fetch_request(ClientID, ChannelID, []) ->
         end,
     case ChannelDescriptor of
         {error, Cause} ->
-            {error, utils:format_error(?SERVER_ERROR_DB_ERROR, Cause)};
+            utils:format_error(?SERVER_ERROR_DB_ERROR, Cause);
         {ok, {_ChannelName, ChannelID}} ->
             {ok, YoutubeKey} = db_access:get_client_youtube_key(ClientID),
             ClientProfile = [{YoutubeKey, ChannelID}],
@@ -89,7 +116,6 @@ respond_to_video_fetch_request(ClientID, ChannelID, []) ->
     end;
 respond_to_video_fetch_request(_ClientID, _ChannelID, ListOfRecords) ->
     utils:package_channel_record_list(ListOfRecords).      
-
 
     
 

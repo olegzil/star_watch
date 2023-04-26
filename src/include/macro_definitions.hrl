@@ -19,21 +19,47 @@
 -define(REQUIRED_CLIENT_ID_TOKEN, <<"client_key">>).
 -define(REQUIRED_ACTION_TOKEN, <<"action">>).
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
--define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchchanneldirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>]).
+-define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchchanneldirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>]).
 
--define(SERVER_ERROR_OK, 				16#FFAA00).
--define(SERVER_ERROR_BAD_CLIENT_ID, 	16#FFAA01).
--define(SERVER_ERROR_MISSING_ACTION, 	16#FFAA02).
--define(SERVER_ERROR_MISSING_PARAMETER, 16#FFAA03).
--define(SERVER_ERROR_MALFORMED_COMMAND, 16#FFAA04).
--define(SERVER_ERROR_INVALID_COMMAND, 	16#FFAA05).
--define(SERVER_ERROR_DB_ERROR, 			16#FFAA06).
--define(SERVER_ERROR_NOT_FOUND, 		16#FFAA07).
--define(SERVER_ERROR_AUTHENTICATION, 	16#FFAA08).
--define(SERVER_ERROR_INVALID_ACTION,	16#FFAA09).
--define(SERVER_ERROR_MISSING_CHANNEL,	16#FFAA0A).
--define(SERVER_ERROR_MISSING_CLIENT,	16#FFAA0B).
--define(SERVER_ERROR_INVALID_CLIENT,	16#FFAA0C).
+-define(SERVER_ERROR_OK, 					16#FFAA00).
+-define(SERVER_ERROR_BAD_CLIENT_ID, 		16#FFAA01).
+-define(SERVER_ERROR_MISSING_ACTION, 		16#FFAA02).
+-define(SERVER_ERROR_MISSING_PARAMETER, 	16#FFAA03).
+-define(SERVER_ERROR_MALFORMED_COMMAND, 	16#FFAA04).
+-define(SERVER_ERROR_INVALID_COMMAND, 		16#FFAA05).
+-define(SERVER_ERROR_DB_ERROR, 				16#FFAA06).
+-define(SERVER_ERROR_NOT_FOUND, 			16#FFAA07).
+-define(SERVER_ERROR_AUTHENTICATION, 		16#FFAA08).
+-define(SERVER_ERROR_INVALID_ACTION,		16#FFAA09).
+-define(SERVER_ERROR_MISSING_CHANNEL,		16#FFAA0A).
+-define(SERVER_ERROR_MISSING_CLIENT,		16#FFAA0B).
+-define(SERVER_ERROR_INVALID_CLIENT,		16#FFAA0C).
+-define(SERVER_ERROR_MISSING_VIDEO,			16#FFAA0D).
+-define(SERVER_ERROR_INVALID_LINK,			16#FFAA0E).
+-define(SERVER_ERROR_LINK_EXISTS, 			16#FFAA0F).
+-define(SERVER_ERROR_LINK_PENDING, 			16#FFAA10).
+-define(SERVER_ERROR_RECORD_NOT_FOUND,		16#FFAA11).
+-define(SERVER_ERROR_ADMIN_KEY,				16#FFAA12).
+-define(SERVER_ERROR_NO_ACTION_SPECIFIED,	16#FFAA13).
+-define(SERVER_ERROR_ACTION_TYPE,			16#FFAA14).
+-define(SERVER_ERROR_NO_SUCH_CLIENT,		16#FFAA15).
+-define(SERVER_ERROR_INVALID_PARAMETER,		16#FFAA16).
+-define(SERVER_ERROR_NOT_IMPLEMENTED,		16#FFAA17).
+-define(SERVER_ERROR_NO_SUCH_CHANNEL,		16#FFAA18).
+
+-define(RESPONSE_CODES, [{link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
+						 {link_pending, ?SERVER_ERROR_LINK_PENDING}, 
+						 {video_link_added, ?SERVER_ERROR_OK}, 
+						 {no_records, ?SERVER_ERROR_RECORD_NOT_FOUND},
+						 {no_admin_key, ?SERVER_ERROR_ADMIN_KEY},
+						 {no_action_specified, ?SERVER_ERROR_NO_ACTION_SPECIFIED},
+						 {missing_action_type, ?SERVER_ERROR_ACTION_TYPE},
+						 {no_such_client, ?SERVER_ERROR_NO_SUCH_CLIENT},
+						 {invalid_parameters, ?SERVER_ERROR_INVALID_PARAMETER},
+						 {channel_id_required, ?SERVER_ERROR_MISSING_CHANNEL},
+						 {not_implemented, ?SERVER_ERROR_NOT_IMPLEMENTED},
+						 {client_id_required, ?SERVER_ERROR_MISSING_CLIENT},
+						 {no_such_channel, ?SERVER_ERROR_NO_SUCH_CHANNEL}]).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

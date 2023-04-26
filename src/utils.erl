@@ -18,10 +18,13 @@
 		 test_multi_channel_data_fetch/0,
 		 reformat_channel_data/1,
 		 compose_error_message/2,
+		 format_success/1,
 		 jsonify_list_of_tuples/2, 
 		 jsonify_client_profile_table/1,
 		 format_error/2,
-		 package_channel_record_list/1]).
+		 package_channel_record_list/1,
+		 log_message/1,
+		 is_key_present/3]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -585,11 +588,28 @@ format_error(ErrorCode, ErrorMessage) ->
 					<<"undefined">>
 			end,
 	 Error = #{
+	 	status => error,
 		date_time => utils:current_time_string(),
 		error_code => ErrorCode,
 		error_text => Message
 	},
 	{error, Error}.
+
+format_success(Message) ->
+	Message = if
+				is_atom(Message) ->
+					atom_to_binary(Message);
+				is_binary(Message) ->
+					Message;
+				true ->
+					<<"undefined">>
+			end,
+	 Success = #{
+	 	status => success,
+		date_time => utils:current_time_string(),
+		text => Message
+	},
+	{ok, Success}.
 
 package_channel_record_list(RecordList) ->
 	List = package_records(RecordList, []),
@@ -606,6 +626,30 @@ package_records([Record|Records], List) ->
 	Final = maps:put(channel_id, Record#youtube_channel.channel_id, F),
 	NewList = lists:append(List, [Final]),
 	package_records(Records, NewList).
+
+log_message(Items) ->
+	Result = lists:foldl(fun(Item, Acc)-> 
+		{Title, Var} = Item,
+		{Description, Values} = Acc,
+		A = list_to_binary(Title),
+		NewDescription = <<Description/binary, A/binary, ": ~p~n">>,
+		NewValues = Values ++ [Var],
+		{NewDescription, NewValues}
+		end, 
+		{<<"">>, []}, 
+		Items),
+	{Caption, Values} = Result,
+	io:format("~n***********************~n"),
+	io:format(Caption, Values),
+	io:format("***********************~n").
+
+is_key_present(Key, Index, List) ->
+	case lists:keyfind(Key, Index, List) of
+		false ->
+			false;
+		_ ->
+			true
+	end.
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

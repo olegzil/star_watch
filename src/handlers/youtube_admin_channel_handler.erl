@@ -21,31 +21,119 @@ handle(Req, State) ->
   end.
 
 submit_request_for_processing(Request) ->
-    try #{
-        action := Action,
-        key := Key
-    } = cowboy_req:match_qs([key, action], Request) of
-         _ ->
-            validate_admin_key(Key, Action, Request)
-     catch
-         _:Error ->
-            {_, {_, Term}, _} = Error,
-            io:format("Big Error: ~p~n", [Error]),          
-            jiffy:encode(Term)     
+    TokenList = cowboy_req:parse_qs(Request),
+    ValidationResult = validate_request(all, TokenList),    
+
+    case ValidationResult of
+        {ok, Result} ->
+            case administrator:handle_admin_action(Result) of
+            {ok, Good} ->
+                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, jiffy:encode(Good), Request),
+                Good;
+              {error, Bad} ->
+                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, jiffy:encode(Bad), Request),
+                Bad;
+              {_, Other} ->
+                Other
+            end;
+        {error, Bad} ->
+            cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, jiffy:encode(Bad), Request)
     end.
-    
-validate_admin_key(Key, Action, Request) when ?ADMINISTRATOR_KEY =:= Key ->
-    case administrator:execute_action(Action) of
-    {ok, Good} ->
-        cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
-        Good;
-      {error, Bad} ->
-        cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Bad, Request),
-        Bad;
-      {_, Other} ->
-        Other
+validate_request(all, TokenList) ->
+    ValidateAdminKey =  validate_request(adminkey, TokenList),
+    AdminAction = validate_request(action, TokenList),
+
+    TestList = [ValidateAdminKey, AdminAction],
+    ErrorTuple = lists:keyfind(error, 1, TestList),
+    case ErrorTuple of
+        false ->
+            AdminAction;            
+        {error, Error} ->
+            {ErrorName, ErrorCode} = lists:keyfind(Error, 1, ?RESPONSE_CODES),
+            utils:format_error(ErrorCode, ErrorName)
     end;
 
-validate_admin_key(Key, _Arg1, _Arg2) ->
-    Message = <<"invalid Administrator key: ">>,
-    utils:format_error(?SERVER_ERROR_AUTHENTICATION, <<Message/binary, Key/binary>>).
+validate_request(adminkey, TokenList) ->
+    Target = lists:keyfind(<<"key">>, 1, TokenList),
+    if
+        Target =:= false ->
+            {error, no_admin_key};
+        true ->
+            {_Tag, AdminKey} = Target,
+            validate_admin_key(AdminKey)
+    end;
+validate_request(action, TokenList) ->
+    Target = lists:keyfind(<<"action">>, 1, TokenList),
+    if
+        Target =:= false ->
+            {error, no_action_specified};
+        true ->
+            case Target of
+                {_Tag, Action} ->    
+                    validate_action(Action, TokenList);
+                _ ->
+                    {error, missing_action_type}                
+            end
+    end.
+
+validate_action(Action, TokenList) ->
+    case Action of
+        <<"deleteconfigrecord">> -> % Format: action=deleteconfigrecord&client_id=<ClientID>
+            Result = lists:keyfind(<<"client_id">>, 1, TokenList),
+            case Result of
+                {<<"client_id">>, ClientID} ->
+                    Found = server_config_processor:is_client_in_profile_map(ClientID),
+                    if
+                        Found =:= false ->
+                            {error, no_such_client};
+                        true ->
+                            {ok, {<<"deleteconfigrecord">>, ClientID}}
+                    end;
+                _ ->
+                    {error, invalid_parameters}
+            end;
+
+        <<"deleteyoutubechannel">> -> % Format: {action,deleteyoutubechannel}, {channel_id, <Channel id>}, {client_id, <Client id>}
+            ChannelParam = lists:keyfind(<<"channel_id">>, 1, TokenList),
+            ClientParam = lists:keyfind(<<"client_id">>, 1, TokenList),
+            WellFormed = if
+                ChannelParam =:= false ->
+                    {error, channel_id_required};
+                ClientParam =:= false ->
+                    {error, client_id_required};
+                true ->
+                    {_, ChannelID} = ChannelParam,
+                    {_, ClientID} = ClientParam,
+                    case server_config_processor:is_channel_in_profile(ClientID, ChannelID) of
+                        false ->
+                            {error, no_such_channel};
+                        true ->
+                            {ok, ClientParam, ChannelParam}
+                    end
+            end,
+            case WellFormed of
+                {error, Error} ->
+                    {error, Error};
+                {ok, ClientParam, ChannelParam}->
+                    {<<"channel_id">>, Channel} = ChannelParam,
+                    {<<"client_id">>, Client} = ClientParam,
+                    Target = server_config_processor:is_client_in_profile_map(Client),
+                    if 
+                        Target =:= true ->
+                            {ok, { <<"deleteyoutubechannel">>, {Client, Channel}}};
+                        true ->
+                            {error, no_such_client}
+                    end
+            end;
+            
+        <<"promoteconfigrecord">> ->  % Format: {action, promoteconfigrecord}, {client_id, <Client id>}
+            {error, not_implemented};
+        <<"fetchprofilemap">> ->
+            {error, not_implemented};
+        <<"fetchclientconfigdata">> ->
+            {error, not_implemented}
+    end.
+
+validate_admin_key(Key) when ?ADMINISTRATOR_KEY =:= Key -> ok;
+validate_admin_key(_Arg) -> error.
+

@@ -7,20 +7,23 @@
 -include("include/client_profile_table.hrl").
 -include("include/youtube_channel.hrl").
 -include("include/macro_definitions.hrl").
--export([fetch_client_config_data_db/2, 
+-export([fetch_client_config_data_db/1, 
 		 fetch_list_of_channel_ids_and_youtube_keys_db/0,
 		 fetch_profile_map_from_file/1,
 		 fetch_channel_directory/1,
 		 process_channel_request/3,
-		 add_client_pending_config_data/4,
-		 promote_client_pending_config_data/1,
+		 add_client_config_data/4,
 		 update_client_profile_channels/3,
 		 update_client_record/3,
 		 fetch_profile_map_from_db/0,
 		 generate_profile_map/1,
 		 get_default_youtube_key/1, 
 		 get_client_key/1,
-		 populate_client_profile_table/1]).
+		 populate_client_profile_table/1,
+		 is_client_in_profile_map/1,
+		 delete_config_record/1, 
+		 is_channel_in_profile/2,
+		 delete_youtube_channel/2]).
 
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
@@ -76,7 +79,7 @@ process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% Begin fetch_client_config_data_db logic %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fetch_client_config_data_db(json, ClientID) ->
+fetch_client_config_data_db(ClientID) ->
 	ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end,
 	Result = mnesia:activity(transaction, ReaderFun),
 	case Result of
@@ -92,53 +95,43 @@ fetch_client_config_data_db(json, ClientID) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% Begin add_client_pending_config_data logic %%%%%%%%%%%%%%%
+%%%%%%%%%% Begin add_client_config_data logic %%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-add_client_pending_config_data(ClientID, Name, YoutubeKey, ChannelID) ->
-	NewRecord = #client_profile_table_pending{
-		client_id = ClientID,
-		channel_list = [{Name,[{youtubekey,YoutubeKey},{channel_id,ChannelID}]}]
-	},
-	WriteFun = fun() -> mnesia:write(NewRecord) end,
-	mnesia:activity(transaction, WriteFun),
-	{ok, record_added}.
+add_client_config_data(ClientID, Name, YoutubeKey, ChannelID) ->
+	{atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, ClientID) end),
+	case Result of
+		[] ->
+			Record = #client_profile_table{
+				client_id = ClientID, 
+				youtube_key = YoutubeKey,
+				channel_list = [ChannelID]
+			},
+			mnesia:transaction(fun()-> mnesia:write(Record) end);
+		[R] ->
+			NewChannelList = R#client_profile_table.channel_list ++ [{Name, ChannelID}],
+			NewRecord = R#client_profile_table{channel_list= NewChannelList},
+			mnesia:transaction(fun() -> mnesia:write(NewRecord) end)
+	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% End add_client_pending_config_data logic %%%%%%%%%%%%%%%%%
+%%%%%%%%%% End add_client_config_data logic %%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-promote_client_pending_config_data(ClientID) ->
-	ReaderFun = fun() -> mnesia:read(client_profile_table_pending, ClientID)	end,
-	case mnesia:activity(transaction, ReaderFun) of
-	 	[] ->
-	 		Message = <<"client id: ">>,
-	 		utils:format_error(?SERVER_ERROR_MALFORMED_COMMAND, <<Message/binary,ClientID/binary, " does not exist in the pending config table">>);
-	 	[R] ->
-			ClientProfile = mnesia:activity(transaction, fun() -> mnesia:read(client_profile_table, ClientID) end),
-			NewClientID = R#client_profile_table_pending.client_id,
-			NewChannelList = R#client_profile_table_pending.channel_list,
-			NewRecord = #client_profile_table_pending{client_id = NewClientID, channel_list = NewChannelList},
-			update_client_profile_channels(ClientID, ClientProfile, NewRecord),
-			mnesia:activity(transaction, fun() -> mnesia:delete({client_profile_table_pending, ClientID}) end),
-			Message = <<"client id: ">>,
-	 		utils:format_error(?SERVER_ERROR_OK, <<Message/binary,ClientID/binary, " promoted to production and deleted from pending table">>)
-	 end .
 
 %%% The production profile table does not have this client. Add it unconditionally
 update_client_profile_channels(_ClientID, [], NewRecord) ->
 	OutRecord = #client_profile_table{client_id = NewRecord#client_profile_table_pending.client_id,	
-																			 channel_list = NewRecord#client_profile_table_pending.channel_list},
+																			 channel_list = NewRecord#client_profile_table_pending.video_id_list},
 	mnesia:activity(transaction, fun() -> mnesia:write(OutRecord) end),
 	{ok, record_promoted_1};
 
 %%% The Production profile table does have this client. Search its chanel list and update it accordingly.
 update_client_profile_channels(_ChannelID, [ClientProfile], NewRecord) ->
-	[{NewName,[{_,_},{_,_}]}] = NewRecord#client_profile_table_pending.channel_list,
+	[{NewName,[{_,_},{_,_}]}] = NewRecord#client_profile_table_pending.video_id_list,
 	Found = lists:any(fun(Item)-> 
 		{ChannelName,[{_,_},{_,_}]} = Item,
 		ChannelName =:= NewName
-	end, NewRecord#client_profile_table_pending.channel_list),
+	end, NewRecord#client_profile_table_pending.video_id_list),
 	update_client_record(Found, ClientProfile, NewRecord).
 
 %%% The Client channel list did not contain this channel name. Append it to the channel list and write it.
@@ -164,10 +157,10 @@ update_client_record(true, ClientProfile, NewRecord) ->
 	UpdatedList = lists:foldr(AccumulatorFun, [], TargetList),
 	case is_list(UpdatedList) of
 		true ->
-			FinalList = lists:append(UpdatedList, NewRecord#client_profile_table_pending.channel_list),
+			FinalList = lists:append(UpdatedList, NewRecord#client_profile_table_pending.video_id_list),
 			mnesia:activity(transaction, fun() -> mnesia:write(#client_profile_table{client_id=ClientID, channel_list = FinalList}) end);
 		false ->
-			FinalList = lists:append([UpdatedList], NewRecord#client_profile_table_pending.channel_list),
+			FinalList = lists:append([UpdatedList], NewRecord#client_profile_table_pending.video_id_list),
 			mnesia:activity(transaction, fun() -> mnesia:write(#client_profile_table{client_id=ClientID, channel_list = FinalList}) end)
 	end,
 	{ok, record_promoted_3}.
@@ -243,9 +236,6 @@ key_pair_extractor([Key|Remainder], Acc) ->
 %%%%%%%%%%%% Begin populate_client_profile_table logic %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 populate_client_profile_table(false) -> 
-	io:format("~n*********************************************~n"),
-	io:format("populate_client_profile_table: FALSE~n"),
-	io:format("*********************************************~n"),
 	ok;
 populate_client_profile_table(true) -> 
     ClientProfilesList = fetch_profile_map_from_file("server_config.cfg"),
@@ -265,3 +255,41 @@ populate_client_profile_table(true) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%% End populate_client_profile_table logic %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+is_client_in_profile_map(ClientID) ->
+	Map = fetch_profile_map_from_db(),
+	Keys = maps:keys(Map),
+	lists:member(ClientID, Keys).
+
+is_channel_in_profile(ClientID, ChannelID) ->
+	Map = fetch_profile_map_from_db(),
+	Keys = maps:keys(Map),
+	Result = case lists:member(ClientID, Keys) of 
+		 true ->
+			[Profile] = maps:get(ClientID, Map),
+			utils:is_key_present(ChannelID, 2, Profile#client_profile_table.channel_list);
+		false ->
+			false
+	end,
+	Result.
+
+
+delete_config_record(ClientID) ->
+	DelFun = fun() -> mnesia:delete({client_profile_table, ClientID}) end,
+	mnesia:transaction(DelFun).
+
+delete_youtube_channel(ClientID, ChannelID) ->
+	Map = fetch_profile_map_from_db(),
+	[Profile] = maps:get(ClientID, Map),
+	Target = lists:keyfind(ChannelID, 2, Profile#client_profile_table.channel_list),
+	NewList = lists:delete(Target, Profile#client_profile_table.channel_list),
+	NewProfile=Profile#client_profile_table{
+		channel_list = NewList
+	},
+	case mnesia:transaction(fun()-> mnesia:write(NewProfile) end) of 
+		{atomic, ok} ->
+			utils:format_success(<<"deleted: ", ChannelID/binary, " for client ", ClientID/binary>>);
+		_ ->
+			utils:format_error(-1, unknow)
+	end.
+

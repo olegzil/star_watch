@@ -6,5 +6,5 @@
 
 -record(client_profile_table_pending, {
 	client_id, %%% binary UUID, i.e. <<"94be0c40-6d79-4611-87bc-8ee2d48b4dc4">>
-	channel_list %%% a list of channel names, i.e. [<<"pbs space time">>, ..., name]
+	video_id_list %%% a list of channel IDs
 }).

@@ -27,19 +27,15 @@ handle_call({fetchprofilemap}, _From, State) ->
 	{reply, {ok, FetchResult}, State};
 
 handle_call({fetchclientconfigdata, ClientID}, _From, State) ->
-    FetchResult = server_config_processor:fetch_client_config_data_db(json, ClientID),
+    FetchResult = server_config_processor:fetch_client_config_data_db(ClientID),
     {reply, FetchResult,  State};
 
 handle_call({addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, _From, State) ->
-    FetchResult = server_config_processor:add_client_pending_config_data(ClientID, Name, YoutubeKey, ChannelID),
-    {reply, FetchResult,  State};
-
-handle_call({promoteconfigrecord, ClientID}, _From, State) ->
-    FetchResult = server_config_processor:promote_client_pending_config_data(ClientID),
+    FetchResult = server_config_processor:add_client_config_data(ClientID, Name, YoutubeKey, ChannelID),
     {reply, FetchResult,  State};
 
 handle_call({deleteconfigrecord, ClientID}, _From, State) ->
-    FetchResult = server_config_processor:fetch_client_config_data_db(json, ClientID),
+    FetchResult = server_config_processor:fetch_client_config_data_db(ClientID),
     {reply, FetchResult,  State};
 
 handle_call(_Msg, _From, State) ->

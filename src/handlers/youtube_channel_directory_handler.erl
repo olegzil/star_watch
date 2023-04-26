@@ -25,74 +25,47 @@ handle(Req, State) ->
 submit_request_for_processing(Request) ->
     case validate_request(all, Request) of
         {error, Message} ->
-            cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Message, Request),
+            cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Message, Request),
             Message;
-        {ok, {Action, ClientID, ChannelID}} ->
-            case execute_request(Action, ClientID, ChannelID) of
+        {ok, {Action, ClientID, Parameter}} ->
+            case execute_request(Action, ClientID, Parameter) of
             {ok, Good} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
                 Good;
               {error, Bad} ->
-                cowboy_req:reply(404,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, jiffy:encode(Bad), Request),
+                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Bad, Request),
                 Bad;
               {_, Other} ->
                 Other
             end
     end.
 
-%%% TODO: execute_request should call validate_request(), because validation will differ depending on Action
-execute_request(Action, ClientID, ChannelID) ->
+execute_request(Action, ClientID, Parameter) ->
 case Action of
      <<"fetchchannelvideos">> ->
-        gen_server:call(db_access_server, {fetchchannelvideos, ClientID, ChannelID}, infinity);
+        gen_server:call(db_access_server, {fetchchannelvideos, ClientID, Parameter}, infinity);
     <<"fetchchanneldirectory">> ->
         gen_server:call(db_access_server, {fetchchanneldirectory, ClientID}, infinity);
     <<"updatechannel">> ->
-        get_server:call(db_access_server, {updatechannel, ClientID, ChannelID}, infinity);
+        gen_server:call(db_access_server, {updatechannel, ClientID, Parameter}, infinity);
+    <<"addvideolink">> ->
+        gen_server:call(db_access_server, {addvideolink, ClientID, Parameter}, infinity);
     _ ->
         utils:format_error(?SERVER_ERROR_INVALID_ACTION, Action)
 end.
 
-validate_channel_id(Request) ->
-    TokenList = cowboy_req:parse_qs(Request),
-    case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
-        false ->
-            {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
-            {error, jiffy:encode(Message)};
-        {_, ChannelID} ->
-            {ok, ChannelID}
-    end.
-
 validate_request(all, Request) ->
     KeyValidation = validate_request(key, Request),
     ActionValidation = validate_request(action, Request),
-    ClientKeyValidation = validate_request(client_key, Request),
-    ChannelIDValidation = validate_request(channel_id, Request),
-    TestList = [KeyValidation, ActionValidation, ClientKeyValidation, ChannelIDValidation],
+    TestList = [KeyValidation, ActionValidation],
     Found = lists:keyfind(error, 1, TestList),
     case Found  of
         false -> %%% no errors found.
-            {ok, Action} = ActionValidation,
-            {ok, ClientID} = ClientKeyValidation,
-            {ok, ChannelID} = ChannelIDValidation,
-            {ok, {Action, ClientID, ChannelID}};
+            {ok, {Action, Parameter}} = ActionValidation,
+            {ok, ClientID} = KeyValidation,
+            {ok, {Action, ClientID, Parameter}}; %possible values {ok, {ChannelID, ClientID}} | {ok, {ClientID, VideoLink}}
         {error, Message} ->
             {error, jiffy:encode(Message)}
-    end;
-
-validate_request(channel_id, Request) ->
-    TokenList = cowboy_req:parse_qs(Request),
-    case lists:keyfind(?REQUIRED_ACTION_TOKEN, 1, TokenList) of 
-        false ->
-            {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
-            {error, jiffy:encode(Message)};
-        {_, Action} ->
-            if
-                Action =:= <<"fetchchannelvideos">> ->
-                    validate_channel_id(Request);
-                true ->
-                    {ok, ignore}
-            end
     end;
 
 validate_request(key, Request) ->
@@ -114,22 +87,68 @@ validate_request(action, Request) ->
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_ACTION_TOKEN, 1, TokenList) of 
         false -> 
-            {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"action=<fetchchanneldirectory|fetchchannelvideos>">>),
+            HelpMessage = lists:foldl(fun(Item, Acc) ->
+                Token = <<Acc/binary," ", Item/binary>>,
+                Token
+             end, <<"missing action=">>, ?AVAILABLE_CHANNEL_ACTIONS),
+
+            {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, HelpMessage),
             {error, jiffy:encode(Message)};
         {_, Action} ->      
-            Found = lists:member(Action, ?AVAILABLE_CHANNEL_ACTIONS),  
-            if Found =:= true ->
-                    {ok, Action};
+            Found = lists:member(Action, ?AVAILABLE_CHANNEL_ACTIONS), 
+            if Found =:= true->
+                    secondary_action_validation(Action, TokenList);
                 true ->
                     {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, Action),
                     {error, jiffy:encode(Message)}
             end
-        end;
-validate_request(client_key, Request) ->
-    TokenList = cowboy_req:parse_qs(Request),
-    case lists:keyfind(?REQUIRED_CLIENT_ID_TOKEN, 1, TokenList) of 
-        false -> 
-            {ok, ?CLIENT_ACCESS_KEY};
-        {_, Key} ->        
-            {ok, Key}
         end.
+
+secondary_action_validation(Action, TokenList) ->
+    case Action of
+        <<"addvideolink">> -> %% Returns {error, ErrorMessage} or {ClientID, VideoLink}
+            ItemPair = lists:keyfind(<<"video_link">>, 1, TokenList),
+            if
+                ItemPair =:= false ->
+                    {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO, missing_video_link),
+                    {error, jiffy:encode(Message)};
+                true ->
+
+                    {_, Link} = ItemPair,
+                    Parts = string:split(Link, "/", all),
+                    if 
+                        length(Parts) < 4 ->
+                            {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_LINK, video_link_wrong_format),
+                            {error, jiffy:encode(Message)};
+                        true ->
+                            {ok, {Action, Link}}                    
+                    end
+            end;
+        <<"fetchchannelvideos">> -> %% Returns {error, ErrorMessage} or {ClientID, ignore}
+            case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
+                false ->
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
+                    {error, jiffy:encode(Message)};
+                {_, ChannelID} ->
+                    {ok, {Action, ChannelID}}
+            end;
+        <<"fetchchanneldirectory">> ->
+            case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
+                false ->
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
+                    {error, jiffy:encode(Message)};
+                {_, ChannelID} ->
+                    {ok, {Action, ChannelID}}
+            end;    
+        <<"updatechannel">> ->
+            case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
+                false ->
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
+                    {error, jiffy:encode(Message)};
+                {_, ChannelID} ->
+                    {ok, {Action, ChannelID}}
+            end;    
+        _ ->
+            {ok, Action}
+
+    end.

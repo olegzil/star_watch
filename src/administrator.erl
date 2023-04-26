@@ -6,7 +6,7 @@
 -include ("include/admin_response.hrl").
 -include("include/macro_definitions.hrl").
 -include("include/invalid_request.hrl").
--export([execute_action/1]).
+-export([execute_action/1, handle_admin_action/1]).
 
 execute_action(Request) ->
 	[A, Subject] = string:split(Request, ":"),
@@ -150,4 +150,15 @@ validate_add_command(Actions, [Head|Tail], Map) ->
 					_ ->
 						validate_add_command(Actions, Tail, Map)
 				end
+	end.
+
+handle_admin_action(Action)	->
+	case Action of
+		{ <<"deleteconfigrecord">>, ClientID} ->
+			server_config_processor:delete_config_record(ClientID),
+			{ok, #{deleted => ClientID}};
+		{<<"deleteyoutubechannel">>, {ClientID, ChannelID}} ->
+			server_config_processor:delete_youtube_channel(ClientID, ChannelID);
+		_ ->
+			utils:format_error(?SERVER_ERROR_OK, command_not_found)
 	end.
