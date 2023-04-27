@@ -144,7 +144,6 @@ validate_action(Action, TokenList) ->
                                 YoutubeKey
 
                         end,
-                    utils:log_message([{"ClientID", ClientID}, {"ChannelID", ChannelID}]),
                     case server_config_processor:is_channel_in_profile(ClientID, ChannelID) of
                         false ->
                             {ok, {<<"updateclientprofile">>, {Key, ClientID, ChannelID, ChannelName}}};

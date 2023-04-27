@@ -57,12 +57,13 @@ end.
 validate_request(all, Request) ->
     KeyValidation = validate_request(key, Request),
     ActionValidation = validate_request(action, Request),
-    TestList = [KeyValidation, ActionValidation],
+    ClineIDValidation = validate_request(client_id, Request),
+    TestList = [KeyValidation, ActionValidation, ClineIDValidation],
     Found = lists:keyfind(error, 1, TestList),
     case Found  of
         false -> %%% no errors found.
             {ok, {Action, Parameter}} = ActionValidation,
-            {ok, ClientID} = KeyValidation,
+            {ok, ClientID} = ClineIDValidation,
             {ok, {Action, ClientID, Parameter}}; %possible values {ok, {ChannelID, ClientID}} | {ok, {ClientID, VideoLink}}
         {error, Message} ->
             {error, jiffy:encode(Message)}
@@ -83,6 +84,16 @@ validate_request(key, Request) ->
                 {ok, Key}
             end
         end;
+validate_request(client_id, Request) ->
+    TokenList = cowboy_req:parse_qs(Request),
+    case lists:keyfind(?REQUIRED_CLIENT_ID_TOKEN, 1, TokenList) of 
+        false -> 
+            {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CLIENT, <<"<client_key=your client id. NOT your client key>">>),
+            {error, jiffy:encode(Message)};
+        {_, Key} ->        
+            {ok, Key}
+        end;
+
 validate_request(action, Request) ->
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_ACTION_TOKEN, 1, TokenList) of 
@@ -107,14 +118,14 @@ validate_request(action, Request) ->
 secondary_action_validation(Action, TokenList) ->
     case Action of
         <<"addvideolink">> -> %% Returns {error, ErrorMessage} or {ClientID, VideoLink}
-            ItemPair = lists:keyfind(<<"video_link">>, 1, TokenList),
+            VideoLinkParam = lists:keyfind(<<"video_link">>, 1, TokenList),
             if
-                ItemPair =:= false ->
+                VideoLinkParam =:= false ->
                     {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO, missing_video_link),
                     {error, jiffy:encode(Message)};
                 true ->
 
-                    {_, Link} = ItemPair,
+                    {_, Link} = VideoLinkParam,
                     Parts = string:split(Link, "/", all),
                     if 
                         length(Parts) < 4 ->

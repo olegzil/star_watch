@@ -12,7 +12,6 @@
 execute_action(Request) ->
 	[A, Subject] = string:split(Request, ":"),
 	Verb = binary_to_atom(A),
-	io:format("~nRequest: ~p~nSubject: ~p~nVerb: ~p~n", [Request, Subject, Verb]),	
 	case {Verb, Subject} of
 		{channel_directory, Subject} ->
 			{_, Result} = validate_action(Subject),
