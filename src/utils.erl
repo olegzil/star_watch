@@ -25,7 +25,8 @@
 		 package_channel_record_list/1,
 		 log_message/1,
 		 is_key_present/3,
-		 tuple_list_to_list_of_maps/2]).
+		 tuple_list_to_list_of_maps/2,
+		 config_records_to_list_of_maps/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -661,6 +662,18 @@ tuple_list_to_list_of_maps({Tag1, Tag2}, ListOfTuples) ->
 		Acc ++ [Map]
 	end, [], ListOfTuples).
 
+
+config_records_to_list_of_maps(Keys, MapOfRecords) ->
+	ProfileMap = lists:foldl(fun(Key, Acc)-> 
+		[R] = maps:get(Key, MapOfRecords),
+		RecordMap = #{
+			client_id => Key,
+			youtube_key => R#client_profile_table.youtube_key,
+			channel_list => utils:tuple_list_to_list_of_maps({channel_name, channel_id}, R#client_profile_table.channel_list)
+		},				
+		Acc ++ [RecordMap]
+	end,
+	[], Keys).
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

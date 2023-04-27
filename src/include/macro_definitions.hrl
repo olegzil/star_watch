@@ -19,7 +19,7 @@
 -define(REQUIRED_CLIENT_ID_TOKEN, <<"client_key">>).
 -define(REQUIRED_ACTION_TOKEN, <<"action">>).
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
--define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchchanneldirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>]).
+-define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchchanneldirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>, <<"fetchclientprofile">>, <<"updateclientprofile">>]).
 
 -define(SERVER_ERROR_OK, 					16#FFAA00).
 -define(SERVER_ERROR_BAD_CLIENT_ID, 		16#FFAA01).
@@ -47,10 +47,12 @@
 -define(SERVER_ERROR_NOT_IMPLEMENTED,		16#FFAA17).
 -define(SERVER_ERROR_NO_SUCH_CHANNEL,		16#FFAA18).
 -define(SERVER_ERROR_NO_SUCH_COMMAND,		16#FFAA19).
+-define(SERVER_ERROR_DUPLICATE_CHANNEL,		16#FFAA1A).
 
 -define(RESPONSE_CODES, [{link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
 						 {link_pending, ?SERVER_ERROR_LINK_PENDING}, 
 						 {video_link_added, ?SERVER_ERROR_OK}, 
+						 {duplicate_channel, ?SERVER_ERROR_DUPLICATE_CHANNEL},
 						 {no_records, ?SERVER_ERROR_RECORD_NOT_FOUND},
 						 {no_admin_key, ?SERVER_ERROR_ADMIN_KEY},
 						 {no_action_specified, ?SERVER_ERROR_NO_ACTION_SPECIFIED},

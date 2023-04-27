@@ -26,7 +26,7 @@ handle_call({fetchprofilemap}, _From, State) ->
     FetchResult = utils:jsonify_client_profile_table(ProfileMap),
 	{reply, {ok, FetchResult}, State};
 
-handle_call({fetchclientconfigdata, ClientID}, _From, State) ->
+handle_call({fetchclientprofile, ClientID}, _From, State) ->
     FetchResult = server_config_processor:fetch_client_config_data_db(ClientID),
     {reply, FetchResult,  State};
 

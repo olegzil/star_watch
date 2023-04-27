@@ -48,7 +48,7 @@ process_item(<<"deleteconfigrecord">>, Actions) ->
 process_item(<<"fetchprofilemap">>, _Actions) ->
 	gen_server:call(config_server, {fetchprofilemap}, infinity);
 
-process_item(<<"fetchclientconfigdata">>, Actions) ->
+process_item(<<"fetchclientprofile">>, Actions) ->
 	if
 		length(Actions) =:= 0 ->
 			{error, Message} = utils:format_error(?SERVER_ERROR_MISSING_ACTION, requires_action_token),
@@ -63,7 +63,7 @@ process_item(<<"fetchclientconfigdata">>, Actions) ->
 					{error, Message} = utils:format_error(?SERVER_ERROR_BAD_CLIENT_ID, requires_client_id),
 					{error, #{error => Message}};
 				true ->
-					gen_server:call(config_server, {fetchclientconfigdata, ClientID}, infinity)
+					gen_server:call(config_server, {fetchclientprofile, ClientID}, infinity)
 			end
 	end;
 
@@ -158,28 +158,46 @@ handle_admin_action(Action)	->
 		{ <<"deleteconfigrecord">>, ClientID} ->
 			server_config_processor:delete_config_record(ClientID),
 			utils:format_success(<<"deleted client ", ClientID/binary, " from profile db">>);
+
 		{<<"deleteyoutubechannel">>, {ClientID, ChannelID}} ->
 			case server_config_processor:delete_youtube_channel(ClientID, ChannelID) of 
 				{atomic, ok} ->
 					utils:format_success(<<"deleted: ", ChannelID/binary, " for client ", ClientID/binary>>);
 				_ ->
-					utils:format_error(-1, unknow)
+					utils:format_error(-1, unknown)
 			end;
 
 		<<"fetchprofilemap">> ->
 			MapOfRecords = server_config_processor:fetch_profile_map_from_db(),
 			Keys = maps:keys(MapOfRecords),
-			ProfileMap = lists:foldl(fun(Key, Acc)-> 
-				[R] = maps:get(Key, MapOfRecords),
-				RecordMap = #{
-					client_id => Key,
-					youtube_key => R#client_profile_table.youtube_key,
-					channel_list => utils:tuple_list_to_list_of_maps({channel_name, channel_id}, R#client_profile_table.channel_list)
-				},				
-				Acc ++ [RecordMap]
-			end,
-			[], Keys),
+			ProfileMap = utils:config_records_to_list_of_maps(Keys, MapOfRecords),
 			{ok, ProfileMap};
-		_ ->
+
+		{<<"fetchclientprofile">>, ClientID} ->
+			case server_config_processor:fetch_config_data_for_client(ClientID) of
+				{error, ErrorMessage} -> 
+					utils:format_error(ErrorMessage, <<"client profile error">>);
+				{ok, ProfileRecord} ->
+					ProfileMap = utils:config_records_to_list_of_maps([ClientID], #{ClientID => [ProfileRecord]}),
+					{ok, ProfileMap}	
+			end;
+		{<<"updateclientprofile">>,{YoutubeKey, ClientID, ChannelID, ChannelName}} ->
+			NewClient = #{
+				client_id => ClientID,
+				youtube_api_key => YoutubeKey,
+				client_channel_data => [{ChannelName, ChannelID}]
+			},
+			case server_config_processor:fetch_config_data_for_client(ClientID) of
+				{error, no_such_client} -> % Trivial case: new client id. Add it unconditionally
+					server_config_processor:add_new_client_record(NewClient),
+					utils:format_success(<<ClientID/binary, " added">>);
+
+				{ok, _Record} ->
+					server_config_processor:update_existing_client(NewClient),
+					utils:format_success(<<ClientID/binary, " updated">>)
+			end;
+
+		Command ->
+			utils:log_message([{"Command", Command}]),
 			utils:format_error(?SERVER_ERROR_OK, command_not_found)
 	end.

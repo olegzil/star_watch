@@ -79,19 +79,7 @@ validate_request(action, TokenList) ->
 validate_action(Action, TokenList) ->
     case Action of
         <<"deleteconfigrecord">> -> % Format: action=deleteconfigrecord&client_id=<ClientID>
-            Result = lists:keyfind(<<"client_id">>, 1, TokenList),
-            case Result of
-                {<<"client_id">>, ClientID} ->
-                    Found = server_config_processor:is_client_in_profile_map(ClientID),
-                    if
-                        Found =:= false ->
-                            {error, no_such_client};
-                        true ->
-                            {ok, {<<"deleteconfigrecord">>, ClientID}}
-                    end;
-                _ ->
-                    {error, invalid_parameters}
-            end;
+            validate_client_id_for_action(<<"deleteconfigrecord">>, TokenList);
 
         <<"deleteyoutubechannel">> -> % Format: {action,deleteyoutubechannel}, {channel_id, <Channel id>}, {client_id, <Client id>}
             ChannelParam = lists:keyfind(<<"channel_id">>, 1, TokenList),
@@ -128,12 +116,62 @@ validate_action(Action, TokenList) ->
             
         <<"promoteconfigrecord">> ->  % Format: {action, promoteconfigrecord}, {client_id, <Client id>}
             {error, not_implemented};
+
         <<"fetchprofilemap">> ->
             {ok, <<"fetchprofilemap">>};
-        <<"fetchclientconfigdata">> ->
-            {error, not_implemented};
+
+        <<"fetchclientprofile">> ->
+            validate_client_id_for_action(<<"fetchclientprofile">>, TokenList);
+
+        <<"updateclientprofile">> ->
+            ChannelParam = lists:keyfind(<<"channel_id">>, 1, TokenList),
+            ClientParam = lists:keyfind(<<"client_id">>, 1, TokenList),
+            NameParam = lists:keyfind(<<"channel_name">>, 1, TokenList),
+            YoutubeKeyParam = lists:keyfind(<<"youtube_key">>, 1, TokenList), %optional
+            if
+                ChannelParam =:= false ->
+                    {error, channel_id_required};
+                ClientParam =:= false ->
+                    {error, client_id_required};
+                NameParam =:= false ->
+                    {error, channel_name_required};
+                true ->
+                    {_, ChannelID} = ChannelParam,
+                    {_, ClientID} = ClientParam,
+                    {_, ChannelName} = NameParam,
+                    Key = if
+                            YoutubeKeyParam =:= false ->
+                                server_config_processor:get_default_youtube_key("server_config.cfg");
+                            true -> 
+                                {_, YoutubeKey} = YoutubeKeyParam,
+                                YoutubeKey
+
+                        end,
+                    utils:log_message([{"ClientID", ClientID}, {"ChannelID", ChannelID}]),
+                    case server_config_processor:is_channel_in_profile(ClientID, ChannelID) of
+                        false ->
+                            {ok, {<<"updateclientprofile">>, {Key, ClientID, ChannelID, ChannelName}}};
+                        true ->
+                            {error, duplicate_channel}
+                    end
+            end;
         _ ->
             {error, no_such_command}
+    end.
+
+validate_client_id_for_action(Action, TokenList) ->
+    Result = lists:keyfind(<<"client_id">>, 1, TokenList),
+    case Result of
+        {<<"client_id">>, ClientID} ->
+            Found = server_config_processor:is_client_in_profile_map(ClientID),
+            if
+                Found =:= false ->
+                    {error, no_such_client};
+                true ->
+                    {ok, {Action, ClientID}}
+            end;
+        _ ->
+            {error, invalid_parameters}
     end.
 
 validate_admin_key(Key) when ?ADMINISTRATOR_KEY =:= Key -> ok;

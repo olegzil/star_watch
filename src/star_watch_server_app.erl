@@ -35,7 +35,7 @@ start(_Type, _Args) ->
         #{env => #{dispatch => Dispatch}}
     ),
     inets:start(),
-    utils:start_cron_job(youtube),
+    % utils:start_cron_job(youtube),
     utils:start_cron_job(apod),
     MasterPid = star_watch_master_sup:start_link(),
     %% Create a child process that will handle all file access to the server_config.cfg file.

@@ -23,7 +23,10 @@
 		 is_client_in_profile_map/1,
 		 delete_config_record/1, 
 		 is_channel_in_profile/2,
-		 delete_youtube_channel/2]).
+		 delete_youtube_channel/2,
+		 fetch_config_data_for_client/1,
+		 update_existing_client/1,
+		 add_new_client_record/1]).
 
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
@@ -168,7 +171,7 @@ update_client_record(true, ClientProfile, NewRecord) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%% Begin fetch_profile_map_from_file logic %%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Returns {ok,#{items =>[#{client_id => <<"ClientID">>, youtube_key=> <<"YoutubeKey">>, channel_data =>[{name => pbs_space_time, channel_id => <<"ChannelID">>}, ... ,#{same as before}]}
+%% Returns {ok,#{items =>[#{client_id => <<"ClientID">>, youtube_key=> <<"YoutubeKey">>, client_channel_data =>[{name => pbs_space_time, channel_id => <<"ChannelID">>}, ... ,#{same as before}]}
 fetch_profile_map_from_file(FileName) ->
 	ProfileMap = get_profiles_list(FileName),
 	Keys = maps:keys(ProfileMap),
@@ -179,7 +182,7 @@ extract_record([Key|Keys], ProfileMap, Acc) ->
 	{ok, ClientProfile} = maps:find(Key, ProfileMap),
 	{ok, ChannelData} = maps:find(client_channel_data, ClientProfile),
 	{ok, YoutubeKey} = maps:find(youtube_api_key, ClientProfile),
-	Map = #{client_id => Key, youtube_key => YoutubeKey, channel_data => ChannelData},
+	Map = #{client_id => Key, youtube_key => YoutubeKey, client_channel_data => ChannelData},
 	List = lists:append(Acc, [Map]),
 	extract_record(Keys, ProfileMap, List).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -243,7 +246,7 @@ populate_client_profile_table(true) ->
     	Record = #client_profile_table{
     		client_id = maps:get(client_id, Map), 
 			youtube_key = maps:get(youtube_key, Map),
-			channel_list = maps:get(channel_data, Map)
+			channel_list = maps:get(client_channel_data, Map)
     	},
     	WriteFun = fun() ->
     		mnesia:write(Record)
@@ -288,3 +291,37 @@ delete_youtube_channel(ClientID, ChannelID) ->
 	},
 	mnesia:transaction(fun()-> mnesia:write(NewProfile) end).
 
+fetch_config_data_for_client(ClientID)->
+	{atomic, Keys} = mnesia:transaction(fun()-> mnesia:all_keys(client_profile_table) end),
+	case lists:member(ClientID, Keys) of
+		false ->
+			{error, no_such_client};
+		true ->
+			{atomic, [Record]} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, ClientID) end),
+			{ok, Record}
+	end.
+
+add_new_client_record(NewClient) ->
+	ClientID = maps:get(client_id, NewClient),
+	Map = fetch_profile_map_from_db(),
+	case maps:find(ClientID, Map) of
+		error ->
+			Record = #client_profile_table{
+				client_id = ClientID,
+				youtube_key = maps:get(youtube_api_key, NewClient),
+				channel_list = maps:get(client_channel_data, NewClient)
+			},
+			mnesia:transaction(fun()-> mnesia:write(Record) end);
+		{ok, ClientRecord} ->
+			UpdatedRecrod = ClientRecord#client_profile_table.channel_list ++ maps:get(client_channel_data, NewClient),
+			mnesia:transaction(fun()-> mnesia:write(UpdatedRecrod) end)
+	end.
+update_existing_client(Client) ->
+	ClientID = maps:get(client_id, Client),
+	Map = fetch_profile_map_from_db(),
+	[Record] = maps:get(ClientID, Map),
+	UpdatedRecord = Record#client_profile_table{
+		youtube_key = maps:get(youtube_api_key, Client),
+		channel_list = Record#client_profile_table.channel_list ++ maps:get(client_channel_data, Client)
+	},
+	mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end).
