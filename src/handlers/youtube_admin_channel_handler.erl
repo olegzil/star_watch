@@ -114,9 +114,6 @@ validate_action(Action, TokenList) ->
                     end
             end;
             
-        <<"promoteconfigrecord">> ->  % Format: {action, promoteconfigrecord}, {client_id, <Client id>}
-            {error, not_implemented};
-
         <<"fetchprofilemap">> ->
             {ok, <<"fetchprofilemap">>};
 

@@ -67,92 +67,11 @@ process_item(<<"fetchclientprofile">>, Actions) ->
 			end
 	end;
 
-process_item(<<"promoteconfigrecord">>, Actions) ->
-	if
-		length(Actions) =:= 0 ->
-			{error, Message} = utils:format_error(?SERVER_ERROR_MISSING_ACTION, requires_action_token),
-			{error, #{error => Message}};
-		true ->
-			Value = Actions,
-			Parts = string:split(Value, "="),
-			Action = string:lowercase(lists:nth(1, Parts)),
-			ClientID = lists:nth(2, Parts),
-			case Action =:= <<"client_id">> of
-				false ->
-					{error, Message} = utils:format_error(?SERVER_ERROR_BAD_CLIENT_ID, requires_client_id),
-					{error, #{error => Message}};
-				true ->
-					gen_server:call(config_server, {promoteconfigrecord, ClientID}, infinity)
-			end
-	end;
-
-process_item(<<"add">>, Actions) ->
-	Parts = string:split(Actions, ",", all),
-	Result = validate_add_command(Actions, Parts, #{}),
-	case Result of
-		{ok, Map} ->
-			ClientID = maps:get(<<"client_id">>, Map),
-			Name = binary_to_atom(maps:get(<<"name">>, Map)), 
-			ChannelID = maps:get(<<"channel_id">>, Map),
-
-			Test = maps:is_key(?YOUTUBE_KEY, Map),
-			if
-				Test =:= true ->
-					YoutubeKey = maps:get(?YOUTUBE_KEY, Map),
-					gen_server:call(config_server, {addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, infinity);
-				true ->
-					YoutubeKey = server_config_processor:get_default_youtube_key("server_config.cfg"),
-					gen_server:call(config_server, {addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, infinity)
-			end;
-
-		{error, Message} ->
-			{error, #{error => Message}}
-	end;
 process_item(InvalidCommand, _Arg) ->
 	{error, Message} = utils:format_error(?SERVER_ERROR_INVALID_COMMAND, InvalidCommand),
 	{error, #{error => Message}}.
 
 	
-validate_commands([], _Arg2, Map) ->
-	{ok, Map};
-validate_commands([Command|Tail], CommandList, Map) ->
-	case lists:member(Command, CommandList) of
-		true ->
-			validate_commands(Tail, CommandList, Map);
-		false ->
-			utils:format_error(?SERVER_ERROR_MALFORMED_COMMAND, Command)
-	end.
-
-validate_add_command(_Arg1, [], Map) -> 
-	CommandList = [<<"client_id">>, <<"name">>, <<"channel_id">>],
-	validate_commands(CommandList, maps:keys(Map), Map);
-
-validate_add_command(Actions, [Head|Tail], Map) ->
-	Items = string:split(Head, <<"=">>),
-	Label = lists:nth(1, Items),
-	if
-		length(Items) < 2 ->
-			utils:format_error(?SERVER_ERROR_MALFORMED_COMMAND, add);
-			true -> 
-				Value = lists:nth(2, Items),
-				case Label of
-					<<"client_id">> ->
-						NewMap = maps:put(Label, Value, Map),
-						validate_add_command(Actions, Tail, NewMap);
-					<<"name">> ->
-						NewMap = maps:put(Label, Value, Map),
-						validate_add_command(Actions, Tail, NewMap);
-					<<"youtubekey">> ->
-						NewMap = maps:put(Label, Value, Map),
-						validate_add_command(Actions, Tail, NewMap);
-					<<"channel_id">> ->
-						NewMap = maps:put(Label, Value, Map),
-						validate_add_command(Actions, Tail, NewMap);
-					_ ->
-						validate_add_command(Actions, Tail, Map)
-				end
-	end.
-
 handle_admin_action(Action)	->
 	case Action of
 		{ <<"deleteconfigrecord">>, ClientID} ->
