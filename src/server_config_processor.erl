@@ -10,7 +10,7 @@
 -export([fetch_client_config_data_db/1, 
 		 fetch_list_of_channel_ids_and_youtube_keys_db/0,
 		 fetch_profile_map_from_file/1,
-		 fetch_channel_directory/1,
+		 fetch_client_directory/1,
 		 process_channel_request/3,
 		 add_client_config_data/4,
 		 update_client_profile_channels/3,
@@ -27,7 +27,7 @@
 		 fetch_config_data_for_client/1,
 		 update_existing_client/1,
 		 add_new_client_record/1]).
-
+-compile(export_all).
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
 	ConfigMap.
@@ -54,7 +54,7 @@ get_client_key(File) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% Begin fetch_channel_directory logic %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fetch_channel_directory(ClientID) ->
+fetch_client_directory(ClientID) ->
 	case mnesia:activity(transaction, fun() -> mnesia:read(client_profile_table, ClientID) end) of
 		[] ->
 			Message = utils:jsonify_list_of_tuples([error, client_key], [{<<"client id not found">>, ClientID}]),
@@ -70,10 +70,31 @@ process_channel_request(_Arg1, [], ListOfMaps) ->
 
 process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
 	{ChannelName,ChannelID} = Channel,
-	A = maps:merge(maps:put(channel_id, ChannelID, #{}), maps:put(client, ClientID, #{})),
-	Final = maps:merge(A, maps:put(name, ChannelName, A)),
-	List = lists:append(Acc, [Final]),
-	process_channel_request(ClientID, ChannelList, List).
+	Record = db_access:get_channel_data(ChannelID),
+	case db_access:get_channel_data(ChannelID) of
+		false ->
+			process_channel_request(ClientID, ChannelList, Acc);
+		Record ->
+	VideoList = 
+		[{video_id, Record#youtube_channel.video_id}, 
+	    {url_medium, Record#youtube_channel.url_medium},
+	    {title, Record#youtube_channel.title},
+	    {width, Record#youtube_channel.width},
+	    {height, Record#youtube_channel.height},
+	    {date, utils:gregorian_days_to_binary(Record#youtube_channel.date)},
+	    {channel_id, Record#youtube_channel.channel_id}],
+	    LatestVideo = maps:from_list(VideoList),
+
+	    DirectoryRecord =
+	    [{channel_id, ChannelID}, 
+	    	{client, ClientID}, 
+	    	{name, ChannelName},
+	    	{latest_video, LatestVideo}],
+
+	    Final = maps:from_list(DirectoryRecord),
+		List = lists:append(Acc, [Final]),
+		process_channel_request(ClientID, ChannelList, List)		
+	end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% End fetch_channel_directory logic %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

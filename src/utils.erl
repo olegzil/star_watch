@@ -619,13 +619,15 @@ package_channel_record_list(RecordList) ->
 
 package_records([], Acc) -> Acc;
 package_records([Record|Records], List) ->
-	A = maps:put(width, Record#youtube_channel.width, #{}),
-	B = maps:put(video_id, Record#youtube_channel.video_id, A),
-	C = maps:put(url_medium, Record#youtube_channel.url_medium, B),
-	D = maps:put(title, Record#youtube_channel.title, C),
-	E = maps:put(height, Record#youtube_channel.height, D),
-	F = maps:put(date, Record#youtube_channel.date, E),
-	Final = maps:put(channel_id, Record#youtube_channel.channel_id, F),
+	RecordList = [{width, Record#youtube_channel.width}, 
+				  {video_id, Record#youtube_channel.video_id}, 
+				  {url_medium, Record#youtube_channel.url_medium}, 
+				  {title, Record#youtube_channel.title}, 
+				  {height, Record#youtube_channel.height}, 
+				  {date, utils:gregorian_days_to_binary(Record#youtube_channel.date)}, 
+				  {channel_id, Record#youtube_channel.channel_id}],
+
+	Final = maps:from_list(RecordList),
 	NewList = lists:append(List, [Final]),
 	package_records(Records, NewList).
 

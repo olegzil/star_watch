@@ -16,10 +16,10 @@
 -define(ADMIN_AVAILABLE_ACTIONS, [<<"delete">>, <<add>>]).
 -define(YOUTUBE_KEY, <<"youtubekey">>).
 -define(REQUIRED_CLIENT_KEY_TOKEN, <<"key">>).
--define(REQUIRED_CLIENT_ID_TOKEN, <<"client_key">>).
 -define(REQUIRED_ACTION_TOKEN, <<"action">>).
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
--define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchchanneldirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>, <<"fetchclientprofile">>, <<"updateclientprofile">>]).
+-define(REQUIRED_CLIENT_ID_TOKEN, <<"client_id">>).
+-define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchclientdirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>, <<"fetchclientprofile">>, <<"updateclientprofile">>, <<"fetchchannelimage">>]).
 
 -define(SERVER_ERROR_OK, 					16#FFAA00).
 -define(SERVER_ERROR_BAD_CLIENT_ID, 		16#FFAA01).

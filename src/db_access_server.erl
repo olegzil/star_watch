@@ -8,6 +8,8 @@
 -export([start_link/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2,
          handle_info/2, code_change/3, terminate/2]).
+-compile(export_all).
+
 start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [Args], []).
 
@@ -22,9 +24,9 @@ init([{FileName}]) ->
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
-handle_call({fetchchanneldirectory, ClientID}, _From, State) ->
+handle_call({fetchclientdirectory, ClientID}, _From, State) ->
     _FileName = State, 
-    FetchResult = server_config_processor:fetch_channel_directory(ClientID),
+    FetchResult = server_config_processor:fetch_client_directory(ClientID),
     {reply, FetchResult,  State};
 
 handle_call({fetchchannelvideos, ClientID, ChannelID}, _From, State) ->
@@ -83,7 +85,7 @@ fetch_channel_data(serverfirst, ClientID, ChannelID) ->
         respond_to_video_fetch_request(ClientID, ChannelID, []);
 
 fetch_channel_data(dbfirst, ClientID, ChannelID) ->
-        {_, ListOfRecords} = db_access:fetch_videos_for_channel_id(ChannelID),
+        ListOfRecords = db_access:fetch_videos_for_channel_id(ChannelID),
         respond_to_video_fetch_request(ClientID, ChannelID, ListOfRecords).
 
 

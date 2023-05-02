@@ -22,7 +22,8 @@
            fetch_videos_for_channel_id/1, 
            purge_table/1, 
            get_channel_descriptors_for_client/1,
-           get_client_youtube_key/1]).
+           get_client_youtube_key/1,
+           get_channel_data/1]).
 
  -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 -compile(export_all).
@@ -89,15 +90,17 @@ process_date_request(StartDate, EndDate) ->
             {ok, jiffy:encode(JsonFreindly)}
     end.
 
-
 fetch_videos_for_channel_id(ChannelID) ->
-    Match = ets:fun2ms(
-        fun(Record) 
-            when Record#youtube_channel.channel_id =:= ChannelID ->
-                Record
-        end),
-    SelectRecords = fun() -> mnesia:select(youtube_channel, Match) end,
-    mnesia:sync_transaction(SelectRecords).
+    ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
+    {atomic, Records} = mnesia:transaction(ReaderFun),
+    Predicate = fun(Lhs, Rhs) ->
+        if
+            Rhs#youtube_channel.date =< Lhs#youtube_channel.date ->
+                true;
+            true -> false
+        end
+    end,
+    lists:sort(Predicate, Records).
 
 fetch_client_data(client_profile_table, ClientID) ->
     Match = ets:fun2ms(
@@ -153,14 +156,6 @@ fetch_channel_data_from_db(Channel) ->
     mnesia:sync_transaction(SelectRecords).
 
 package_channel_data(ListOfRecords) ->
-    Predicate = fun(Lhs, Rhs) ->
-        if
-            Rhs#youtube_channel.date =< Lhs#youtube_channel.date ->
-                true;
-            true -> false
-        end
-    end,
-    SortedList = lists:sort(Predicate, ListOfRecords),
     MapData = lists:map(fun(DbItem) ->
         #{channel_id    => DbItem#youtube_channel.channel_id,
             video_id      => DbItem#youtube_channel.video_id,
@@ -170,7 +165,7 @@ package_channel_data(ListOfRecords) ->
             title         => DbItem#youtube_channel.title,
             date          => DbItem#youtube_channel.date
         }                                 
-        end, SortedList),
+        end, ListOfRecords),
     maps:put(?TOP_KEY, MapData, #{}).
     
 
@@ -282,6 +277,29 @@ is_channel_id_in_youtube_channel(ClientID, Link) ->
                 true -> true
             end
     end.
+
+%%%
+%%% Get the latest image associate with this channel
+%%%
+get_channel_data(ChannelID) ->
+    ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
+    {atomic, Records} = mnesia:transaction(ReaderFun),
+    case length(Records) of
+        0 ->
+            false;
+        _->
+            Predicate = fun(Lhs, Rhs) ->
+                if
+                    Rhs#youtube_channel.date =< Lhs#youtube_channel.date ->
+                        true;
+                    true -> false
+                end
+            end,
+            SortedList = lists:sort(Predicate, Records),
+            [First | _] = SortedList,
+            First
+    end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_telemetry_table() ->

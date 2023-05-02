@@ -20,7 +20,7 @@ handle(Req, State) ->
       {error, Req, State}
   end.
 
-%%% Required values: action = fetchchanneldirectory | fetchchannelvideos
+%%% Required values: action = fetchclientdirectory | fetchchannelvideos
 %%% If client_id is specified, the value represents custom youtube channel directory, the default directory otherwise.
 submit_request_for_processing(Request) ->
     case validate_request(all, Request) of
@@ -44,8 +44,8 @@ execute_request(Action, ClientID, Parameter) ->
 case Action of
      <<"fetchchannelvideos">> ->
         gen_server:call(db_access_server, {fetchchannelvideos, ClientID, Parameter}, infinity);
-    <<"fetchchanneldirectory">> ->
-        gen_server:call(db_access_server, {fetchchanneldirectory, ClientID}, infinity);
+    <<"fetchclientdirectory">> ->
+        gen_server:call(db_access_server, {fetchclientdirectory, ClientID}, infinity);
     <<"updatechannel">> ->
         gen_server:call(db_access_server, {updatechannel, ClientID, Parameter}, infinity);
     <<"addvideolink">> ->
@@ -66,7 +66,7 @@ validate_request(all, Request) ->
             {ok, ClientID} = ClineIDValidation,
             {ok, {Action, ClientID, Parameter}}; %possible values {ok, {ChannelID, ClientID}} | {ok, {ClientID, VideoLink}}
         {error, Message} ->
-            {error, jiffy:encode(Message)}
+            {error, Message}
     end;
 
 validate_request(key, Request) ->
@@ -143,10 +143,10 @@ secondary_action_validation(Action, TokenList) ->
                 {_, ChannelID} ->
                     {ok, {Action, ChannelID}}
             end;
-        <<"fetchchanneldirectory">> ->
-            case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
+        <<"fetchclientdirectory">> ->
+            case lists:keyfind(?REQUIRED_CLIENT_ID_TOKEN, 1, TokenList) of 
                 false ->
-                    {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"channel_id=<your channel id>">>),
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"client_id=<your client id>">>),
                     {error, jiffy:encode(Message)};
                 {_, ChannelID} ->
                     {ok, {Action, ChannelID}}
