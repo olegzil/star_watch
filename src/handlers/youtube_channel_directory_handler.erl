@@ -50,6 +50,8 @@ case Action of
         gen_server:call(db_access_server, {updatechannel, ClientID, Parameter}, infinity);
     <<"addvideolink">> ->
         gen_server:call(db_access_server, {addvideolink, ClientID, Parameter}, infinity);
+    <<"linkstatus">> ->
+        gen_server:call(db_access_server, {linkstatus, ClientID, Parameter}, infinity);
     _ ->
         utils:format_error(?SERVER_ERROR_INVALID_ACTION, Action)
 end.
@@ -102,7 +104,6 @@ validate_request(action, Request) ->
                 Token = <<Acc/binary," ", Item/binary>>,
                 Token
              end, <<"missing action=">>, ?AVAILABLE_CHANNEL_ACTIONS),
-
             {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, HelpMessage),
             {error, jiffy:encode(Message)};
         {_, Action} ->      
@@ -117,6 +118,25 @@ validate_request(action, Request) ->
 
 secondary_action_validation(Action, TokenList) ->
     case Action of
+        <<"linkstatus">> ->
+            VideoLinkParam = lists:keyfind(<<"video_link">>, 1, TokenList),
+            if
+                VideoLinkParam =:= false ->
+                    {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO, missing_video_link),
+                    {error, jiffy:encode(Message)};
+                true ->
+
+                    {_, Link} = VideoLinkParam,
+                    Parts = string:split(Link, "/", all),
+                    if 
+                        length(Parts) < 4 ->
+                            {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_LINK, video_link_wrong_format),
+                            {error, jiffy:encode(Message)};
+                        true ->
+                            {ok, {Action, Link}}                    
+                    end
+            end;
+
         <<"addvideolink">> -> %% Returns {error, ErrorMessage} or {ClientID, VideoLink}
             VideoLinkParam = lists:keyfind(<<"video_link">>, 1, TokenList),
             if

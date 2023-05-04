@@ -19,7 +19,7 @@
 -define(REQUIRED_ACTION_TOKEN, <<"action">>).
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
 -define(REQUIRED_CLIENT_ID_TOKEN, <<"client_id">>).
--define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchclientdirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>, <<"fetchclientprofile">>, <<"updateclientprofile">>, <<"fetchchannelimage">>]).
+-define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchclientdirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>, <<"linkstatus">>, <<"fetchclientprofile">>, <<"updateclientprofile">>, <<"fetchchannelimage">>]).
 
 -define(SERVER_ERROR_OK, 					16#FFAA00).
 -define(SERVER_ERROR_BAD_CLIENT_ID, 		16#FFAA01).
@@ -35,9 +35,12 @@
 -define(SERVER_ERROR_MISSING_CLIENT,		16#FFAA0B).
 -define(SERVER_ERROR_INVALID_CLIENT,		16#FFAA0C).
 -define(SERVER_ERROR_MISSING_VIDEO,			16#FFAA0D).
--define(SERVER_ERROR_INVALID_LINK,			16#FFAA0E).
--define(SERVER_ERROR_LINK_EXISTS, 			16#FFAA0F).
--define(SERVER_ERROR_LINK_PENDING, 			16#FFAA10).
+-define(SERVER_ERROR_INVALID_LINK,			16#FFAB00).
+-define(SERVER_ERROR_LINK_EXISTS, 			16#FFAB01).
+-define(SERVER_ERROR_LINK_PENDING, 			16#FFAB02).
+-define(SERVER_ERROR_LINK_ADDED,			16#FFAB03).
+-define(SERVER_ERROR_LINK_DENIED, 			16#FFAB04).
+-define(SERVER_ERROR_LINK_NOT_FOUND,		16#FFAB05).
 -define(SERVER_ERROR_RECORD_NOT_FOUND,		16#FFAA11).
 -define(SERVER_ERROR_ADMIN_KEY,				16#FFAA12).
 -define(SERVER_ERROR_NO_ACTION_SPECIFIED,	16#FFAA13).
@@ -49,7 +52,8 @@
 -define(SERVER_ERROR_NO_SUCH_COMMAND,		16#FFAA19).
 -define(SERVER_ERROR_DUPLICATE_CHANNEL,		16#FFAA1A).
 
--define(RESPONSE_CODES, [{link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
+-define(RESPONSE_CODES, [{video_link_added, ?SERVER_ERROR_LINK_ADDED},
+						 {link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
 						 {link_pending, ?SERVER_ERROR_LINK_PENDING}, 
 						 {video_link_added, ?SERVER_ERROR_OK}, 
 						 {duplicate_channel, ?SERVER_ERROR_DUPLICATE_CHANNEL},
@@ -63,7 +67,8 @@
 						 {not_implemented, ?SERVER_ERROR_NOT_IMPLEMENTED},
 						 {client_id_required, ?SERVER_ERROR_MISSING_CLIENT},
 						 {no_such_channel, ?SERVER_ERROR_NO_SUCH_CHANNEL},
-						 {no_such_command, ?SERVER_ERROR_NO_SUCH_COMMAND}]).
+						 {no_such_command, ?SERVER_ERROR_NO_SUCH_COMMAND},
+						 {no_such_link, ?SERVER_ERROR_LINK_NOT_FOUND}]).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

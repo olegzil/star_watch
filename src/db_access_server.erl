@@ -37,6 +37,21 @@ handle_call({updatechannel, ClientID, ChannelID}, _From, State) ->
     RequestResult = fetch_channel_data(serverfirst, ClientID, ChannelID),
     {reply, RequestResult, State};
 
+handle_call({linkstatus, ClientID, VideoLink}, _From, State) ->
+    {ok, Code} = db_access:get_link_status(ClientID, VideoLink),
+    Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
+    RequestResult = 
+    if
+        Result =:= false ->
+            BinaryCode = atom_to_binary(Code),
+            throw(<<"no such code: ", BinaryCode/binary>>);
+        true ->
+            {_AtomicCode, ServerErrorCode} = Result,
+            {ok , Return} = utils:format_success(ServerErrorCode, VideoLink),
+            {ok, jiffy:encode(#{success => Return})}
+    end,
+    {reply, RequestResult, State};
+
 handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
     RequestResult = db_access:add_video_link(ClientID, VideoLink),
     Response = case RequestResult of
@@ -48,18 +63,18 @@ handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
                     {error, jiffy:encode(#{error => Return})};
                 true ->
                     {AtomicCode, ServerErrorCode} = Result,
-                    {error , Return} = utils:format_error(ServerErrorCode, AtomicCode),
+                    {error , Return} = utils:format_error(ServerErrorCode, VideoLink),
                     {error, jiffy:encode(#{error => Return})}
             end;
         {ok, Code} ->
             Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
             if
                 Result =:= false ->
-                    {error , Return} = utils:format_error(Code, Code),
+                    {error , Return} = utils:format_success(Code, VideoLink),
                     {ok, jiffy:encode(#{success => Return})};
                 true ->
-                    {AtomicCode, ServerErrorCode} = Result,
-                    {error , Return} = utils:format_error(ServerErrorCode, AtomicCode),
+                    {_AtomicCode, ServerErrorCode} = Result,
+                    {ok , Return} = utils:format_success(ServerErrorCode, VideoLink),
                     {ok, jiffy:encode(#{success => Return})}
             end
     end,

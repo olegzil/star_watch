@@ -23,7 +23,8 @@
            purge_table/1, 
            get_channel_descriptors_for_client/1,
            get_client_youtube_key/1,
-           get_channel_data/1]).
+           get_channel_data/1,
+           get_link_status/2]).
 
  -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 -compile(export_all).
@@ -214,6 +215,18 @@ get_client_youtube_key(ClientID) ->
             {ok, Record#client_profile_table.youtube_key}
     end.
 
+get_link_status(ClientID, Link) ->
+    IsPending = is_channel_id_pending(ClientID, Link),
+    IsPresent = is_channel_id_in_youtube_channel(ClientID, Link),
+    if 
+        IsPending ->
+            {ok, link_pending};
+        IsPresent ->
+            {ok, link_exists};
+        true ->
+            {ok, no_such_link}
+    end.
+
 add_video_link(ClientID, Link) ->
     IsPending = is_channel_id_pending(ClientID, Link),
     IsPresent = is_channel_id_in_youtube_channel(ClientID, Link),
@@ -223,12 +236,20 @@ add_video_link(ClientID, Link) ->
         IsPresent ->
             {error, link_exists};
         true ->
-            {atomic, [Record]} = mnesia:transaction(fun() -> mnesia:read(client_profile_table_pending, ClientID) end),
-            NewList = Record#client_profile_table_pending.video_id_list ++ [Link],
-            NewRecord = Record#client_profile_table_pending{video_id_list = NewList},
-            mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
-           {ok, video_link_added}
+            {atomic, Record} = mnesia:transaction(fun() -> mnesia:read(client_profile_table_pending, ClientID) end),
+            add_link(ClientID, Link, Record)
     end.
+
+add_link(_ClientID, Link, [Record]) ->
+    NewList = Record#client_profile_table_pending.video_id_list ++ [Link],
+    NewRecord = Record#client_profile_table_pending{video_id_list = NewList},
+    mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+    {ok, video_link_added};
+
+add_link(ClientID, Link, []) ->
+    NewRecord = #client_profile_table_pending{client_id=ClientID, video_id_list = [Link]},
+    mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+    {ok, video_link_added}.    
 
 %%%
 %%% Determine if the peding table contains the target video link. First determine

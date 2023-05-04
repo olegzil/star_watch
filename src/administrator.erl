@@ -75,12 +75,12 @@ handle_admin_action(Action)	->
 	case Action of
 		{ <<"deleteconfigrecord">>, ClientID} ->
 			server_config_processor:delete_config_record(ClientID),
-			utils:format_success(<<"deleted client ", ClientID/binary, " from profile db">>);
+			utils:format_success(?SERVER_ERROR_OK, <<"deleted client ", ClientID/binary, " from profile db">>);
 
 		{<<"deleteyoutubechannel">>, {ClientID, ChannelID}} ->
 			case server_config_processor:delete_youtube_channel(ClientID, ChannelID) of 
 				{atomic, ok} ->
-					utils:format_success(<<"deleted: ", ChannelID/binary, " for client ", ClientID/binary>>);
+					utils:format_success(?SERVER_ERROR_OK, <<"deleted: ", ChannelID/binary, " for client ", ClientID/binary>>);
 				_ ->
 					utils:format_error(-1, unknown)
 			end;
@@ -108,11 +108,11 @@ handle_admin_action(Action)	->
 			case server_config_processor:fetch_config_data_for_client(ClientID) of
 				{error, no_such_client} -> % Trivial case: new client id. Add it unconditionally
 					server_config_processor:add_new_client_record(NewClient),
-					utils:format_success(<<ClientID/binary, " added">>);
+					utils:format_success(?SERVER_ERROR_OK, <<ClientID/binary, " added">>);
 
 				{ok, _Record} ->
 					server_config_processor:update_existing_client(NewClient),
-					utils:format_success(<<ClientID/binary, " updated">>)
+					utils:format_success(?SERVER_ERROR_OK, <<ClientID/binary, " updated">>)
 			end;
 
 		Command ->

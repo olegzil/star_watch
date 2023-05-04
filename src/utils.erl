@@ -18,7 +18,7 @@
 		 test_multi_channel_data_fetch/0,
 		 reformat_channel_data/1,
 		 compose_error_message/2,
-		 format_success/1,
+		 format_success/2,
 		 jsonify_list_of_tuples/2, 
 		 jsonify_client_profile_table/1,
 		 format_error/2,
@@ -597,7 +597,7 @@ format_error(ErrorCode, ErrorMessage) ->
 	},
 	{error, Error}.
 
-format_success(Message) ->
+format_success(Code, Message) ->
 	Message = if
 				is_atom(Message) ->
 					atom_to_binary(Message);
@@ -607,6 +607,7 @@ format_success(Message) ->
 					<<"undefined">>
 			end,
 	 Success = #{
+	 	code => Code,
 	 	status => success,
 		date_time => utils:current_time_string(),
 		text => Message
