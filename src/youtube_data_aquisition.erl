@@ -29,10 +29,16 @@ fetch_channel_data(Date, MasterMap, [Head|Tail]) ->
 			PageMap = #{<<"first_page">> => FirstPageMap},										% First page does not have a token identifier
 			PageToken = get_next_page_token(FirstPageMap),										% Extract the next page token
 			{ok, RemainderChannelMap} = fetch_next_page(YoutubeKey, ChannelID, Date, PageToken, PageMap), 	% Atempt to fetch data for the next page, or return
-			CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
-			SectionMap = maps:put(ChannelID, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
-			NewMaster = maps:merge(SectionMap, MasterMap),
-			fetch_channel_data(Date, NewMaster, Tail);
+			case fetch_next_page(YoutubeKey, ChannelID, Date, PageToken, PageMap) of
+				{ok, RemainderChannelMap} ->
+					CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
+					SectionMap = maps:put(ChannelID, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
+					NewMaster = maps:merge(SectionMap, MasterMap),
+					fetch_channel_data(Date, NewMaster, Tail);
+				{error, ErrorMessage} ->
+					utils:log_message([{"Youtube error: ", ErrorMessage}]),
+					fetch_channel_data(Date, MasterMap, [])
+			end;
 
 		{ok,{_,_,ErrorMessage}} ->
 			io:format("fetch_channel_data failed: ~p~n", [ErrorMessage]),

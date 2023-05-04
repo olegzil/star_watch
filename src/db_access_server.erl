@@ -26,16 +26,31 @@ handle_call(stop, _From, State) ->
 
 handle_call({fetchclientdirectory, ClientID}, _From, State) ->
     _FileName = State, 
-    FetchResult = server_config_processor:fetch_client_directory(ClientID),
-    {reply, FetchResult,  State};
+    {Code, Data} = server_config_processor:fetch_client_directory(ClientID),
+    case Code of
+        ok ->
+            {reply, {Code, Data},  State};
+        _ ->
+            {reply, {Code, jiffy:encode(Data)},  State}
+    end;
 
 handle_call({fetchchannelvideos, ClientID, ChannelID}, _From, State) ->
-    RequestResult = fetch_channel_data(dbfirst, ClientID, ChannelID),
-	{reply, RequestResult, State};
+    {Code, Data} = fetch_channel_data(dbfirst, ClientID, ChannelID),
+    case Code of
+        ok ->
+            {reply, {Code, Data},  State};
+        _ ->
+            {reply, {Code, jiffy:encode(Data)},  State}
+    end;
 
 handle_call({updatechannel, ClientID, ChannelID}, _From, State) ->
-    RequestResult = fetch_channel_data(serverfirst, ClientID, ChannelID),
-    {reply, RequestResult, State};
+    {Code, Data} = fetch_channel_data(serverfirst, ClientID, ChannelID),
+    case Code of
+        ok ->
+            {reply, {Code, Data},  State};
+        _ ->
+            {reply, {Code, jiffy:encode(Data)},  State}
+    end;
 
 handle_call({linkstatus, ClientID, VideoLink}, _From, State) ->
     {ok, Code} = db_access:get_link_status(ClientID, VideoLink),
@@ -108,14 +123,14 @@ respond_to_video_fetch_request(ClientID, ChannelID, []) ->
     ChannelDescriptor = 
     case db_access:get_channel_descriptors_for_client(ClientID) of
             {error, Reason} ->
-                {error, Reason};
+                utils:format_error(?SERVER_ERROR_NO_RECORDS_FOUND, Reason);
             {atomic, []} ->
-                {error, no_such_client};
+                utils:format_error(?SERVER_ERROR_MISSING_CLIENT, no_such_client);
             {ok, TupleList} ->
                 ChannelFound = lists:keyfind(ChannelID, 2, TupleList),
                 if
                     ChannelFound =:= false ->
-                        {error, no_such_channel};
+                        utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, no_such_channel);
                     true ->
                         {ok, ChannelFound}
                 end

@@ -7,43 +7,10 @@ telemetry/request -- used only by the StarWatch app to report telementry events.
 telemetry/stats -- same as telemetry/request except when different.
 astronomy/celestialbody -- can be used to retrive images of verious celestial bodies. Not active.
 
-%%% Add a record to the client_config_table_pending
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:add:client_id=two_e125-4888-9d57-ac702bc20966,name=pbs_space_time,channel_id=UC7_gcs09iThXybpVgjHZ_7g,youtubekey=AIzaSyDXepMVUKYMdn9ui3Nn9X6rau37r-89t6Q
-
-%%% Promote the record indicated by client_id from client_config_table_pending to client_config_table
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:promoteconfigrecord:client_id=three_e125-4888-9d57-ac702bc20966
-
-%%% returns the channel directory for the client specified by a channel id
-http://10.0.0.18:8083/youtube/channelselector/?key=389b4e36-b3d2-11ed-afa1-0242ac120002&action=fetchchannelvideos&channel_id=<UC7_gcs09iThXybpVgjHZ_7g
-
-%%% returns all videos for the specified client
-http://10.0.0.18:8083/youtube/channelselector/?key=389b4e36-b3d2-11ed-afa1-0242ac120002&action=fetchchanneldirectory&client_key=two_e125-4888-9d57-ac702bc20966
-
-
-%%%%%%%%%%%%%%%%%% Google API behavior %%%%%%%%%%%%%%%%%%%%%%%%%%
---- Get video list for specific channel with a page token. Drop page token to access first page ---
-https://www.googleapis.com/youtube/v3/search?key=AIzaSyBWhaM01ueTAyMIhWf11zbJBo3ulKA89u4&channelId="UCjHz5SVHeMT0AViCYZvsGDA&part=snippet,id&order=date&maxResults=20
-
---- Get play list from a channel ID ---
-https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&channelId=UCQfZkf3-Y2RwzdRFWXYsdaQ&maxResults=50&key=AIzaSyBWhaM01ueTAyMIhWf11zbJBo3ulKA89u4
-
---- Get play list items based on play list ID ---
-https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=PLqJ5869zi0au3XwBHxh1iy0wwcGLD6KM6&key=AIzaSyBWhaM01ueTAyMIhWf11zbJBo3ulKA89u4
-
-PBS Space Time -- UC7_gcs09iThXybpVgjHZ_7g
-Sonoma Ashram -- UCQfZkf3-Y2RwzdRFWXYsdaQ 
---- Get video list after a specific date ---
-https://www.googleapis.com/youtube/v3/search?key=AIzaSyBWhaM01ueTAyMIhWf11zbJBo3ulKA89u4&channelId=UC7_gcs09iThXybpVgjHZ_7g&part=snippet,id&order=date&maxResults=20&publishedAfter=1970-01-01T23:11:57Z
-
-%%%%%%%%%%%% EXAMPLES OF REST CALLS %%%%%%%%%%%%%
-%% key -- a key that is used by all apps to access non-admin server functionality
-%% action the -- tag whose value is fetchchanneldirectory or fetchchannelvideos
-%% client_key -- a unique client key. This is a optional parameter. The key is generated once the client requests a custom video directory listing. 
-
-%%% Should produce {"error":"client id not found","client_key":"f09a2270-ac19-418c-a443-9f9e4f4c9019"}
-http://10.0.0.18:8083/youtube/channelselector/?key=389b4e36-b3d2-11ed-afa1-0242ac120002&action=fetchchanneldirectory&client_key=f09a2270-ac19-418c-a443-9f9e4f4c9019
-
-%%% Should produce {"error":{"error_text":"id=389b4e36-b3d2-11ed-afa1-0242ac120002 is not a valid request. Must be client_id=389b4e36-b3d2-11ed-afa1-0242ac120002","error_code":-1,"date_time":"2023-04-01T00:05:45.0+00:00"}}
-
-%%% Shourd produce "record_added"
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=channel_directory:add:client_id=three_e125-4888-9d57-ac702bc20966,name=the_cool_channel,channel_id=CoolChannelID
+http://10.0.0.18:8083/youtube/channelselector/?action=fetchchannelvideos&key=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g
+http://10.0.0.18:8083/youtube/channelselector/?action=addvideolink&key=389b4e36-b3d2-11ed-afa1-0242ac120002&video_link=https://youtu.be/fMIiNY3Ie0c
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=deleteconfigrecord&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002 
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=deleteyoutubechannel&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g 
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchprofilemap&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchclientprofile&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
+http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=updateclientprofile&client_id=52e1e0b3-04ff-4811-9547-0a22fa7d85a0&channel_name=Anton Petrov&channel_id=UCciQ8wFcVoIIMi-lfu8-cjQ
