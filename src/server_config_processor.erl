@@ -368,11 +368,16 @@ copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID}) ->
 	DefaultClient = get_client_key("server_config.cfg"), % get default client key we need for coppying
 	DefaultYoutubeKey = get_default_youtube_key("server_config.cfg"),
 	{atomic, [DefaultRecord]} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, DefaultClient) end), 
-	NewRecord = #client_profile_table{
-		client_id = TargetID, 
-		youtube_key = DefaultYoutubeKey,
-		channel_list = DefaultRecord#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
-	},
-	mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
-	ProfileMap = utils:config_records_to_list_of_maps([TargetID], #{TargetID => [NewRecord]}),
-	{ok, ProfileMap}.
+	case lists:keyfind(ChannelID, 2, DefaultRecord#client_profile_table.channel_list) of
+			false ->
+				NewRecord = #client_profile_table{
+					client_id = TargetID, 
+					youtube_key = DefaultYoutubeKey,
+					channel_list = DefaultRecord#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
+				},
+				mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+				ProfileMap = utils:config_records_to_list_of_maps([TargetID], #{TargetID => [NewRecord]}),
+				{ok, ProfileMap};
+	_ ->
+		{error, link_exists}
+	end.

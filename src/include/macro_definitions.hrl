@@ -58,7 +58,6 @@
 -define(RESPONSE_CODES, [{video_link_added, ?SERVER_ERROR_LINK_ADDED},
 						 {link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
 						 {link_pending, ?SERVER_ERROR_LINK_PENDING}, 
-						 {video_link_added, ?SERVER_ERROR_OK}, 
 						 {duplicate_channel, ?SERVER_ERROR_DUPLICATE_CHANNEL},
 						 {no_records, ?SERVER_ERROR_RECORD_NOT_FOUND},
 						 {no_admin_key, ?SERVER_ERROR_ADMIN_KEY},
