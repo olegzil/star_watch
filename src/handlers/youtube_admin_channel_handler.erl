@@ -81,39 +81,6 @@ validate_action(Action, TokenList) ->
         <<"deleteconfigrecord">> -> % Format: action=deleteconfigrecord&client_id=<ClientID>
             validate_client_id_for_action(<<"deleteconfigrecord">>, TokenList);
 
-        <<"deleteyoutubechannel">> -> % Format: {action,deleteyoutubechannel}, {channel_id, <Channel id>}, {client_id, <Client id>}
-            ChannelParam = lists:keyfind(<<"channel_id">>, 1, TokenList),
-            ClientParam = lists:keyfind(<<"client_id">>, 1, TokenList),
-            WellFormed = if
-                ChannelParam =:= false ->
-                    {error, channel_id_required};
-                ClientParam =:= false ->
-                    {error, client_id_required};
-                true ->
-                    {_, ChannelID} = ChannelParam,
-                    {_, ClientID} = ClientParam,
-                    case server_config_processor:is_channel_in_profile(ClientID, ChannelID) of
-                        false ->
-                            {error, no_such_channel};
-                        true ->
-                            {ok, ClientParam, ChannelParam}
-                    end
-            end,
-            case WellFormed of
-                {error, Error} ->
-                    {error, Error};
-                {ok, ClientParam, ChannelParam}->
-                    {<<"channel_id">>, Channel} = ChannelParam,
-                    {<<"client_id">>, Client} = ClientParam,
-                    Target = server_config_processor:is_client_in_profile_map(Client),
-                    if 
-                        Target =:= true ->
-                            {ok, { <<"deleteyoutubechannel">>, {Client, Channel}}};
-                        true ->
-                            {error, no_such_client}
-                    end
-            end;
-            
         <<"fetchprofilemap">> ->
             {ok, <<"fetchprofilemap">>};
 
@@ -121,38 +88,38 @@ validate_action(Action, TokenList) ->
             validate_client_id_for_action(<<"fetchclientprofile">>, TokenList);
 
         <<"updateclientprofile">> ->
-            ChannelParam = lists:keyfind(<<"channel_id">>, 1, TokenList),
-            ClientParam = lists:keyfind(<<"client_id">>, 1, TokenList),
-            NameParam = lists:keyfind(<<"channel_name">>, 1, TokenList),
-            YoutubeKeyParam = lists:keyfind(<<"youtube_key">>, 1, TokenList), %optional
+            TargetIDParam = lists:keyfind(<<"target_client_id">>, 1, TokenList),
+            ChannelParam = lists:keyfind(<<"channel_descipion">>, 1, TokenList),
+            
             if
+                TargetIDParam =:= false ->
+                    {error, target_client_id_required};
                 ChannelParam =:= false ->
-                    {error, channel_id_required};
-                ClientParam =:= false ->
-                    {error, client_id_required};
-                NameParam =:= false ->
-                    {error, channel_name_required};
+                    {error, channel_data_required};
                 true ->
-                    {_, ChannelID} = ChannelParam,
-                    {_, ClientID} = ClientParam,
-                    {_, ChannelName} = NameParam,
-                    Key = if
-                            YoutubeKeyParam =:= false ->
-                                server_config_processor:get_default_youtube_key("server_config.cfg");
-                            true -> 
-                                {_, YoutubeKey} = YoutubeKeyParam,
-                                YoutubeKey
-
-                        end,
-                    case server_config_processor:is_channel_in_profile(ClientID, ChannelID) of
-                        false ->
-                            {ok, {<<"updateclientprofile">>, {Key, ClientID, ChannelID, ChannelName}}};
+                    {_, TargetID} = TargetIDParam,
+                    {_, ChannelData} = ChannelParam, % {name, channel_id}
+                    NameAndID = validate_channel_data(ChannelData),
+                    if
+                        NameAndID =:= false ->
+                            {error, invalid_channel_data};
                         true ->
-                            {error, duplicate_channel}
+                          {<<"updateclientprofile">>,  {ClientID, {ChannelName, ChannelID}}} =
+                          {<<"updateclientprofile">>, {TargetID, NameAndID}},
+                          {ok, {<<"updateclientprofile">>,  {ClientID, {ChannelName, ChannelID}}}}
                     end
             end;
         _ ->
             {error, no_such_command}
+    end.
+validate_channel_data(ChannelData) ->
+    Data = string:split(ChannelData, ",", all),
+    Count = length(Data), 
+    case Count of
+        2 ->
+            {lists:nth(1, Data), lists:nth(2, Data)};
+        _ ->
+            false
     end.
 
 validate_client_id_for_action(Action, TokenList) ->

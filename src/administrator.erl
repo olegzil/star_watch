@@ -77,14 +77,6 @@ handle_admin_action(Action)	->
 			server_config_processor:delete_config_record(ClientID),
 			utils:format_success(?SERVER_ERROR_OK, <<"deleted client ", ClientID/binary, " from profile db">>);
 
-		{<<"deleteyoutubechannel">>, {ClientID, ChannelID}} ->
-			case server_config_processor:delete_youtube_channel(ClientID, ChannelID) of 
-				{atomic, ok} ->
-					utils:format_success(?SERVER_ERROR_OK, <<"deleted: ", ChannelID/binary, " for client ", ClientID/binary>>);
-				_ ->
-					utils:format_error(-1, unknown)
-			end;
-
 		<<"fetchprofilemap">> ->
 			MapOfRecords = server_config_processor:fetch_profile_map_from_db(),
 			Keys = maps:keys(MapOfRecords),
@@ -99,21 +91,13 @@ handle_admin_action(Action)	->
 					ProfileMap = utils:config_records_to_list_of_maps([ClientID], #{ClientID => [ProfileRecord]}),
 					{ok, ProfileMap}	
 			end;
-		{<<"updateclientprofile">>,{YoutubeKey, ClientID, ChannelID, ChannelName}} ->
-			NewClient = #{
-				client_id => ClientID,
-				youtube_api_key => YoutubeKey,
-				client_channel_data => [{ChannelName, ChannelID}]
-			},
-			case server_config_processor:fetch_config_data_for_client(ClientID) of
-				{error, no_such_client} -> % Trivial case: new client id. Add it unconditionally
-					server_config_processor:add_new_client_record(NewClient),
-					utils:format_success(?SERVER_ERROR_OK, <<ClientID/binary, " added">>);
-
-				{ok, _Record} ->
-					server_config_processor:update_existing_client(NewClient),
-					utils:format_success(?SERVER_ERROR_OK, <<ClientID/binary, " updated">>)
-			end;
+		{<<"updateclientprofile">>,  {TargetID, {ChannelName, ChannelID}}} ->
+            case db_access:does_record_exist(TargetID, client_profile_table) of
+                true ->
+                    server_config_processor:add_new_channel_to_profile(TargetID, {ChannelName, ChannelID});
+                false ->
+                    server_config_processor:copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID})
+            end;
 
 		Command ->
 			utils:log_message([{"Command", Command}]),

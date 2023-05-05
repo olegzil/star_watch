@@ -26,7 +26,9 @@
 		 delete_youtube_channel/2,
 		 fetch_config_data_for_client/1,
 		 update_existing_client/1,
-		 add_new_client_record/1]).
+		 add_new_client_record/1,
+		 add_new_channel_to_profile/2,
+		 copy_profile_and_add_new_channel/2]).
 -compile(export_all).
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
@@ -337,6 +339,7 @@ add_new_client_record(NewClient) ->
 			UpdatedRecrod = ClientRecord#client_profile_table.channel_list ++ maps:get(client_channel_data, NewClient),
 			mnesia:transaction(fun()-> mnesia:write(UpdatedRecrod) end)
 	end.
+
 update_existing_client(Client) ->
 	ClientID = maps:get(client_id, Client),
 	Map = fetch_profile_map_from_db(),
@@ -345,4 +348,31 @@ update_existing_client(Client) ->
 		youtube_key = maps:get(youtube_api_key, Client),
 		channel_list = Record#client_profile_table.channel_list ++ maps:get(client_channel_data, Client)
 	},
+	mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
+	ProfileMap = utils:config_records_to_list_of_maps([ClientID], #{ClientID => [UpdatedRecord]}),
+	{ok, ProfileMap}.
+
+
+%%% All arguments must be validated by the caller. Including
+%%% the existance of the TargetID
+add_new_channel_to_profile(TargetID, {ChannelName, ChannelID}) ->
+	Record = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), 
+	UpdatedRecord = Record#client_profile_table{
+		channel_list = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]		
+	},
 	mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end).
+
+%%% All arguments must be validated by the caller.
+copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID}) ->
+	Record = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), %read the record to update
+	DefaultClient = get_client_key("server_config.cfg"), % get default client key we need for coppying
+	DefaultYoutubeKey = get_default_youtube_key("server_config.cfg"),
+	{atomic, [DefaultRecord]} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, DefaultClient) end), 
+	NewRecord = #client_profile_table{
+		client_id = TargetID, 
+		youtube_key = DefaultYoutubeKey,
+		channel_list = DefaultRecord#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
+	},
+	mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+	ProfileMap = utils:config_records_to_list_of_maps([TargetID], #{TargetID => [NewRecord]}),
+	{ok, ProfileMap}.

@@ -52,7 +52,9 @@
 -define(SERVER_ERROR_NO_SUCH_COMMAND,		16#FFAA19).
 -define(SERVER_ERROR_DUPLICATE_CHANNEL,		16#FFAA1A).
 -define(SERVER_ERROR_NO_RECORDS_FOUND,		16#FFAA1B).
-
+-define(SERVER_ERROR_TARGET_ID_REQUIRED, 	16#FFAC00).
+-define(SERVER_ERROR_CHANNEL_DATA_REQUIRED,	16#FFAC01).
+-define(SERVER_ERROR_INVALID_CHANNEL_DATA, 	16#FFAC02).
 -define(RESPONSE_CODES, [{video_link_added, ?SERVER_ERROR_LINK_ADDED},
 						 {link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
 						 {link_pending, ?SERVER_ERROR_LINK_PENDING}, 
@@ -69,7 +71,10 @@
 						 {client_id_required, ?SERVER_ERROR_MISSING_CLIENT},
 						 {no_such_channel, ?SERVER_ERROR_NO_SUCH_CHANNEL},
 						 {no_such_command, ?SERVER_ERROR_NO_SUCH_COMMAND},
-						 {no_such_link, ?SERVER_ERROR_LINK_NOT_FOUND}]).
+						 {no_such_link, ?SERVER_ERROR_LINK_NOT_FOUND},
+						 {target_client_id_required, ?SERVER_ERROR_TARGET_ID_REQUIRED},
+						 {channel_data_required, ?SERVER_ERROR_CHANNEL_DATA_REQUIRED},
+						 {invalid_channel_data, ?SERVER_ERROR_INVALID_CHANNEL_DATA}]).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

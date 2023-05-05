@@ -24,7 +24,8 @@
            get_channel_descriptors_for_client/1,
            get_client_youtube_key/1,
            get_channel_data/1,
-           get_link_status/2]).
+           get_link_status/2,
+           does_record_exist/2]).
 
  -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 -compile(export_all).
@@ -321,6 +322,12 @@ get_channel_data(ChannelID) ->
             First
     end.
 
+does_record_exist(TargetID, TableName) ->
+    Result = mnesia:transaction(fun() -> mnesia:read(TableName, <<"invalid">>)  end),
+    case Result of 
+        {atomic, []} -> false;
+        {atomic, _} -> true
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_telemetry_table() ->
