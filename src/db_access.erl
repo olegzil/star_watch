@@ -25,7 +25,9 @@
            get_client_youtube_key/1,
            get_channel_data/1,
            get_link_status/2,
-           does_record_exist/2]).
+           does_record_exist/2,
+           add_link/3,
+           delete_video_link_from_pending_profile_table/2]).
 
  -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 -compile(export_all).
@@ -223,7 +225,7 @@ get_link_status(ClientID, Link) ->
         IsPending ->
             {ok, link_pending};
         IsPresent ->
-            {ok, link_exists};
+            {ok, video_link_exists};
         true ->
             {ok, no_such_link}
     end.
@@ -235,7 +237,7 @@ add_video_link(ClientID, Link) ->
         IsPending ->
             {error, link_pending};
         IsPresent ->
-            {error, link_exists};
+            {error, video_link_exists};
         true ->
             {atomic, Record} = mnesia:transaction(fun() -> mnesia:read(client_profile_table_pending, ClientID) end),
             add_link(ClientID, Link, Record)
@@ -323,7 +325,7 @@ get_channel_data(ChannelID) ->
     end.
 
 does_record_exist(TargetID, TableName) ->
-    Result = mnesia:transaction(fun() -> mnesia:read(TableName, <<"invalid">>)  end),
+    Result = mnesia:transaction(fun() -> mnesia:read(TableName, TargetID)  end),
     case Result of 
         {atomic, []} -> false;
         {atomic, _} -> true
@@ -398,4 +400,12 @@ dump_db() ->
 	{ok, File} = file:open("/home/oleg/temp/dates.txt", [write]),
 	io:format(File, "~p~n", [DateList]).
 
-
+delete_video_link_from_pending_profile_table(ClientID, VideoLink) ->
+    {atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table_pending, ClientID) end),
+    case Result of
+        [] ->
+            {error, VideoLink};
+        _ ->
+            mnesia:transaction(fun()-> mnesia:delete({client_profile_table_pending, ClientID}) end),
+            {ok, ClientID}
+    end.

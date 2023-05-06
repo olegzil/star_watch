@@ -355,15 +355,24 @@ update_existing_client(Client) ->
 
 %%% All arguments must be validated by the caller. Including
 %%% the existance of the TargetID
-add_new_channel_to_profile(TargetID, {ChannelName, ChannelID}) ->
-	Record = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), 
-	UpdatedRecord = Record#client_profile_table{
-		channel_list = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]		
-	},
-	mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end).
+add_new_channel_to_profile(TargetID, {ChannelName, ChannelID, VideoLink}) ->
+	{atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), 
+	case Result of
+		[] ->
+			{error, no_such_client};
+		[Record] ->
+			UpdatedRecord = Record#client_profile_table{
+				channel_list = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]		
+			},
+			WriteResult = mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
+			utils:log_message([{"Result", WriteResult}]),
+		    DeleteResult = db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
+		    utils:log_message([{"Result", DeleteResult}]),
+			{ok, video_link_added}
+	end.
 
 %%% All arguments must be validated by the caller.
-copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID}) ->
+copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID, VideoLink}) ->
 	Record = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), %read the record to update
 	DefaultClient = get_client_key("server_config.cfg"), % get default client key we need for coppying
 	DefaultYoutubeKey = get_default_youtube_key("server_config.cfg"),
@@ -375,9 +384,12 @@ copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID}) ->
 					youtube_key = DefaultYoutubeKey,
 					channel_list = DefaultRecord#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
 				},
-				mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+				WriteResult = mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+				utils:log_message([{"WriteResult", WriteResult}]),
+			    DeleteResult = db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
+				utils:log_message([{"DeleteResult", DeleteResult}]),
 				ProfileMap = utils:config_records_to_list_of_maps([TargetID], #{TargetID => [NewRecord]}),
 				{ok, ProfileMap};
 	_ ->
-		{error, link_exists}
+		{error, video_link_exists}
 	end.

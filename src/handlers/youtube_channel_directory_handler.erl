@@ -50,6 +50,8 @@ case Action of
         gen_server:call(db_access_server, {updatechannel, ClientID, Parameter}, infinity);
     <<"addvideolink">> ->
         gen_server:call(db_access_server, {addvideolink, ClientID, Parameter}, infinity);
+    <<"deletevideolink">> ->
+        gen_server:call(db_access_server, {deletevideolink, ClientID, Parameter}, infinity);
     <<"linkstatus">> ->
         gen_server:call(db_access_server, {linkstatus, ClientID, Parameter}, infinity);
     _ ->
@@ -155,6 +157,25 @@ secondary_action_validation(Action, TokenList) ->
                             {ok, {Action, Link}}                    
                     end
             end;
+        <<"deletevideolink">> ->
+            VideoLinkParam = lists:keyfind(<<"video_link">>, 1, TokenList),
+            if
+                VideoLinkParam =:= false ->
+                    {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO, missing_video_link),
+                    {error, jiffy:encode(Message)};
+                true ->
+
+                    {_, Link} = VideoLinkParam,
+                    Parts = string:split(Link, "/", all),
+                    if 
+                        length(Parts) < 4 ->
+                            {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_LINK, video_link_wrong_format),
+                            {error, jiffy:encode(Message)};
+                        true ->
+                            {ok, {Action, Link}}                    
+                    end
+            end;
+            
         <<"fetchchannelvideos">> -> %% Returns {error, ErrorMessage} or {ClientID, ignore}
             case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
                 false ->

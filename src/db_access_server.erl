@@ -95,6 +95,34 @@ handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
     end,
     {reply, Response, State};
 
+handle_call({deletevideolink, ClientID, VideoLink}, _From, State) ->
+    RequestResult = db_access:delete_video_link(ClientID, VideoLink),
+    Response = case RequestResult of
+        {error, Code} ->
+            Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
+            if
+                Result =:= false ->
+                    {error , Return} = utils:format_error(Code, Code),
+                    {error, jiffy:encode(#{error => Return})};
+                true ->
+                    {AtomicCode, ServerErrorCode} = Result,
+                    {error , Return} = utils:format_error(ServerErrorCode, VideoLink),
+                    {error, jiffy:encode(#{error => Return})}
+            end;
+        {ok, Code} ->
+            Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
+            if
+                Result =:= false ->
+                    {error , Return} = utils:format_success(Code, VideoLink),
+                    {ok, jiffy:encode(#{success => Return})};
+                true ->
+                    {_AtomicCode, ServerErrorCode} = Result,
+                    {ok , Return} = utils:format_success(ServerErrorCode, VideoLink),
+                    {ok, jiffy:encode(#{success => Return})}
+            end
+    end,
+    {reply, Response, State};
+
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
 

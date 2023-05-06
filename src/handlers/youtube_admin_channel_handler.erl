@@ -90,15 +90,18 @@ validate_action(Action, TokenList) ->
         <<"updateclientprofile">> ->
             TargetIDParam = lists:keyfind(<<"target_client_id">>, 1, TokenList),
             ChannelParam = lists:keyfind(<<"channel_descipion">>, 1, TokenList),
-            
+            VideoParam = lists:keyfind(<<"video_link">>, 1, TokenList),
             if
                 TargetIDParam =:= false ->
                     {error, target_client_id_required};
                 ChannelParam =:= false ->
                     {error, channel_data_required};
+                VideoParam =:= false ->
+                    {error, video_link_required};
                 true ->
                     {_, TargetID} = TargetIDParam,
                     {_, ChannelData} = ChannelParam, % {name, channel_id}
+                    {_, VideoLink}   = VideoParam,
                     NameAndID = validate_channel_data(ChannelData),
                     if
                         NameAndID =:= false ->
@@ -106,7 +109,7 @@ validate_action(Action, TokenList) ->
                         true ->
                           {<<"updateclientprofile">>,  {ClientID, {ChannelName, ChannelID}}} =
                           {<<"updateclientprofile">>, {TargetID, NameAndID}},
-                          {ok, {<<"updateclientprofile">>,  {ClientID, {ChannelName, ChannelID}}}}
+                          {ok, {<<"updateclientprofile">>,  {ClientID, {ChannelName, ChannelID, VideoLink}}}}
                     end
             end;
         _ ->

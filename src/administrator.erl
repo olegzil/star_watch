@@ -91,12 +91,12 @@ handle_admin_action(Action)	->
 					ProfileMap = utils:config_records_to_list_of_maps([ClientID], #{ClientID => [ProfileRecord]}),
 					{ok, ProfileMap}	
 			end;
-		{<<"updateclientprofile">>,  {TargetID, {ChannelName, ChannelID}}} ->
+		{<<"updateclientprofile">>,  {TargetID, {ChannelName, ChannelID, VideoLink}}} ->
             case db_access:does_record_exist(TargetID, client_profile_table) of
                 true ->
-                    server_config_processor:add_new_channel_to_profile(TargetID, {ChannelName, ChannelID});
+                    server_config_processor:add_new_channel_to_profile(TargetID, {ChannelName, ChannelID, VideoLink});
                 false ->
-                    server_config_processor:copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID})
+                    server_config_processor:copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID, VideoLink})
             end;
 
 		Command ->
