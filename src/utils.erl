@@ -27,7 +27,7 @@
 		 is_key_present/3,
 		 tuple_list_to_list_of_maps/2,
 		 config_records_to_list_of_maps/2,
-		 remove_duplicate_channels/1]).
+		 remove_duplicate_channels/0]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
