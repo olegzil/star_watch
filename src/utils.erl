@@ -26,7 +26,8 @@
 		 log_message/1,
 		 is_key_present/3,
 		 tuple_list_to_list_of_maps/2,
-		 config_records_to_list_of_maps/2]).
+		 config_records_to_list_of_maps/2,
+		 remove_duplicate_channels/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -679,6 +680,20 @@ config_records_to_list_of_maps(Keys, MapOfRecords) ->
 	[], Keys).
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+remove_duplicate_channels() ->
+	{atomic, Keys} = mnesia:transaction(fun() -> mnesia:all_keys(client_profile_table) end),
+	lists:foreach(fun(Key)-> 
+		{atomic, [Record]} = mnesia:transaction(fun() -> mnesia:read(client_profile_table, Key) end),
+		remove_duplicate_channels(worker, Record)
+	end,
+	Keys).
+
+remove_duplicate_channels(worker, Record) ->
+	Unique = lists:uniq(fun({_, ChannelID})-> ChannelID end, Record#client_profile_table.channel_list),
+	UpdatedRecord = Record#client_profile_table{
+	channel_list = Unique
+	},
+	mnesia:transaction(fun() -> mnesia:write(UpdatedRecord) end).
 
 parse_test_json(ChannelKey, JsonData) ->
 	ChannelData = maps:get(ChannelKey, JsonData),
