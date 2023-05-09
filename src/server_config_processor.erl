@@ -73,7 +73,6 @@ process_channel_request(_Arg1, [], ListOfMaps) ->
 
 process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
 	{ChannelName,ChannelID} = Channel,
-	Record = db_access:get_channel_data(ClientID, ChannelID),
 	case db_access:get_channel_data(ClientID, ChannelID) of
 		false ->
 			process_channel_request(ClientID, ChannelList, Acc);
@@ -344,22 +343,17 @@ update_existing_client(Client) ->
 %%% All arguments must be validated by the caller. Including
 %%% the existance of the TargetID
 add_new_channel_to_profile(TargetID, {ChannelName, ChannelID, VideoLink}) ->
-	utils:log_message([{"ChannelName", ChannelName}, {"ChannelID", ChannelID}]),
 	{atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), 
 	case Result of
 		[] ->
-			utils:log_message([{"error", no_such_client}]),
 			{error, no_such_client};
 		[Record] ->
 			NewList = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}],
-			utils:log_message([{"NewList", NewList}]),
 			UpdatedRecord = Record#client_profile_table{
 				channel_list = NewList
 			},
 			WriteResult = mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
-			utils:log_message([{"Result", WriteResult}]),
 		    DeleteResult = db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
-		    utils:log_message([{"Result", DeleteResult}]),
 			{ok, video_link_added}
 	end.
 

@@ -9,13 +9,39 @@
 
 fetch_single_video(ClientID, ChannelID) ->
 	{ok, YoutubeKey} = db_access:get_client_youtube_key(ClientID),
-	fetch_channel_data([], #{}, [{YoutubeKey, ChannelID}], "1").
+	fetch_single_page([], #{}, [{YoutubeKey, ChannelID}], "1").
 
 fetch_data(production, ClientProfile, Date) ->
 	fetch_channel_data(Date, #{}, ClientProfile, ?YOUTUBE_MAXRESULTS); 
 
 fetch_data(periodic, ClientProfile, Date) ->
 	fetch_channel_data(Date, #{}, ClientProfile, ?YOUTUBE_MAXRESULTS).
+
+fetch_single_page(Date, MasterMap, [Head|Tail], MaxResults) ->
+	{YoutubeKey, ChannelID} = Head,
+	Request = first_page_query(YoutubeKey, ChannelID, Date, MaxResults),
+	case httpc:request(Request) of
+		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
+			{ok, FirstPageMap} = utils:update_database(youtube, Body),							% Commit data from the first fetch to the database
+			PageMap = #{<<"first_page">> => FirstPageMap},										% First page does not have a token identifier
+			{ok, RemainderChannelMap} = fetch_next_page(YoutubeKey, ChannelID, Date, [], MaxResults, PageMap), 	% Atempt to fetch data for the next page, or return
+			case fetch_next_page(YoutubeKey, ChannelID, Date, [], MaxResults, PageMap) of
+				{ok, RemainderChannelMap} ->
+					CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
+					SectionMap = maps:put(ChannelID, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
+					NewMaster = maps:merge(SectionMap, MasterMap),
+					fetch_channel_data(Date, NewMaster, Tail, ?YOUTUBE_MAXRESULTS);
+				{error, ErrorMessage} ->
+					utils:log_message([{"Youtube error: ", ErrorMessage}]),
+					fetch_channel_data(Date, MasterMap, [], ?YOUTUBE_MAXRESULTS)
+			end;
+
+		{ok,{_,_,ErrorMessage}} ->
+			io:format("fetch_channel_data failed: ~p~n", [ErrorMessage]),
+			{error, ErrorMessage};
+		Other ->
+			{error, Other}
+	end.
 
 fetch_channel_data(_Date, NewMaster, [], ?YOUTUBE_MAXRESULTS) ->
 	FinalMap = #{?TOP_KEY => NewMaster},

@@ -308,23 +308,32 @@ is_channel_id_in_youtube_channel(ClientID, Link) ->
 %%% Get the latest image associate with this channel
 %%%
 get_channel_data(ClientID, ChannelID) ->
-    ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
-    {atomic, Records} = mnesia:transaction(ReaderFun),
+    Records = get_channel_data_db(ChannelID),
+    Predicate = fun(Lhs, Rhs) ->
+        if
+            Rhs#youtube_channel.date =< Lhs#youtube_channel.date ->
+                true;
+            true -> false
+        end
+    end,
     case length(Records) of
         0 ->
-            youtube_data_aquisition:fetch_single_video(ClientID, ChannelID);
+           youtube_data_aquisition:fetch_single_video(ClientID, ChannelID),
+           UpdatedRecord = get_channel_data_db(ChannelID),
+           %TODO: This needs to be changed. Records will be [] so the asigment will fail
+            SortedList = lists:sort(Predicate, UpdatedRecord),
+            [First | _] = SortedList,
+            First;
         _->
-            Predicate = fun(Lhs, Rhs) ->
-                if
-                    Rhs#youtube_channel.date =< Lhs#youtube_channel.date ->
-                        true;
-                    true -> false
-                end
-            end,
             SortedList = lists:sort(Predicate, Records),
             [First | _] = SortedList,
             First
     end.
+
+get_channel_data_db(ChannelID) ->
+    ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
+    {atomic, Records} = mnesia:transaction(ReaderFun),
+    Records.
 
 does_record_exist(TargetID, TableName) ->
     Result = mnesia:transaction(fun() -> mnesia:read(TableName, TargetID)  end),
