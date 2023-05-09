@@ -6,7 +6,7 @@
 -define(CLIENT_ACCESS_KEY, <<"389b4e36-b3d2-11ed-afa1-0242ac120002">>).
 -define(ADMINISTRATOR_KEY, <<"f09a2270-ac19-418c-a443-9f9e4f4c9019">>).
 -define(YOUTUBE_MAXRESULTS, "50").
--define(FIRST_PUBLISH_DATE, "1990-01-01T00:00:00Z").
+-define(FIRST_PUBLISH_DATE, "1970-01-01T00:00:00Z").
 -define(SERVER_CONFIG_FILE, <<"server_config.cfg">>).
 
 -define(YOUTUBE_NEXTPAGE, <<"nextPageToken">>).

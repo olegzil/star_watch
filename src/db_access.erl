@@ -23,11 +23,13 @@
            purge_table/1, 
            get_channel_descriptors_for_client/1,
            get_client_youtube_key/1,
-           get_channel_data/1,
+           get_channel_data/2,
            get_link_status/2,
            does_record_exist/2,
            add_link/3,
-           delete_video_link_from_pending_profile_table/2]).
+           delete_video_link_from_pending_profile_table/2,
+           delete_channel_from_client/2,
+           get_valid_client_id/1]).
 
  -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 -compile(export_all).
@@ -305,12 +307,12 @@ is_channel_id_in_youtube_channel(ClientID, Link) ->
 %%%
 %%% Get the latest image associate with this channel
 %%%
-get_channel_data(ChannelID) ->
+get_channel_data(ClientID, ChannelID) ->
     ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
     {atomic, Records} = mnesia:transaction(ReaderFun),
     case length(Records) of
         0 ->
-            false;
+            youtube_data_aquisition:fetch_single_video(ClientID, ChannelID);
         _->
             Predicate = fun(Lhs, Rhs) ->
                 if
@@ -329,6 +331,34 @@ does_record_exist(TargetID, TableName) ->
     case Result of 
         {atomic, []} -> false;
         {atomic, _} -> true
+    end.
+
+delete_channel_from_client(ClientID, ChannelID) ->
+    ReadResult = mnesia:transaction(fun() -> mnesia:read(client_profile_table, ClientID) end),
+    case ReadResult of
+        {atomic, []} ->
+            {error, no_such_client};
+        {atomic, [Record]} ->
+            NewList = lists:keydelete(ChannelID, 2, Record#client_profile_table.channel_list),
+            if
+                NewList =/= [] ->
+                    UpdatedRecord = Record#client_profile_table{
+                        channel_list = NewList
+                    },
+                    mnesia:transaction(fun() -> mnesia:write(UpdatedRecord) end),
+                    {ok, ChannelID};
+                true ->
+                    {error, no_such_channel}
+            end
+    end.
+
+get_valid_client_id(ClientID) ->
+    Present = server_config_processor:is_client_in_profile_map(approved, ClientID),
+    if
+        Present =:= true ->
+            ClientID;
+        true ->
+            server_config_processor:get_client_key(?SERVER_CONFIG_FILE)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

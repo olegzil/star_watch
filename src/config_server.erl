@@ -35,7 +35,7 @@ handle_call({addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, _From, Sta
     {reply, FetchResult,  State};
 
 handle_call({deleteconfigrecord, ClientID}, _From, State) ->
-    FetchResult = server_config_processor:fetch_client_config_data_db(ClientID),
+    FetchResult = server_config_processor:delete_client_config_data_db(ClientID),
     {reply, FetchResult,  State};
 
 handle_call(_Msg, _From, State) ->

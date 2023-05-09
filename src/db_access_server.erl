@@ -26,7 +26,8 @@ handle_call(stop, _From, State) ->
 
 handle_call({fetchclientdirectory, ClientID}, _From, State) ->
     _FileName = State, 
-    {Code, Data} = server_config_processor:fetch_client_directory(ClientID),
+    ValidClientID = db_access:get_valid_client_id(ClientID),
+    {Code, Data} = server_config_processor:fetch_client_directory(ValidClientID),
     case Code of
         ok ->
             {reply, {Code, Data},  State};

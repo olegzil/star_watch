@@ -96,8 +96,6 @@ validate_action(Action, TokenList) ->
                     {error, target_client_id_required};
                 ChannelParam =:= false ->
                     {error, channel_data_required};
-                VideoParam =:= false ->
-                    {error, video_link_required};
                 true ->
                     {_, TargetID} = TargetIDParam,
                     {_, ChannelData} = ChannelParam, % {name, channel_id}

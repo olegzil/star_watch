@@ -175,7 +175,7 @@ secondary_action_validation(Action, TokenList) ->
                             {ok, {Action, Link}}                    
                     end
             end;
-            
+
         <<"fetchchannelvideos">> -> %% Returns {error, ErrorMessage} or {ClientID, ignore}
             case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 
                 false ->
@@ -189,8 +189,8 @@ secondary_action_validation(Action, TokenList) ->
                 false ->
                     {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CHANNEL, <<"client_id=<your client id>">>),
                     {error, jiffy:encode(Message)};
-                {_, ChannelID} ->
-                    {ok, {Action, ChannelID}}
+                {_, ClientID} ->
+                    {ok, {Action, ClientID}}
             end;    
         <<"updatechannel">> ->
             case lists:keyfind(?REQUIRED_CHANNEL_ID_TOKEN, 1, TokenList) of 

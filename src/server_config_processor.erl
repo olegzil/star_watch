@@ -11,16 +11,17 @@
 		 fetch_list_of_channel_ids_and_youtube_keys_db/0,
 		 fetch_profile_map_from_file/1,
 		 fetch_client_directory/1,
+		 delete_client_config_data_db/1,
 		 process_channel_request/3,
 		 add_client_config_data/4,
 		 update_client_profile_channels/3,
 		 update_client_record/3,
-		 fetch_profile_map_from_db/0,
+		 fetch_profile_map_from_db/1,
 		 generate_profile_map/1,
 		 get_default_youtube_key/1, 
 		 get_client_key/1,
 		 populate_client_profile_table/1,
-		 is_client_in_profile_map/1,
+		 is_client_in_profile_map/2,
 		 delete_config_record/1, 
 		 is_channel_in_profile/2,
 		 delete_youtube_channel/2,
@@ -59,8 +60,8 @@ get_client_key(File) ->
 fetch_client_directory(ClientID) ->
 	case mnesia:activity(transaction, fun() -> mnesia:read(client_profile_table, ClientID) end) of
 		[] ->
-			Message = utils:jsonify_list_of_tuples([error, client_key], [{<<"client id not found">>, ClientID}]),
-			{error, Message};
+			Message = <<"client id " , ClientID/binary,  " not found">>,
+			utils:format_error(?SERVER_ERROR_INVALID_CLIENT, Message);
 		[ClientRecord] ->
 			ChannelList = ClientRecord#client_profile_table.channel_list,
 			process_channel_request(ClientID, ChannelList, [])
@@ -72,8 +73,8 @@ process_channel_request(_Arg1, [], ListOfMaps) ->
 
 process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
 	{ChannelName,ChannelID} = Channel,
-	Record = db_access:get_channel_data(ChannelID),
-	case db_access:get_channel_data(ChannelID) of
+	Record = db_access:get_channel_data(ClientID, ChannelID),
+	case db_access:get_channel_data(ClientID, ChannelID) of
 		false ->
 			process_channel_request(ClientID, ChannelList, Acc);
 		Record ->
@@ -97,9 +98,6 @@ process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
 		List = lists:append(Acc, [Final]),
 		process_channel_request(ClientID, ChannelList, List)		
 	end.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% End fetch_channel_directory logic %%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% Returns a tuple whose second item is a json-friendly list of 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -116,9 +114,13 @@ fetch_client_config_data_db(ClientID) ->
 			Message = utils:jsonify_client_profile_table(Record),
 			{ok, Message}
 	end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% End fetch_client_config_data_db logic %%%%%%%%%%%%%%%
+%%%%%%%%%% Begin delete_client_config_data_db logic %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+delete_client_config_data_db(ClientID) ->
+	Result = mnesia:activity(transaction, fun() -> mnesia:delete({client_profile_table, ClientID}) end),
+	{ok, Result}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% Begin add_client_config_data logic %%%%%%%%%%%%%%%
@@ -139,10 +141,6 @@ add_client_config_data(ClientID, Name, YoutubeKey, ChannelID) ->
 			NewRecord = R#client_profile_table{channel_list= NewChannelList},
 			mnesia:transaction(fun() -> mnesia:write(NewRecord) end)
 	end.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% End add_client_config_data logic %%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% The production profile table does not have this client. Add it unconditionally
 update_client_profile_channels(_ClientID, [], NewRecord) ->
@@ -208,17 +206,14 @@ extract_record([Key|Keys], ProfileMap, Acc) ->
 	Map = #{client_id => Key, youtube_key => YoutubeKey, client_channel_data => ChannelData},
 	List = lists:append(Acc, [Map]),
 	extract_record(Keys, ProfileMap, List).
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%% End fetch_profile_map_from_db logic %%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%% Begin fetch_profile_map_from_file logic %%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%Reads the database. Returns a map of clients . Each client points to a record that contains the client id and a list of channel descriptors for this client.
-fetch_profile_map_from_db() ->
+fetch_profile_map_from_db(Table) ->
 	FetchKeys = fun() ->
-		mnesia:all_keys(client_profile_table)
+		mnesia:all_keys(Table)
 	end,
 	KeyList = mnesia:activity(transaction, FetchKeys),
 	generate_profile_map(KeyList).
@@ -229,10 +224,6 @@ generate_profile_map(Keys) ->
 			maps:put(Key, ProfileItem, AccumulatorMap)
 		end,
 	lists:foldr(AccumulatorFun, #{}, Keys).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%% End fetch_profile_map_from_file logic %%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%% Begin fetch_list_of_channel_ids_and_youtube_keys_db logic %%%%%%%%%%%%%%%%%%%%%
@@ -253,10 +244,6 @@ key_pair_extractor([Key|Remainder], Acc) ->
 	List = lists:foldl(FoldFun, [], ChannelData),
 	NewList = lists:append(Acc, List),
 	key_pair_extractor(Remainder, NewList).
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%% End fetch_list_of_channel_ids_and_youtube_keys_db logic %%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%% Begin populate_client_profile_table logic %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -278,17 +265,18 @@ populate_client_profile_table(true) ->
     end,
     lists:foreach(ListFun, ClientProfilesList).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%% End populate_client_profile_table logic %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+is_client_in_profile_map(approved, ClientID) ->
+	Map = fetch_profile_map_from_db(client_profile_table),
+	Keys = maps:keys(Map),
+	lists:member(ClientID, Keys);
 
-is_client_in_profile_map(ClientID) ->
-	Map = fetch_profile_map_from_db(),
+is_client_in_profile_map(pending, ClientID) ->
+	Map = fetch_profile_map_from_db(client_profile_table_pending),
 	Keys = maps:keys(Map),
 	lists:member(ClientID, Keys).
 
 is_channel_in_profile(ClientID, ChannelID) ->
-	Map = fetch_profile_map_from_db(),
+	Map = fetch_profile_map_from_db(client_profile_table),
 	Keys = maps:keys(Map),
 	Result = case lists:member(ClientID, Keys) of 
 		 true ->
@@ -305,7 +293,7 @@ delete_config_record(ClientID) ->
 	mnesia:transaction(DelFun).
 
 delete_youtube_channel(ClientID, ChannelID) ->
-	Map = fetch_profile_map_from_db(),
+	Map = fetch_profile_map_from_db(client_profile_table),
 	[Profile] = maps:get(ClientID, Map),
 	Target = lists:keyfind(ChannelID, 2, Profile#client_profile_table.channel_list),
 	NewList = lists:delete(Target, Profile#client_profile_table.channel_list),
@@ -326,7 +314,7 @@ fetch_config_data_for_client(ClientID)->
 
 add_new_client_record(NewClient) ->
 	ClientID = maps:get(client_id, NewClient),
-	Map = fetch_profile_map_from_db(),
+	Map = fetch_profile_map_from_db(client_profile_table),
 	case maps:find(ClientID, Map) of
 		error ->
 			Record = #client_profile_table{
@@ -342,7 +330,7 @@ add_new_client_record(NewClient) ->
 
 update_existing_client(Client) ->
 	ClientID = maps:get(client_id, Client),
-	Map = fetch_profile_map_from_db(),
+	Map = fetch_profile_map_from_db(client_profile_table),
 	[Record] = maps:get(ClientID, Map),
 	UpdatedRecord = Record#client_profile_table{
 		youtube_key = maps:get(youtube_api_key, Client),
@@ -356,13 +344,17 @@ update_existing_client(Client) ->
 %%% All arguments must be validated by the caller. Including
 %%% the existance of the TargetID
 add_new_channel_to_profile(TargetID, {ChannelName, ChannelID, VideoLink}) ->
+	utils:log_message([{"ChannelName", ChannelName}, {"ChannelID", ChannelID}]),
 	{atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), 
 	case Result of
 		[] ->
+			utils:log_message([{"error", no_such_client}]),
 			{error, no_such_client};
 		[Record] ->
+			NewList = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}],
+			utils:log_message([{"NewList", NewList}]),
 			UpdatedRecord = Record#client_profile_table{
-				channel_list = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]		
+				channel_list = NewList
 			},
 			WriteResult = mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
 			utils:log_message([{"Result", WriteResult}]),
@@ -373,7 +365,6 @@ add_new_channel_to_profile(TargetID, {ChannelName, ChannelID, VideoLink}) ->
 
 %%% All arguments must be validated by the caller.
 copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID, VideoLink}) ->
-	Record = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), %read the record to update
 	DefaultClient = get_client_key("server_config.cfg"), % get default client key we need for coppying
 	DefaultYoutubeKey = get_default_youtube_key("server_config.cfg"),
 	{atomic, [DefaultRecord]} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, DefaultClient) end), 
