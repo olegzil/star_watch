@@ -24,7 +24,6 @@ fetch_single_page(Date, MasterMap, [Head|Tail], MaxResults) ->
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, FirstPageMap} = utils:update_database(youtube, Body),							% Commit data from the first fetch to the database
 			PageMap = #{<<"first_page">> => FirstPageMap},										% First page does not have a token identifier
-			{ok, RemainderChannelMap} = fetch_next_page(YoutubeKey, ChannelID, Date, [], MaxResults, PageMap), 	% Atempt to fetch data for the next page, or return
 			case fetch_next_page(YoutubeKey, ChannelID, Date, [], MaxResults, PageMap) of
 				{ok, RemainderChannelMap} ->
 					CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
