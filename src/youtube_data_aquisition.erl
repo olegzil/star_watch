@@ -82,6 +82,7 @@ fetch_next_page(YoutubeKey, ChannelID, Date, [PageToken], MaxResults, Acc) ->
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, Map} = utils:update_database(youtube, Body),
+			utils:log_message([{"update db with", Body}]),
 			Token = get_next_page_token(Map),
 			fetch_next_page(YoutubeKey, ChannelID, Date, Token, MaxResults, maps:put(PageToken, Map, Acc)); 
 			
@@ -121,7 +122,6 @@ first_page_query(YoutbeApiKey, ChannelID, [], MaxResults) ->
   									  {"publishedAfter", ?FIRST_PUBLISH_DATE},
 									  {"maxResults", MaxResults}
 									  ]),
-	utils:log_message([{"YoutbeApiKey", YoutbeApiKey}, {"ChannelID", ChannelID}, {"?FIRST_PUBLISH_DATE", ?FIRST_PUBLISH_DATE}, {"MaxResults", MaxResults}]),
 	string:join([?YOUTUBE_HOST, Query], "").
 
 next_page_query(YoutbeApiKey, ChannelID, [Date], PageToken, MaxResults) ->

@@ -668,7 +668,7 @@ tuple_list_to_list_of_maps({Tag1, Tag2}, ListOfTuples) ->
 
 
 config_records_to_list_of_maps(Keys, MapOfRecords) ->
-	ProfileMap = lists:foldl(fun(Key, Acc)-> 
+	lists:foldl(fun(Key, Acc)-> 
 		[R] = maps:get(Key, MapOfRecords),
 		RecordMap = #{
 			client_id => Key,

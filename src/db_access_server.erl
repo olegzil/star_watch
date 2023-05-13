@@ -24,6 +24,24 @@ init([{FileName}]) ->
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
+handle_call({restoredefaultclient, ClientID}, _From, State) ->
+    {Code, Data} = server_config_processor:restore_default_client(ClientID),
+    case Code of
+        ok ->
+            {reply, {Code, Data},  State};
+        _ ->
+            {reply, {Code, jiffy:encode(Data)},  State}
+    end;
+
+handle_call({deletechannel, ClientID, ChannelID}, _From, State) ->
+    {Code, Data} = db_access:delete_channel_from_client(ClientID, ChannelID),
+    case Code of
+        ok ->
+            {reply, {Code, Data},  State};
+        _ ->
+            {reply, {Code, jiffy:encode(Data)},  State}
+    end;
+
 handle_call({fetchclientdirectory, ClientID}, _From, State) ->
     _FileName = State, 
     ValidClientID = db_access:get_valid_client_id(ClientID),
@@ -78,7 +96,7 @@ handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
                     {error , Return} = utils:format_error(Code, Code),
                     {error, jiffy:encode(#{error => Return})};
                 true ->
-                    {AtomicCode, ServerErrorCode} = Result,
+                    {_AtomicCode, ServerErrorCode} = Result,
                     {error , Return} = utils:format_error(ServerErrorCode, VideoLink),
                     {error, jiffy:encode(#{error => Return})}
             end;
@@ -97,7 +115,7 @@ handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
     {reply, Response, State};
 
 handle_call({deletevideolink, ClientID, VideoLink}, _From, State) ->
-    RequestResult = db_access:delete_video_link(ClientID, VideoLink),
+    RequestResult = db_access:delete_video_link_from_profile_table(ClientID, VideoLink),
     Response = case RequestResult of
         {error, Code} ->
             Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
@@ -106,7 +124,7 @@ handle_call({deletevideolink, ClientID, VideoLink}, _From, State) ->
                     {error , Return} = utils:format_error(Code, Code),
                     {error, jiffy:encode(#{error => Return})};
                 true ->
-                    {AtomicCode, ServerErrorCode} = Result,
+                    {_AtomicCode, ServerErrorCode} = Result,
                     {error , Return} = utils:format_error(ServerErrorCode, VideoLink),
                     {error, jiffy:encode(#{error => Return})}
             end;

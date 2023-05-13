@@ -28,6 +28,7 @@
            does_record_exist/2,
            add_link/3,
            delete_video_link_from_pending_profile_table/2,
+           delete_video_link_from_profile_table/2,
            delete_channel_from_client/2,
            get_valid_client_id/1]).
 
@@ -118,7 +119,7 @@ fetch_client_data(client_profile_table, ClientID) ->
     mnesia:sync_transaction(SelectRecords).
 
 fetch_channel_videos(ClientKey) ->
-    {Code, Map} = server_config_processor:fetch_client_config_data_db(ClientKey),
+    {Code, Map} = server_config_processor:fetch_client_config_data_db(json, ClientKey),
     format_channel_videos(ClientKey, {Code, Map}).
 
 format_channel_videos(ClientKey, {error, _Map}) ->
@@ -294,7 +295,7 @@ is_channel_id_in_youtube_channel(ClientID, Link) ->
         _->
             [Record] = Records,
             [ChannelID, _VideoID] = string:split(Record#youtube_channel.key, ":", all),
-            {ok, ClientRecord} = server_config_processor:fetch_client_config_data_db(ClientID),
+            {ok, ClientRecord} = server_config_processor:fetch_client_config_data_db(json, ClientID),
             ChannelList = maps:get(channel_list, ClientRecord),
             Found = lists:keyfind(ChannelID, 2, ChannelList),
             if
@@ -342,23 +343,52 @@ does_record_exist(TargetID, TableName) ->
         {atomic, _} -> true
     end.
 
+%%% This function deletes a channel associated with this client id. If the cient ID is not found, 
+%%% the funnction assumes it's a new ID. In this case, the channels from the default client id
+%%% are serched for the target clientID. If not found, an error is returned. If found, all channels
+%%% from the default client id are coppied to the new client id and the targe id is deleted.
 delete_channel_from_client(ClientID, ChannelID) ->
     ReadResult = mnesia:transaction(fun() -> mnesia:read(client_profile_table, ClientID) end),
     case ReadResult of
         {atomic, []} ->
-            {error, no_such_client};
+            use_default_client(ClientID, ChannelID);
         {atomic, [Record]} ->
             NewList = lists:keydelete(ChannelID, 2, Record#client_profile_table.channel_list),
+            L1 = length(NewList),
+            L2 = length(Record#client_profile_table.channel_list),
             if
+                L1 =:= L2 ->
+                    utils:format_error(?SERVER_ERROR_NO_SUCH_CHANNEL, <<"channel id: ", ChannelID/binary, " not found">>);
                 NewList =/= [] ->
                     UpdatedRecord = Record#client_profile_table{
                         channel_list = NewList
                     },
                     mnesia:transaction(fun() -> mnesia:write(UpdatedRecord) end),
-                    {ok, ChannelID};
+                    {ok, Message} = utils:format_success(?SERVER_ERROR_OK, <<"channel id: ", ChannelID/binary, " has been deleted from client: ", ClientID/binary>>),
+                    {ok, jiffy:encode(Message)};
                 true ->
-                    {error, no_such_channel}
+                    utils:format_error(?SERVER_ERROR_NO_SUCH_CLIENT, <<"client id: ", ClientID/binary, " does not exist">>)
             end
+    end.
+
+use_default_client(ClientID, ChannelID) ->
+    DefaultClient = server_config_processor:get_client_key(?SERVER_CONFIG_FILE),
+    DefaultRecord = server_config_processor:fetch_client_config_data_db(not_json, DefaultClient),
+    Found = lists:keyfind(ChannelID, 2, DefaultRecord#client_profile_table.channel_list),
+    case Found of
+        false ->
+            utils:format_error(?SERVER_ERROR_NO_SUCH_CHANNEL, no_such_channel);
+        _ ->
+            mnesia:transaction(fun()-> 
+                NewList = lists:keydelete(ChannelID, 2, DefaultRecord#client_profile_table.channel_list),
+                NewRecord = DefaultRecord#client_profile_table{
+                    client_id = ClientID,
+                    channel_list = NewList
+                },
+                mnesia:write(NewRecord)
+            end),
+            {ok, Message} = utils:format_success(?SERVER_ERROR_OK, <<"channelID: ", ChannelID/binary, " has been deleted">>),
+            {ok, jiffy:encode(Message)}
     end.
 
 get_valid_client_id(ClientID) ->
@@ -368,6 +398,26 @@ get_valid_client_id(ClientID) ->
             ClientID;
         true ->
             server_config_processor:get_client_key(?SERVER_CONFIG_FILE)
+    end.
+
+delete_video_link_from_pending_profile_table(ClientID, VideoLink) ->
+    {atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table_pending, ClientID) end),
+    case Result of
+        [] ->
+            {error, VideoLink};
+        _ ->
+            mnesia:transaction(fun()-> mnesia:delete({client_profile_table_pending, ClientID}) end),
+            {ok, ClientID}
+    end.
+
+delete_video_link_from_profile_table(ClientID, VideoLink) ->
+    {atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, ClientID) end),
+    case Result of
+        [] ->
+            {error, VideoLink};
+        _ ->
+            mnesia:transaction(fun()-> mnesia:delete({client_profile_table, ClientID}) end),
+            {ok, ClientID}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -438,13 +488,3 @@ dump_db() ->
 	{atomic, DateList} = mnesia:transaction(Transaction),
 	{ok, File} = file:open("/home/oleg/temp/dates.txt", [write]),
 	io:format(File, "~p~n", [DateList]).
-
-delete_video_link_from_pending_profile_table(ClientID, VideoLink) ->
-    {atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table_pending, ClientID) end),
-    case Result of
-        [] ->
-            {error, VideoLink};
-        _ ->
-            mnesia:transaction(fun()-> mnesia:delete({client_profile_table_pending, ClientID}) end),
-            {ok, ClientID}
-    end.

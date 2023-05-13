@@ -78,7 +78,7 @@ handle_admin_action(Action)	->
 			utils:format_success(?SERVER_ERROR_OK, <<"deleted client ", ClientID/binary, " from profile db">>);
 
 		<<"fetchprofilemap">> ->
-			MapOfRecords = server_config_processor:fetch_profile_map_from_db(),
+			MapOfRecords = server_config_processor:fetch_profile_map_from_db(client_profile_table),
 			Keys = maps:keys(MapOfRecords),
 			ProfileMap = utils:config_records_to_list_of_maps(Keys, MapOfRecords),
 			{ok, ProfileMap};

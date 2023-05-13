@@ -7,10 +7,13 @@ telemetry/request -- used only by the StarWatch app to report telementry events.
 telemetry/stats -- same as telemetry/request except when different.
 astronomy/celestialbody -- can be used to retrive images of verious celestial bodies. Not active.
 
-http://10.0.0.18:8083/youtube/channelselector/?action=fetchchannelvideos&key=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g
-http://10.0.0.18:8083/youtube/channelselector/?action=addvideolink&key=389b4e36-b3d2-11ed-afa1-0242ac120002&video_link=https://youtu.be/fMIiNY3Ie0c
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=deleteconfigrecord&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002 
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=deleteyoutubechannel&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g 
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchprofilemap&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchclientprofile&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
-http://10.0.0.18:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=updateclientprofile&client_id=52e1e0b3-04ff-4811-9547-0a22fa7d85a0&channel_name=Anton Petrov&channel_id=UCciQ8wFcVoIIMi-lfu8-cjQ
+http://10.0.0.35:8083/youtube/channelselector/?key=389b4e36-b3d2-11ed-afa1-0242ac120002&client_id=c6d5c9a4-26ae-42d2-bbe9-8d868839fdb1&action=restoredefaultclient
+http://10.0.0.35:8083/youtube/channelselector/?action=deletechannel&key=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UCMng_0bpueq8iJKY9yOnMDA&client_id=c6d5c9a4-26ae-42d2-bbe9-8d868839fdb1
+http://10.0.0.35:8083/youtube/channelselector/?action=fetchchannelvideos&key=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g&client_id=52e1e0b3-04ff-4811-9547-0a22fa7d85a0
+http://10.0.0.35:8083/youtube/channelselector/?action=addvideolink&key=389b4e36-b3d2-11ed-afa1-0242ac120002&video_link=https://youtu.be/fMIiNY3Ie0c
+http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=restoredefaultclient
+http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=deleteconfigrecord&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002 
+http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=deleteyoutubechannel&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g 
+http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchprofilemap&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
+http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchclientprofile&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
+http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=updateclientprofile&target_client_id=52e1e0b3-04ff-4811-9547-0a22fa7d85a0&channel_description=Anton Petrov&channel_id,UCciQ8wFcVoIIMi-lfu8-cjQ

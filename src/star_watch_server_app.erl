@@ -86,7 +86,6 @@ initialize_mnesia() ->
     timer:apply_after(1000, server_config_processor, populate_client_profile_table, [Empty]),
     mnesia:add_table_index(youtube_channel, video_id),
     mnesia:add_table_index(youtube_channel, channel_id).
-
 init_table(TableName) ->
     case mnesia:table_info(TableName, size) of
         0 ->

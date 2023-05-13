@@ -7,7 +7,7 @@
 -include("include/client_profile_table.hrl").
 -include("include/youtube_channel.hrl").
 -include("include/macro_definitions.hrl").
--export([fetch_client_config_data_db/1, 
+-export([fetch_client_config_data_db/2, 
 		 fetch_list_of_channel_ids_and_youtube_keys_db/0,
 		 fetch_profile_map_from_file/1,
 		 fetch_client_directory/1,
@@ -29,7 +29,9 @@
 		 update_existing_client/1,
 		 add_new_client_record/1,
 		 add_new_channel_to_profile/2,
-		 copy_profile_and_add_new_channel/2]).
+		 copy_profile_and_add_new_channel/2,
+		 restore_default_client/1]).
+
 -compile(export_all).
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
@@ -102,7 +104,7 @@ process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% Begin fetch_client_config_data_db logic %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fetch_client_config_data_db(ClientID) ->
+fetch_client_config_data_db(json, ClientID) ->
 	ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end,
 	Result = mnesia:activity(transaction, ReaderFun),
 	case Result of
@@ -112,6 +114,16 @@ fetch_client_config_data_db(ClientID) ->
 		[Record] ->
 			Message = utils:jsonify_client_profile_table(Record),
 			{ok, Message}
+	end;
+
+fetch_client_config_data_db(not_json, ClientID) ->
+	ReaderFun = fun() -> mnesia:read(client_profile_table, ClientID) end,
+	Result = mnesia:activity(transaction, ReaderFun),
+	case Result of
+		[] ->
+			{error, no_such_client};
+		[Record] ->
+			{ok, Record}
 	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -352,14 +364,14 @@ add_new_channel_to_profile(TargetID, {ChannelName, ChannelID, VideoLink}) ->
 			UpdatedRecord = Record#client_profile_table{
 				channel_list = NewList
 			},
-			WriteResult = mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
-		    DeleteResult = db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
+			mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
+		    db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
 			{ok, video_link_added}
 	end.
 
 %%% All arguments must be validated by the caller.
 copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID, VideoLink}) ->
-	DefaultClient = get_client_key("server_config.cfg"), % get default client key we need for coppying
+	DefaultClient = get_client_key(?SERVER_CONFIG_FILE), % get default client key we need for coppying
 	DefaultYoutubeKey = get_default_youtube_key("server_config.cfg"),
 	{atomic, [DefaultRecord]} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, DefaultClient) end), 
 	case lists:keyfind(ChannelID, 2, DefaultRecord#client_profile_table.channel_list) of
@@ -369,12 +381,38 @@ copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID, VideoLink}) 
 					youtube_key = DefaultYoutubeKey,
 					channel_list = DefaultRecord#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
 				},
-				WriteResult = mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
-				utils:log_message([{"WriteResult", WriteResult}]),
-			    DeleteResult = db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
-				utils:log_message([{"DeleteResult", DeleteResult}]),
+				mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
+			    db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
 				ProfileMap = utils:config_records_to_list_of_maps([TargetID], #{TargetID => [NewRecord]}),
 				{ok, ProfileMap};
 	_ ->
 		{error, video_link_exists}
 	end.
+
+restore_default_client(ClientID) ->
+	case is_client_in_profile_map(approved, ClientID) of 
+		true ->
+			DefaultClientID = get_client_key(?SERVER_CONFIG_FILE),
+			Profiles = get_profiles_list(?SERVER_CONFIG_FILE),
+			Profile = maps:get(DefaultClientID, Profiles),
+			ChannelList = maps:get(client_channel_data, Profile),
+
+			%% Just in case, restore the default client profile
+			Record = #client_profile_table {
+				client_id = get_profiles_list(?SERVER_CONFIG_FILE),
+				youtube_key = get_default_youtube_key(?SERVER_CONFIG_FILE),
+				channel_list = ChannelList
+			},
+			mnesia:transaction(fun()-> mnesia:write(Record) end),
+				mnesia:transaction(fun() -> 
+				[R] = mnesia:read(client_profile_table, ClientID),
+				MergedList = lists:merge(ChannelList, R#client_profile_table.channel_list),
+				UniqueList = lists:uniq(fun({_Name, ChannelID}) -> ChannelID end, MergedList),
+				mnesia:write(R#client_profile_table{channel_list = UniqueList})
+			end),
+			{ok, Message} = utils:format_success(?SERVER_ERROR_OK, <<"channels for client id: ", ClientID/binary, " have been restored">>),
+			{ok, jiffy:encode(Message)};
+		_ ->
+			utils:format_error(?SERVER_ERROR_NO_SUCH_CLIENT, <<"no such client id: ", ClientID/binary>>)
+	end.
+

@@ -127,7 +127,7 @@ validate_client_id_for_action(Action, TokenList) ->
     Result = lists:keyfind(<<"client_id">>, 1, TokenList),
     case Result of
         {<<"client_id">>, ClientID} ->
-            Found = server_config_processor:is_client_in_profile_map(ClientID),
+            Found = server_config_processor:is_client_in_profile_map(approved, ClientID),
             if
                 Found =:= false ->
                     {error, no_such_client};

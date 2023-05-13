@@ -19,7 +19,16 @@
 -define(REQUIRED_ACTION_TOKEN, <<"action">>).
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
 -define(REQUIRED_CLIENT_ID_TOKEN, <<"client_id">>).
--define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchclientdirectory">>,<<"fetchchannelvideos">>,<<"updatechannel">>,<<"addvideolink">>, <<"linkstatus">>, <<"fetchclientprofile">>, <<"updateclientprofile">>, <<"fetchchannelimage">>]).
+-define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchclientdirectory">>,
+									<<"fetchchannelvideos">>,
+									<<"updatechannel">>,
+									<<"addvideolink">>, 
+									<<"linkstatus">>, 
+									<<"fetchclientprofile">>, 
+									<<"updateclientprofile">>, 
+									<<"fetchchannelimage">>,
+									<<"deletechannel">>,
+									<<"restoredefaultclient">>]).
 
 -define(SERVER_ERROR_OK, 					16#FFAA00).
 -define(SERVER_ERROR_BAD_CLIENT_ID, 		16#FFAA01).

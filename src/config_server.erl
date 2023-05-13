@@ -22,12 +22,12 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
 handle_call({fetchprofilemap}, _From, State) ->
-	ProfileMap = server_config_processor:fetch_profile_map_from_db(),
+	ProfileMap = server_config_processor:fetch_profile_map_from_db(client_profile_table),
     FetchResult = utils:jsonify_client_profile_table(ProfileMap),
 	{reply, {ok, FetchResult}, State};
 
 handle_call({fetchclientprofile, ClientID}, _From, State) ->
-    FetchResult = server_config_processor:fetch_client_config_data_db(ClientID),
+    FetchResult = server_config_processor:fetch_client_config_data_db(json, ClientID),
     {reply, FetchResult,  State};
 
 handle_call({addconfigrecord, ClientID, Name, YoutubeKey, ChannelID}, _From, State) ->
