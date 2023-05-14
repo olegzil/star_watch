@@ -410,8 +410,7 @@ restore_default_client(ClientID) ->
 				UniqueList = lists:uniq(fun({_Name, ChannelID}) -> ChannelID end, MergedList),
 				mnesia:write(R#client_profile_table{channel_list = UniqueList})
 			end),
-			{ok, Message} = utils:format_success(?SERVER_ERROR_OK, <<"channels for client id: ", ClientID/binary, " have been restored">>),
-			{ok, jiffy:encode(Message)};
+			fetch_client_directory(ClientID);
 		_ ->
 			utils:format_error(?SERVER_ERROR_NO_SUCH_CLIENT, <<"no such client id: ", ClientID/binary>>)
 	end.

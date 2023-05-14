@@ -31,6 +31,7 @@ fetch_single_page(Date, MasterMap, [Head|Tail], MaxResults) ->
 					NewMaster = maps:merge(SectionMap, MasterMap),
 					fetch_channel_data(Date, NewMaster, Tail, ?YOUTUBE_MAXRESULTS);
 				{error, ErrorMessage} ->
+					utils:log_message([{"Error calling fetch_next_page", ErrorMessage}]),
 					fetch_channel_data(Date, MasterMap, [], ?YOUTUBE_MAXRESULTS)
 			end;
 

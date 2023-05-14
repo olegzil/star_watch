@@ -190,7 +190,7 @@ respond_to_video_fetch_request(ClientID, ChannelID, []) ->
             {ok, YoutubeKey} = db_access:get_client_youtube_key(ClientID),
             ClientProfile = [{YoutubeKey, ChannelID}],
             youtube_data_aquisition:fetch_data(production, ClientProfile, []),
-            {_, ListOfRecords} = db_access:fetch_videos_for_channel_id(ChannelID),
+            ListOfRecords = db_access:fetch_videos_for_channel_id(ChannelID),
             utils:package_channel_record_list(ListOfRecords)      
     end;
 respond_to_video_fetch_request(_ClientID, _ChannelID, ListOfRecords) ->

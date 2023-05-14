@@ -364,8 +364,7 @@ delete_channel_from_client(ClientID, ChannelID) ->
                         channel_list = NewList
                     },
                     mnesia:transaction(fun() -> mnesia:write(UpdatedRecord) end),
-                    {ok, Message} = utils:format_success(?SERVER_ERROR_OK, <<"channel id: ", ChannelID/binary, " has been deleted from client: ", ClientID/binary>>),
-                    {ok, jiffy:encode(Message)};
+                    utils:package_channel_record_list(fetch_videos_for_channel_id(ChannelID));
                 true ->
                     utils:format_error(?SERVER_ERROR_NO_SUCH_CLIENT, <<"client id: ", ClientID/binary, " does not exist">>)
             end
