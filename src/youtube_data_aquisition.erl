@@ -50,8 +50,6 @@ fetch_channel_data(_Date, NewMaster, [], ?YOUTUBE_MAXRESULTS) ->
 
 fetch_channel_data(Date, MasterMap, [Head|Tail], MaxResults) ->
 	{YoutubeKey, ChannelID} = Head,
-	utils:log_message([{"fetching data for channel: ", ChannelID}]),
-
 	Request = first_page_query(YoutubeKey, ChannelID, Date, MaxResults),
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->

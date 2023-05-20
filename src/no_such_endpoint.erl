@@ -13,7 +13,7 @@ init(Req0, State) ->
 handle(Req, State) -> 
   case cowboy_req:method(Req) of
     <<"GET">> -> 
-      #{id := Id} = cowboy_req:match_qs([{id, [], undefined}], Req),
+      #{id := Id} = cowboy_req:match_qs([{id, [], no_such_endpoint}], Req),
       Request = reply(get, Id, Req),
         {ok, Request, State};
 		_ ->
