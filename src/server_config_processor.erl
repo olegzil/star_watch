@@ -37,26 +37,32 @@ parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
 	ConfigMap.
 
+
+get_qualified_file_name(File) ->
+	{ok, CurrentDirectory} = file:get_cwd(),
+	QualifiedFile = string:concat("/", File),
+	string:concat(CurrentDirectory, QualifiedFile).
+
+
 % Returns a list of maps. The map key is the client ID and the value is a list with format:  {two_pbs_space_time,[{youtubekey,<<"AIzaSyDXepMVUKYMdn9ui3Nn9X6rau37r-89t6Q">>}, 
 get_profiles_list(File) ->
-	{ok, CurrentDirectory} = file:get_cwd(),
-	{ok, FileNames} = file:list_dir_all(CurrentDirectory),
-
-	utils:log_message([{"CurrentDirectory", CurrentDirectory}]),
-	utils:log_message([{"FileNames", FileNames}]),
-	MasterMap = parse_server_config_file(File),
+	QualifiedConfig = get_qualified_file_name(File),
+	MasterMap = parse_server_config_file(QualifiedConfig),
 	maps:get(client_profiles, MasterMap).
 
 get_server_control_block(File) ->
-	MasterMap = parse_server_config_file(File),
+	QualifiedConfig = get_qualified_file_name(File),
+	MasterMap = parse_server_config_file(QualifiedConfig),
 	maps:get(control_block, MasterMap).
 
 get_default_youtube_key(File) ->
-	ControlBlock = get_server_control_block(File),
+	QualifiedConfig = get_qualified_file_name(File),
+	ControlBlock = get_server_control_block(QualifiedConfig),
 	maps:get(default_youtube_api_key, ControlBlock).
 
 get_client_key(File) ->
-	ControlBlock = get_server_control_block(File),
+	QualifiedConfig = get_qualified_file_name(File),
+	ControlBlock = get_server_control_block(QualifiedConfig),
 	maps:get(default_client_key, ControlBlock).
 
 
@@ -267,7 +273,8 @@ key_pair_extractor([Key|Remainder], Acc) ->
 populate_client_profile_table(false) -> 
 	ok;
 populate_client_profile_table(true) -> 
-    ClientProfilesList = fetch_profile_map_from_file("server_config.cfg"),
+	QualifiedConfig = get_qualified_file_name("server_config.cfg"),
+    ClientProfilesList = fetch_profile_map_from_file(QualifiedConfig),
     ListFun = fun(Map) -> 
     	Record = #client_profile_table{
     		client_id = maps:get(client_id, Map), 
