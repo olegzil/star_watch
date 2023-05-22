@@ -39,6 +39,8 @@ parse_server_config_file(File) ->
 
 % Returns a list of maps. The map key is the client ID and the value is a list with format:  {two_pbs_space_time,[{youtubekey,<<"AIzaSyDXepMVUKYMdn9ui3Nn9X6rau37r-89t6Q">>}, 
 get_profiles_list(File) ->
+	{ok, CurrentDirectory} = file:get_cwd(),
+	utils:log_message([{"CurrentDirectory", CurrentDirectory}]),
 	MasterMap = parse_server_config_file(File),
 	maps:get(client_profiles, MasterMap).
 

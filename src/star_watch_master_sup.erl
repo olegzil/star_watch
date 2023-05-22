@@ -65,6 +65,12 @@ child_start_selector(Server) ->
             supervisor:terminate_child(?MODULE, ServerID),
             supervisor:delete_child(?MODULE, ServerID),
             supervisor:start_child(?MODULE, Server);
+
+        {error, {{already_started, _PID},{_}}} ->
+
+            supervisor:terminate_child(?MODULE, ServerID),
+            supervisor:delete_child(?MODULE, ServerID),
+            supervisor:start_child(?MODULE, Server);
         {ok, _} ->
             Result
     end.
