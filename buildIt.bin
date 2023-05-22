@@ -67,7 +67,7 @@ elif [[ "${BUILD,,}" == 'local' ]];then
 	SSH=~/.ssh/id_ed25519
 elif [[ "${BUILD,,}" == 'cloud' ]];then
 	BUILD='cloud'
-	SSH=~/.ssh/id_rsa
+	SSH=~/.ssh/google_cloud_rsa
 fi
 
 printf "You selected\nBuild type: %s\n " "$BUILD"
