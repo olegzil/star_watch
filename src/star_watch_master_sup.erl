@@ -66,8 +66,7 @@ child_start_selector(Server) ->
             supervisor:delete_child(?MODULE, ServerID),
             supervisor:start_child(?MODULE, Server);
 
-        {error, {{already_started, _PID},{_}}} ->
-
+        {error,{{already_started,_Pid},{child,undefined,_,{database_server,start_link,[{_,_}]},permanent,false,5000,worker,[database_server]}}} ->
             supervisor:terminate_child(?MODULE, ServerID),
             supervisor:delete_child(?MODULE, ServerID),
             supervisor:start_child(?MODULE, Server);
