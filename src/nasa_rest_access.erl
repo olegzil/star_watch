@@ -39,7 +39,7 @@ fetch_root_page(Subject, GregorianStartDays, GregorianEndDays, Page) ->
 parse_nasa_data_update_db(CelestialObject, MapOfNASAData) ->
 		[RootDoc] = maps:keys(MapOfNASAData), % Expecting RootDoc =:= <<"collection">>
 		RootMapItem = maps:get(RootDoc, MapOfNASAData), % Expecting [<<"href">>,<<"items">>,<<"links">>,<<"metadata">>, <<"version">>] 
-		ItemsList = maps:get(<<"items">>, RootMapItem), %Expecting [item1, item2, ... , itemN]
+		ItemsList = maps:get(?YOUTUBE_VIDEO_ARRAY_KEY, RootMapItem), %Expecting [item1, item2, ... , itemN]
 		process_data_item(CelestialObject, ItemsList).
 
 process_clean_collection_url(CelestialObject, DataList, CollectionUrl, ListTail) ->

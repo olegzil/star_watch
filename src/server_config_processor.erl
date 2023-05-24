@@ -46,23 +46,19 @@ get_qualified_file_name(File) ->
 
 % Returns a list of maps. The map key is the client ID and the value is a list with format:  {two_pbs_space_time,[{youtubekey,<<"AIzaSyDXepMVUKYMdn9ui3Nn9X6rau37r-89t6Q">>}, 
 get_profiles_list(File) ->
-	QualifiedConfig = get_qualified_file_name(File),
-	MasterMap = parse_server_config_file(QualifiedConfig),
+	MasterMap = parse_server_config_file(File),
 	maps:get(client_profiles, MasterMap).
 
 get_server_control_block(File) ->
-	QualifiedConfig = get_qualified_file_name(File),
-	MasterMap = parse_server_config_file(QualifiedConfig),
+	MasterMap = parse_server_config_file(File),
 	maps:get(control_block, MasterMap).
 
 get_default_youtube_key(File) ->
-	QualifiedConfig = get_qualified_file_name(File),
-	ControlBlock = get_server_control_block(QualifiedConfig),
+	ControlBlock = get_server_control_block(File),
 	maps:get(default_youtube_api_key, ControlBlock).
 
 get_client_key(File) ->
-	QualifiedConfig = get_qualified_file_name(File),
-	ControlBlock = get_server_control_block(QualifiedConfig),
+	ControlBlock = get_server_control_block(File),
 	maps:get(default_client_key, ControlBlock).
 
 
@@ -273,8 +269,7 @@ key_pair_extractor([Key|Remainder], Acc) ->
 populate_client_profile_table(false) -> 
 	ok;
 populate_client_profile_table(true) -> 
-	QualifiedConfig = get_qualified_file_name("server_config.cfg"),
-    ClientProfilesList = fetch_profile_map_from_file(QualifiedConfig),
+    ClientProfilesList = fetch_profile_map_from_file(?SERVER_CONFIG_FILE),
     ListFun = fun(Map) -> 
     	Record = #client_profile_table{
     		client_id = maps:get(client_id, Map), 

@@ -9,7 +9,7 @@
 
 fetch_single_video(ClientID, ChannelID) ->
 	{ok, YoutubeKey} = db_access:get_client_youtube_key(ClientID),
-	fetch_single_page([], #{}, [{YoutubeKey, ChannelID}], "1").
+	fetch_single_page([], #{}, [{YoutubeKey, ChannelID}], "10").
 
 fetch_data(production, ClientProfile, Date) ->
 	fetch_channel_data(Date, #{}, ClientProfile, ?YOUTUBE_MAXRESULTS); 

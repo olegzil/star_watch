@@ -1,4 +1,4 @@
--define(HTTP_PORT, 8080).
+-define(HTTP_PORT, 8083).
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
 -define(APOD_HOST, "https://api.nasa.gov/planetary/apod?").
 -define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
@@ -13,6 +13,7 @@
 -define(YOUTUBE_NEXTPAGE, <<"nextPageToken">>).
 -define(TOP_KEY, <<"Videos">>).
 -define(YOUTUBE_VIDEO_ARRAY_KEY, <<"items">>).
+-define(YOUTUBE_VIDEO_ID_KEY, <<"videoId">>).
 -define(YOUTUBE_RETURN_VIEDO_LIST_KEY, <<"Videos">>).
 -define(ADMIN_AVAILABLE_ACTIONS, [<<"delete">>, <<add>>]).
 -define(YOUTUBE_KEY, <<"youtubekey">>).

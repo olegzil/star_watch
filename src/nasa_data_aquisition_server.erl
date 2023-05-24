@@ -7,6 +7,7 @@
 -export([start_link/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2,
          handle_info/2, code_change/3, terminate/2, async_call/4]).
+-include("include/macro_definitions.hrl").
 start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
@@ -63,7 +64,7 @@ process_page(loop, CelestialObject, YearStart, YearEnd, Page) ->
         RetCode =:= ok ->
             DecodedData = jiffy:decode(Data, [return_maps]),
             DataMap = maps:get(<<"collection">>, DecodedData),
-            Items = maps:get(<<"items">>, DataMap),
+            Items = maps:get(?YOUTUBE_VIDEO_ARRAY_KEY, DataMap),
             if 
                 Items =/= [] ->
                     nasa_rest_access:parse_nasa_data_update_db(CelestialObject, DecodedData),

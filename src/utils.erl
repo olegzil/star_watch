@@ -23,11 +23,11 @@
 		 jsonify_client_profile_table/1,
 		 format_error/2,
 		 package_channel_record_list/1,
-		 log_message/1,
 		 is_key_present/3,
 		 tuple_list_to_list_of_maps/2,
 		 config_records_to_list_of_maps/2,
-		 remove_duplicate_channels/0]).
+		 remove_duplicate_channels/0,
+		 log_message/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -405,7 +405,7 @@ insert_db_entries(apod, JsonData) when JsonData =/= [] ->
 	mnesia:transaction(Fun); %% execute the transaction
 
 insert_db_entries(youtube, JsonData) ->
-	Items =  maps:get(<<"items">>, JsonData),
+	Items =  maps:get(?YOUTUBE_VIDEO_ARRAY_KEY, JsonData),
 	extract_item_from_list(Items).
 
 extract_item_from_list([Item|Items]) ->
