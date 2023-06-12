@@ -68,6 +68,7 @@
 -define(SERVER_ERROR_CHANNEL_DATA_REQUIRED,	16#FFAC01).
 -define(SERVER_ERROR_INVALID_CHANNEL_DATA, 	16#FFAC02).
 -define(SERVER_ERROR_VIDEO_LINK_REQUIRED, 	16#FFAC03).
+-define(SERVER_ERROR_NO_SUCH_ENDPOINT, 		16#FFAC04).
 
 -define(RESPONSE_CODES, [{video_link_added, ?SERVER_ERROR_LINK_ADDED},
 						 {video_link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
@@ -88,7 +89,8 @@
 						 {target_client_id_required, ?SERVER_ERROR_TARGET_ID_REQUIRED},
 						 {channel_data_required, ?SERVER_ERROR_CHANNEL_DATA_REQUIRED},
 						 {invalid_channel_data, ?SERVER_ERROR_INVALID_CHANNEL_DATA},
-						 {video_link_required, ?SERVER_ERROR_VIDEO_LINK_REQUIRED}]).
+						 {video_link_required, ?SERVER_ERROR_VIDEO_LINK_REQUIRED},
+ 						 {no_such_endpoint, ?SERVER_ERROR_NO_SUCH_ENDPOINT}]).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

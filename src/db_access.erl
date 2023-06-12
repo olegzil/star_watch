@@ -323,7 +323,6 @@ get_channel_data(ClientID, ChannelID) ->
             UpdatedRecord = get_channel_data_db(ChannelID),
            %TODO: This needs to be changed. Records will be [] so the asigment will fail
             SortedList = lists:sort(Predicate, UpdatedRecord),
-            utils:log_message([{"fetch_single_video", A}, {"UpdatedRecord", UpdatedRecord}, {"SortedList", SortedList}]),
             [First | _] = SortedList,
             First;
         _->

@@ -13,25 +13,20 @@ init(Req0, State) ->
 handle(Req, State) -> 
   case cowboy_req:method(Req) of
     <<"GET">> -> 
-      #{id := Id} = cowboy_req:match_qs([{id, [], no_such_endpoint}], Req),
-      Request = reply(get, Id, Req),
+      Request = reply(Req),
         {ok, Request, State};
 		_ ->
 		{error, Req, State}
   end.
 
-  reply(get, _Id, Req) -> 
+  reply(Req) -> 
     cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, parse_request(Req), Req).
 
 %%% 
 %%% Error condition. The client did not specify a valid end-point.
 %%% 
 parse_request(Request) ->
-	Title = <<"Unknown endpoint: ">>,
-	Message = cowboy_req:path(Request),
-	ErrorResponse = #{
-		date_time => utils:current_time_string(),
-		error_code => 404,
-		error_text => <<Title/binary, Message/binary>>
-	},
-	jiffy:encode(ErrorResponse).
+	Headers = maps:get(headers, Request),
+	Endpoint = maps:get(<<"referer">>, Headers),
+	{error, Error} = utils:format_error(-1, <<"No such endpoint: ", Endpoint/binary>>),
+	jiffy:encode(Error).
