@@ -18,6 +18,8 @@
 -define(YOUTUBE_RETURN_VIEDO_LIST_KEY, <<"Videos">>).
 -define(ADMIN_AVAILABLE_ACTIONS, [<<"delete">>, <<add>>]).
 -define(YOUTUBE_KEY, <<"youtubekey">>).
+-define(REQUIRED_TOKEN_USERID, <<"user_id">>).
+-define(REQUIRED_TOKEN_USERPASSWORD, <<"user_password">>).
 -define(REQUIRED_CLIENT_KEY_TOKEN, <<"key">>).
 -define(REQUIRED_ACTION_TOKEN, <<"action">>).
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
@@ -31,7 +33,8 @@
 									<<"updateclientprofile">>, 
 									<<"fetchchannelimage">>,
 									<<"deletechannel">>,
-									<<"restoredefaultclient">>]).
+									<<"restoredefaultclient">>,
+									<<"login">>]).
 
 -define(SERVER_ERROR_OK, 					16#FFAA00).
 -define(SERVER_ERROR_BAD_CLIENT_ID, 		16#FFAA01).
@@ -69,6 +72,9 @@
 -define(SERVER_ERROR_INVALID_CHANNEL_DATA, 	16#FFAC02).
 -define(SERVER_ERROR_VIDEO_LINK_REQUIRED, 	16#FFAC03).
 -define(SERVER_ERROR_NO_SUCH_ENDPOINT, 		16#FFAC04).
+-define(SERVER_ERROR_USER_LOGIN,	 		16#FFAC05).
+-define(SERVER_ERROR_USER_ID,		 		16#FFAC06).
+-define(SERVER_ERROR_USER_PASSWORD,	 		16#FFAC07).
 
 -define(RESPONSE_CODES, [{video_link_added, ?SERVER_ERROR_LINK_ADDED},
 						 {video_link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
@@ -90,7 +96,9 @@
 						 {channel_data_required, ?SERVER_ERROR_CHANNEL_DATA_REQUIRED},
 						 {invalid_channel_data, ?SERVER_ERROR_INVALID_CHANNEL_DATA},
 						 {video_link_required, ?SERVER_ERROR_VIDEO_LINK_REQUIRED},
- 						 {no_such_endpoint, ?SERVER_ERROR_NO_SUCH_ENDPOINT}]).
+ 						 {no_such_endpoint, ?SERVER_ERROR_NO_SUCH_ENDPOINT},
+ 						 {missing_user_id, ?SERVER_ERROR_USER_ID},
+ 						 {missing_password, ?SERVER_ERROR_USER_PASSWORD}]).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 

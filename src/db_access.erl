@@ -32,7 +32,7 @@
            delete_channel_from_client/2,
            get_valid_client_id/1]).
 
- -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
+-export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 -compile(export_all).
 
 update_nasa_table(DBItem) -> 
@@ -308,7 +308,7 @@ is_channel_id_in_youtube_channel(ClientID, Link) ->
 %%%
 %%% Get the latest image associate with this channel
 %%%
-get_channel_data(ClientID, ChannelID) ->
+get_channel_data(_ClientID, ChannelID) ->
     Records = get_channel_data_db(ChannelID),
     Predicate = fun(Lhs, Rhs) ->
         if
@@ -319,7 +319,7 @@ get_channel_data(ClientID, ChannelID) ->
     end,
     case length(Records) of
         0 ->
-            A = youtube_data_aquisition:fetch_single_video(ClientID, ChannelID),
+            % A = youtube_data_aquisition:fetch_single_video(ClientID, ChannelID),
             UpdatedRecord = get_channel_data_db(ChannelID),
            %TODO: This needs to be changed. Records will be [] so the asigment will fail
             SortedList = lists:sort(Predicate, UpdatedRecord),

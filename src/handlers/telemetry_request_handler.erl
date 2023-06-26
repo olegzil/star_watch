@@ -73,7 +73,7 @@ fetch_dataset_size(StartDate, EndDate, Request) ->
   Start = utils:date_to_gregorian_days(StartDate),
   End = utils:date_to_gregorian_days(EndDate),
     Response = star_watch_master_sup:attach_child(apod, {Start, End}),
-    {_ChildID, {_ChildStartResult, Pid}} = Response,
+    Pid = utils:select_pid(Response),
     if 
       is_pid(Pid) -> 
         case gen_server:call(Pid, {datasetsize}, infinity) of

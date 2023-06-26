@@ -27,7 +27,10 @@
 		 tuple_list_to_list_of_maps/2,
 		 config_records_to_list_of_maps/2,
 		 remove_duplicate_channels/0,
-		 log_message/1]).
+		 log_message/1,
+		 decrypt/2,
+		 select_pid/1,
+		 make_nonstring_binary/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -678,6 +681,30 @@ config_records_to_list_of_maps(Keys, MapOfRecords) ->
 		Acc ++ [RecordMap]
 	end,
 	[], Keys).
+
+select_pid({_ChildID, {_ChildStartResults, Pid}}) ->
+	Pid;
+select_pid({_Ref,Pid}) ->
+	Pid;
+select_pid(_) ->
+	error.
+
+decrypt(Key, EncryptedData) ->
+	Data = binary:part(EncryptedData, {1, byte_size(EncryptedData)-2}),
+	Binary = make_nonstring_binary(Data),
+    DecryptedData = public_key:decrypt_private(Binary, Key),
+    io:format("Decrypted data: ~p~n", [DecryptedData]),
+    {ok, DecryptedData}.
+
+make_nonstring_binary(Data) ->
+	List = lists:map(fun(X) -> list_to_integer(X) end, string:tokens(binary_to_list(Data), ", ")),
+	[First|Tail] = List,
+    make_nonstring_binary(Tail, <<First>>).
+
+make_nonstring_binary([H|T], Acc) ->
+    make_nonstring_binary(T, <<Acc/binary, H>>);
+make_nonstring_binary([], Acc) ->
+    Acc.
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_duplicate_channels() ->

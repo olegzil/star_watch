@@ -30,9 +30,14 @@
 		 add_new_client_record/1,
 		 add_new_channel_to_profile/2,
 		 copy_profile_and_add_new_channel/2,
-		 restore_default_client/1]).
+		 restore_default_client/1,
+		 read_private_key_file/0]).
 
 -compile(export_all).
+
+read_private_key_file() ->
+	file:read_file("private-key.pem").
+
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
 	ConfigMap.

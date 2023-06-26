@@ -48,6 +48,14 @@ attach_child(Child, Args) when Child =:= db_access_server ->
                     Result = child_start_selector(Server),
                     {ChildName, Result};
 
+attach_child(Child, Args) when Child =:= login_server ->
+                    ChildName = list_to_atom(erlang:ref_to_list(make_ref())),
+                    Server = {ChildName, 
+                            {login_server, start_link, [Args]}, 
+                            permanent, 5000, worker, [login_server]},
+                    Result = child_start_selector(Server),
+                    {ChildName, Result};
+
 attach_child(_Child, _Args) ->
     {error, invalid_child_requested}.
 
@@ -59,17 +67,16 @@ child_start_selector(Server) ->
         {error, already_present} ->
             supervisor:terminate_child(?MODULE, ServerID),
             supervisor:delete_child(?MODULE, ServerID),
-            supervisor:start_child(?MODULE, Server);
+            {ok, Pid} = supervisor:start_child(?MODULE, Server),
+            Pid;
 
-        {error,{already_started, _Pid}} ->
-            supervisor:terminate_child(?MODULE, ServerID),
-            supervisor:delete_child(?MODULE, ServerID),
-            supervisor:start_child(?MODULE, Server);
+        {error,{already_started, Pid}} ->
+            Pid;
+        {error,{{already_started, Pid},{child,undefined,_,{database_server,start_link,[{_,_}]},permanent,false,5000,worker,[database_server]}}} ->
+            Pid;
 
-        {error,{{already_started,_Pid},{child,undefined,_,{database_server,start_link,[{_,_}]},permanent,false,5000,worker,[database_server]}}} ->
-            supervisor:terminate_child(?MODULE, ServerID),
-            supervisor:delete_child(?MODULE, ServerID),
-            supervisor:start_child(?MODULE, Server);
+        {error,{{already_started,Pid}, {child,undefined, _Ref, {login_server,start_link,[{}]}, permanent,false,5000,worker, [login_server]}}} ->
+            Pid;
         {ok, _} ->
             Result
     end.

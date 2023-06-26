@@ -33,7 +33,7 @@ submit_request_for_processing(_Body, Request) ->
             Start = date_to_gregorian_days(StartDate),
             End = date_to_gregorian_days(EndDate),
             Response = star_watch_master_sup:attach_child(nasageneralapi, {ObjectList, Start, End}),
-            {_ChildID, {_ChildStartResults, Pid}} = Response,
+            Pid = utils:select_pid(Response),
             if 
               is_pid(Pid) -> 
                 case gen_server:call(Pid, {fetchnasadata}, infinity) of
