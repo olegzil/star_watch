@@ -284,7 +284,7 @@ populate_client_profile_table(true) ->
     	WriteFun = fun() ->
     		mnesia:write(Record)
     	end,
-    	io:format("writen: ~p~n", [mnesia:transaction(WriteFun)]) 
+    	io:format("written: ~p~n", [mnesia:transaction(WriteFun)])
     end,
     lists:foreach(ListFun, ClientProfilesList).
 

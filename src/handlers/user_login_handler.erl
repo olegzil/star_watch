@@ -8,7 +8,10 @@ init(Req0, State) ->
 
 handle(Req, State) -> 
   case cowboy_req:method(Req) of
-    <<"POST">> -> 
+    <<"POST">> ->   
+      Request = submit_request_for_processing(Req),
+        {ok, Request, State};
+    <<"GET">> ->   
       Request = submit_request_for_processing(Req),
         {ok, Request, State};
     _ ->
@@ -20,49 +23,95 @@ submit_request_for_processing(Request) ->
         {error, Message} ->
             cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Message, Request),
             Message;
-        {ok, {ClientID, Parameter}} ->
+        {ok, {ClientID, Action, Parameter}} ->
             Response = star_watch_master_sup:attach_child(login_server, {}),
             Pid = utils:select_pid(Response),
             if
             	is_pid(Pid) ->
-		            case execute_request(<<"login">>, ClientID, Parameter) of
-		            {ok, Good} ->
-		                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
-		                Good;
-		              {error, Bad} ->
-		                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Bad, Request),
-		                Bad;
-		              {_, Other} ->
-		                Other
+		            case execute_request(Action, ClientID, Parameter) of
+                        {ok, Good} ->
+                            cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
+                            Good;
+                        {error, Bad} ->
+                            cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Bad, Request),
+                        Bad;
+                            {_, Other} ->
+                                Other
 		            end;
 		        true -> utils:log_message(["failed to start server", login_server])
 	        end
     end.
 execute_request(Action, ClientID, Parameter) ->
-	% TODO: Add login_new, login_recover_id, login_recover_password
-case Action of
-    <<"login">> ->
-        gen_server:call(login_server, {login_existing, ClientID, Parameter}, infinity);
-    _ ->
-        {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"invalid action: ", Action/binary>>),
-        {error, jiffy:encode(Message)}
-end.
+    case Action of
+        <<"login_new_password">> ->
+            Result = gen_server:call(login_server, {login_new_password, ClientID, Parameter}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}
+            end;
+
+        <<"login_new_userid">> ->
+            Result = gen_server:call(login_server, {login_new_userid, ClientID, Parameter}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}
+            end;
+
+        <<"clear_login_table">> ->
+            Result = gen_server:call(login_server, {clear_login_table}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})};
+                _ ->
+                    {ok, jiffy:encode(#{success => <<"login table cleared">>})}
+            end;
+        _ ->
+            {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"invalid action: ", Action/binary>>),
+            {error, jiffy:encode(Message)}
+    end.
 
 validate_request(all, Request) ->
     KeyValidation = validate_request(key, Request),
     ClientIDValidation = validate_request(client_id, Request),
     EncryptedValidation = validate_request(login_payload, Request),
-    TestList = [KeyValidation, ClientIDValidation, EncryptedValidation],
+    ActionValidation = validate_request(action, Request),
+    TestList = [KeyValidation, ClientIDValidation, EncryptedValidation, ActionValidation],
     Found = lists:keyfind(error, 1, TestList),
     case Found  of
         false -> %%% no errors found.
             {ok, ClientID} = ClientIDValidation,
             {ok, EncryptedData} = EncryptedValidation,
-            {ok, {ClientID, EncryptedData}}; 
+            {ok, Action} = ActionValidation,
+            {ok, {ClientID, Action, EncryptedData}}; 
         {error, Message} ->
 
             {error, Message}
     end;
+validate_request(action, Request) ->
+    TokenList = cowboy_req:parse_qs(Request),
+    case lists:keyfind(?REQUIRED_ACTION_TOKEN, 1, TokenList) of 
+        false -> 
+            HelpMessage = lists:foldl(fun(Item, Acc) ->
+                Token = <<Acc/binary," ", Item/binary>>,
+                Token
+             end, <<"missing action. action must be one of ">>, ?AVAILABLE_CHANNEL_ACTIONS),
+            {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, HelpMessage),
+            {error, jiffy:encode(Message)};
+        {_, Action} ->      
+            Found = lists:member(Action, ?AVAILABLE_CHANNEL_ACTIONS), 
+            if Found =:= true->
+                    {ok, Action};
+                true ->
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"no such action: ", Action/binary>>),
+                    {error, jiffy:encode(Message)}
+            end
+        end;
 
 validate_request(login_payload, Request) ->
     case cowboy_req:read_body(Request) of 

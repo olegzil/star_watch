@@ -30,7 +30,8 @@
 		 log_message/1,
 		 decrypt/2,
 		 select_pid/1,
-		 make_nonstring_binary/1]).
+		 make_nonstring_binary/1,
+		 decrypt_data/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -706,6 +707,16 @@ make_nonstring_binary([H|T], Acc) ->
 make_nonstring_binary([], Acc) ->
     Acc.
 
+decrypt_data(EncryptedData) ->
+    {ok, PemBin} = server_config_processor:read_private_key_file(),
+    [RSAEntry] = public_key:pem_decode(PemBin),
+    Key = public_key:pem_entry_decode(RSAEntry),
+    case utils:decrypt(Key, EncryptedData) of
+        {ok, ClearText} ->
+            {ok, ClearText};
+        {error, Error} ->
+            {error, Error}
+    end.
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_duplicate_channels() ->
 	{atomic, Keys} = mnesia:transaction(fun() -> mnesia:all_keys(client_profile_table) end),

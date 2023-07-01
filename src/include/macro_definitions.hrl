@@ -1,3 +1,10 @@
+-ifdef(debug).
+-define(BUILDTYPE, <<"debug">>).
+-else.
+-define(BUILDTYPE, <<"RELEASE">>).
+-endif.
+
+
 -define(HTTP_PORT, 8080).
 -define(HTTP_PORT_LOCAL, 8083).
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
@@ -34,7 +41,17 @@
 									<<"fetchchannelimage">>,
 									<<"deletechannel">>,
 									<<"restoredefaultclient">>,
-									<<"login">>]).
+									<<"login_query">>,
+									<<"login_new_userid">>,
+									<<"login_new_password">>,
+									<<"login_reset_password">>,
+									<<"login_reset_user">>,
+									<<"login_validate_token">>,
+									<<"login_normal">>,
+									<<"clear_login_table">>]).
+
+-define(LOGIN_ID_TOKEN, "id:").
+-define(LOGIN_PASSWORD_TOKEN, "password:").
 
 -define(SERVER_ERROR_OK, 					16#FFAA00).
 -define(SERVER_ERROR_BAD_CLIENT_ID, 		16#FFAA01).
@@ -75,6 +92,11 @@
 -define(SERVER_ERROR_USER_LOGIN,	 		16#FFAC05).
 -define(SERVER_ERROR_USER_ID,		 		16#FFAC06).
 -define(SERVER_ERROR_USER_PASSWORD,	 		16#FFAC07).
+-define(SERVER_ERROR_NO_LOGIN_RECORD, 		16#FFAC07).
+-define(SERVER_ERROR_USER_EXISTS, 			16#FFAC08).
+
+%%%%%%%%%%%%% System faults &&&&&&&&&&&&&&&&&&&&&&
+-define(SERVER_ERROR_DATABASE_FAULT,		16#FFFF01).
 
 -define(RESPONSE_CODES, [{video_link_added, ?SERVER_ERROR_LINK_ADDED},
 						 {video_link_exists, ?SERVER_ERROR_LINK_EXISTS}, 

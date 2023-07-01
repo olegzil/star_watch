@@ -2,7 +2,7 @@
     {description, "Star Watch Project"},
     {vsn, "0.1.0"},
     {registered, [star_watch_master_sup]},
-    {applications, [kernel,stdlib,cowboy, mnesia, jiffy, erlcron]},
+    {applications, [kernel,stdlib,cowboy, mnesia, jiffy, erlcron, gen_smtp]},
     {licenses, ["MIT", "BSD"]},
     {mod, {star_watch_server_app, []}},
     {files, ["Makefile","rebar.config","rebar.config.script","src"]},
