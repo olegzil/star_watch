@@ -103,7 +103,7 @@ handle_new_user_id(userid, UserProfile, ClientID, UserID, Password) ->
             [_User, Host] = string:tokens(binary_to_list(UserID), "@"),
             utils:log_message([{"Host", Host}]),
             utils:log_message([{"BuildType", ?BUILDTYPE}]),
-            gen_smtp_client:send({<<"noreply@gmail.com">>, [UserID], erlang:binary_to_list(<<"hello there!!!">>)}, [{relay, Host}]),
+            gen_smtp_client:send({<<"noreply@gmail.com">>, [UserID], erlang:binary_to_list(<<"hello there!!!">>)}, [{relay, Host},  {port, 2525}]),
             {ok, ProfileMap};
         {_, ExistingUser} ->
             utils:log_message([{"ExistingUser", ExistingUser}]),
