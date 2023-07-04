@@ -76,7 +76,6 @@ terminate(_Reason, _State) -> ok.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 extract_id_and_password(start, Data) ->
     {ok, ClearText} = utils:decrypt_data(Data),
-    utils:log_message([{"ClearText", ClearText}]),
     Parts = string:split(ClearText, ?LOGIN_ID_TOKEN),
     extract_id_and_password(validate_part1, Parts);
 
@@ -102,7 +101,7 @@ handle_new_user_id(userid, UserProfile, ClientID, UserID, Password) ->
             {ok, ProfileMap} = generate_return_value(Profile),
             [_User, Host] = string:tokens(binary_to_list(UserID), "@"),
             utils:log_message([{"Host", Host}]),
-            gen_smtp_client:send({<<"noreply@gmail.com">>, [UserID], erlang:binary_to_list(<<"hello there!!!">>)}, [{relay, Host},  {port, 567}]),
+            gen_smtp_client:send({<<"noreply@gmail.com">>, [UserID], erlang:binary_to_list(<<"hello there!!!">>)}, [{relay, Host},  {port, 587}]),
             {ok, ProfileMap};
         {_, ExistingUser} ->
             utils:log_message([{"ExistingUser", ExistingUser}]),
