@@ -7,6 +7,7 @@
 
 -define(HTTP_PORT, 8080).
 -define(HTTP_PORT_LOCAL, 8083).
+-define(HTTP_ACTIVE_PORT, ?HTTP_PORT).
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
 -define(APOD_HOST, "https://api.nasa.gov/planetary/apod?").
 -define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
