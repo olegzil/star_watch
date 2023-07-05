@@ -55,11 +55,11 @@ RUN echo "relayhost = in-v3.mailjet.com:2525" > /etc/postfix/main.cf && \
     echo "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd" >> /etc/postfix/main.cf && \
     echo "smtp_sasl_security_options = noanonymous" >> /etc/postfix/main.cf
 
-RUN echo "in-v3.mailjet.com:2525 66fe525ff7ed3f945f662b446f14f077:e2a5d55bea4ae9ff3e01b7ed48f0d727" > /etc/postfix/sasl_passwd 
-RUN postmap /etc/postfix/sasl_passwd
-RUN rm /etc/postfix/sasl_passwd
-RUN chmod 600 /etc/postfix/sasl_passwd.db
-RUN /etc/init.d/postfix restart
+RUN echo "in-v3.mailjet.com:2525 66fe525ff7ed3f945f662b446f14f077:e2a5d55bea4ae9ff3e01b7ed48f0d727" > /etc/postfix/sasl_passwd &&\ 
+	 postmap /etc/postfix/sasl_passwd && \
+	 rm /etc/postfix/sasl_passwd && \
+	 chmod 600 /etc/postfix/sasl_passwd.db && \
+	 /etc/init.d/postfix restart
 
 # Expose relevant ports
 EXPOSE 8080
