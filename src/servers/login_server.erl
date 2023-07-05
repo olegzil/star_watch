@@ -107,6 +107,7 @@ handle_new_user_id(userid, UserProfile, ClientID, UserID, Password) ->
             To = binary_to_list(UserID),
             Parts = ["echo", EmailBody, "|", "mail -s", EmailHeader, From, To],
             CommandString = string:join(Parts, " "),
+            utils:log_message([{"CommandString", CommandString}]),
             os:cmd(CommandString),
             {ok, ProfileMap};
         {_, ExistingUser} ->
