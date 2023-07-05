@@ -101,7 +101,13 @@ handle_new_user_id(userid, UserProfile, ClientID, UserID, Password) ->
             {ok, ProfileMap} = generate_return_value(Profile),
             [_User, Host] = string:tokens(binary_to_list(UserID), "@"),
             utils:log_message([{"Host", Host}]),
-            gen_smtp_client:send({<<"noreply@gmail.com">>, [UserID], erlang:binary_to_list(<<"hello there!!!">>)}, [{relay, Host},  {port, 587}]),
+            EmailBody =  "'Erlang test passed.'",
+            EmailHeader = "'Erlang-Test-Email'",
+            From = "-aFrom:TheTinkerersShop@gmail.com",
+            To = binary_to_list(UserID),
+            Parts = ["echo", EmailBody, "|", "mail -s", EmailHeader, From, To],
+            CommandString = string:join(Parts, " "),
+            os:cmd(CommandString),
             {ok, ProfileMap};
         {_, ExistingUser} ->
             utils:log_message([{"ExistingUser", ExistingUser}]),
