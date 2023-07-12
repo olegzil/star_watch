@@ -31,7 +31,8 @@
 		 add_new_channel_to_profile/2,
 		 copy_profile_and_add_new_channel/2,
 		 restore_default_client/1,
-		 read_private_key_file/0]).
+		 read_private_key_file/0,
+		 get_email_keys/1]).
 
 -compile(export_all).
 
@@ -66,6 +67,11 @@ get_client_key(File) ->
 	ControlBlock = get_server_control_block(File),
 	maps:get(default_client_key, ControlBlock).
 
+get_email_keys(File) ->
+	ControlBlock = get_server_control_block(File),
+	PublicKey = maps:get(api_key_public, ControlBlock),
+	SecreteKey = maps:get(api_key_private, ControlBlock),
+	{PublicKey, SecreteKey}.
 
 %%% Returns a map: #{directoryrecords => [Item1, ..., ItemN] }, where Item is itself a map: #{channel_id => a, client => b, name => c}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

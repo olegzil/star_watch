@@ -7,7 +7,7 @@
 
 -define(HTTP_PORT, 8080).
 -define(HTTP_PORT_LOCAL, 8083).
--define(HTTP_ACTIVE_PORT, ?HTTP_PORT).
+-define(HTTP_ACTIVE_PORT, ?HTTP_PORT_LOCAL).
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
 -define(APOD_HOST, "https://api.nasa.gov/planetary/apod?").
 -define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
@@ -18,7 +18,8 @@
 -define(YOUTUBE_MAXRESULTS, "50").
 -define(FIRST_PUBLISH_DATE, "1970-01-01T00:00:00Z").
 -define(SERVER_CONFIG_FILE, <<"server_config.cfg">>).
-
+-define(LOGIN_EMAIL_SENDER, "TheTinkerersShop@gmail.com").
+-define(MAILJET_ENDPOINT, "https://api.mailjet.com/v3.1/send").
 -define(YOUTUBE_NEXTPAGE, <<"nextPageToken">>).
 -define(TOP_KEY, <<"Videos">>).
 -define(YOUTUBE_VIDEO_ARRAY_KEY, <<"items">>).

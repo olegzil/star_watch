@@ -99,17 +99,8 @@ handle_new_user_id(userid, UserProfile, ClientID, UserID, Password) ->
         {error, no_records} ->
             Profile = login_db_access:create_user_profile(ClientID, UserID, Password),
             {ok, ProfileMap} = generate_return_value(Profile),
-            [_User, Host] = string:tokens(binary_to_list(UserID), "@"),
-            utils:log_message([{"Host", Host}]),
-            EmailBody =  "'Erlang test from docker passed.'",
-            EmailHeader = "'Erlang-Test-Email From docker'",
-            From = "-aFrom:TheTinkerersShop@gmail.com",
-            To = binary_to_list(UserID),
-            Parts = ["echo", EmailBody, "|", "mail -s", EmailHeader, From, To],
-            CommandString = string:join(Parts, " "),
-            utils:log_message([{"CommandString", CommandString}]),
-            utils:log_message([{"Email command", CommandString}]),
-            os:cmd(CommandString),
+            [User, _] = string:tokens(binary_to_list(UserID), "@"),
+            mail_utility:send_email(UserID, list_to_binary(User)),
             {ok, ProfileMap};
         {_, ExistingUser} ->
             utils:log_message([{"ExistingUser", ExistingUser}]),

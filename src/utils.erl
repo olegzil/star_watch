@@ -694,7 +694,6 @@ decrypt(Key, EncryptedData) ->
 	Data = binary:part(EncryptedData, {1, byte_size(EncryptedData)-2}),
 	Binary = make_nonstring_binary(Data),
     DecryptedData = public_key:decrypt_private(Binary, Key),
-    io:format("Decrypted data: ~p~n", [DecryptedData]),
     {ok, DecryptedData}.
 
 make_nonstring_binary(Data) ->
