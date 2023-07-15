@@ -1,27 +1,31 @@
 -module(mail_utility).
--export([send_email/2]).
+-export([send_email/3]).
 -include("include/macro_definitions.hrl").
 
-send_email(ToEmail, ToName) ->
+send_email(ClientID, ToEmail, ToName) ->
     % Set the necessary variables
     {ApiKeyPublic, ApiKeyPrivate} = server_config_processor:get_email_keys(?SERVER_CONFIG_FILE),
     Url = "https://api.mailjet.com/v3.1/send",
     ContentType = "application/json",
     SandboxMode = false,
     FromEmail = <<"TheTinkerersShop@gmail.com">>,
-    FromName = <<"Your Mailjet Pilot">>,
-    HTMLPart = <<"<h3>Dear passenger, welcome to Mailjet!</h3><br />May the delivery force be with you!">>,
-    Subject = <<"Your email flight plan!">>,
-    TextPart = <<"Dear passenger, welcome to Mailjet! May the delivery force be with you!">>,
 
+    PREAMBLE = << "<a href=\"">>,
+    POSTAMBLE = << "\">click to complete login</a>" >>,
+    LOGIN_CALLBACK_PATH = <<"youtube/login">>,
+    LoginAction = <<"?action=complete_login&login_token=">>,
+    ClientIDSignature = <<"&client_id=", ClientID/binary>>,
+    KeySignature = <<"&key=", ?CLIENT_ACCESS_KEY/binary>>,
+    Token = list_to_binary(utils:to_string(utils:v4())),
+    MainLink = << ?LOGIN_CALLBACK_ADDRESS_ACTIVE/binary, LOGIN_CALLBACK_PATH/binary, LoginAction/binary, Token/binary, ClientIDSignature/binary, KeySignature/binary >>,
+    Link = <<PREAMBLE/binary, MainLink/binary, POSTAMBLE/binary >>,
     % Create the request payload
     Payload = #{<<"SandboxMode">> => SandboxMode,
                 <<"Messages">> => [
-                    #{<<"From">> => #{<<"Email">> => FromEmail, <<"Name">> => FromName},
+                    #{<<"From">> => #{<<"Email">> => FromEmail, <<"Name">> => ?LOGIN_EMAIL_FROM_NAME},
                       <<"To">> => [#{<<"Email">> => ToEmail, <<"Name">> => ToName}],
-                      <<"Subject">> => Subject,
-                      <<"TextPart">> => TextPart,
-                      <<"HTMLPart">> => HTMLPart
+                      <<"Subject">> => ?LOGIN_EMAIL_SUBJECT,
+                      <<"HTMLPart">> => Link
                     }
                 ]
               },
@@ -37,7 +41,14 @@ send_email(ToEmail, ToName) ->
 
     % Perform the HTTP request
     {ok, {StatusCode, _RespHeaders, RespBody}} = httpc:request(post, Request, Options, [{body_format, binary}]),
+    {_, Code, _} = StatusCode,
 
     % Handle the response
-    io:format("Status code: ~p~n", [StatusCode]),
-    io:format("Response Body: ~p~n", [RespBody]).
+    io:format("Status code: ~p~n", [Code]),
+    io:format("Response Body: ~p~n", [RespBody]),
+    case Code of
+        200 ->
+            {ok, Token};
+        _ErrorCode ->
+            {error, <<"email notification failed">>}
+    end.

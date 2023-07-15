@@ -36,25 +36,45 @@ handle_call({login_existing, _ClientID, EncryptedData}, _From, State) ->
     end;
 
 handle_call({user_login_profile, EncryptedLoginID}, _From, State) ->
-    utils:log_message([{"user_login_profile", user_login_profile}]),
     case utils:decrypt_data(EncryptedLoginID) of
         {ok, ClearText} ->
             query_user_login_id(ClearText);
         {error, Error} ->
             {error, Error} = utils:format_error(false, Error),
-            {reply, {ok, Error}, State}
+            {reply, {error, Error}, State}
     end;
 
 handle_call({login_new_userid, ClientID, EncryptedData}, _From, State) ->
     case extract_id_and_password(start, EncryptedData) of
         {UserID, Password} ->
-            Profile = login_db_access:get_user_profile(UserID),
+            Profile = login_db_access:get_user_profile(private, UserID),
             CreateNewUserResult = handle_new_user_id(userid, Profile, ClientID, UserID, Password),
             {reply, CreateNewUserResult, State};
         error ->
             {error, Error} = utils:format_error(false, <<"invalid login string">>),
             {reply, {error, Error}, State}
     end;
+
+handle_call({complete_login, Token}, _From, State) ->
+    Profile=login_db_access:get_user_profile_from_token(Token),
+    case Profile of
+        {error, _} ->
+            {error, Error} = utils:format_error(?SERVER_ERROR_NO_SUCH_USER_ID, <<"no such token: ", Token/binary>>),
+            {error, jiffy:encode(Error)};
+        {ok, Record} ->
+            TimeDelta = erlang:system_time(millisecond) - Record#users_login_table.log_in_time,
+            if
+                TimeDelta > ?LOGIN_TOKEN_EXPIRATION_TIME ->
+                    {error, Error} = utils:format_error(?SERVER_ERROR_TOKEN_EXPIRED, <<"expired token">>),
+                    {reply, {error, jiffy:encode(Error)}, State};
+                true ->
+                    UserID = Record#users_login_table.user_id,
+                    complete_registration(UserID),
+                    {ok, Success} = utils:format_success(?SERVER_ERROR_OK, <<"UserID registered: ", UserID/binary>>),
+                    {reply, {ok, jiffy:encode(Success)}, State}
+            end
+    end;
+
 handle_call({clear_login_table}, _From, State) ->
     login_db_access:clear_login_table(),
     {reply, {ok, #{success => "login table cleared"}}, State};
@@ -74,6 +94,18 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(_Reason, _State) -> ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+complete_registration(UserID)->
+    UpdateFun = fun()->
+        [Record] = mnesia:read(users_login_table, UserID, write),
+        mnesia:write(Record#users_login_table{
+                    login_token = undefined,
+                    loged_in = true,
+                    log_in_time = erlang:system_time(millisecond),
+                    credentials_verified = true
+            })
+    end,
+    mnesia:transaction(UpdateFun).
+
 extract_id_and_password(start, Data) ->
     {ok, ClearText} = utils:decrypt_data(Data),
     Parts = string:split(ClearText, ?LOGIN_ID_TOKEN),
@@ -97,21 +129,22 @@ handle_new_user_id(userid, UserProfile, ClientID, UserID, Password) ->
         {aborted, Reason} ->
             {error, Reason};
         {error, no_records} ->
-            Profile = login_db_access:create_user_profile(ClientID, UserID, Password),
-            {ok, ProfileMap} = generate_return_value(Profile),
             [User, _] = string:tokens(binary_to_list(UserID), "@"),
-            mail_utility:send_email(UserID, list_to_binary(User)),
-            {ok, ProfileMap};
-        {_, ExistingUser} ->
-            utils:log_message([{"ExistingUser", ExistingUser}]),
-            if
-                ExistingUser#users_login_table.credentials_verified =:= false orelse
-                ExistingUser#users_login_table.credentials_verified =:= undefined ->
-                    Profile = login_db_access:create_user_profile(ClientID, UserID, Password),
-                    generate_return_value(Profile);
-                true ->
-                    utils:format_error(?SERVER_ERROR_USER_EXISTS, <<"user exists: ", UserID/binary>>)
-                end
+            EmeailResult = mail_utility:send_email(ClientID, UserID, list_to_binary(User)),
+            handle_email_response(EmeailResult, ClientID, UserID, Password);
+        {_, Map} ->
+            UserID = maps:get(user_id, Map),
+            {error, Error} = utils:format_error(?SERVER_ERROR_USER_EXISTS, <<"duplicate user id ", UserID/binary>>),
+            {error, jiffy:encode(Error)}
+    end.
+
+handle_email_response(EmailResponse, ClientID, UserID, Password) ->            
+    case EmailResponse of
+        {ok, Token} ->
+            Profile = login_db_access:create_user_profile(ClientID, UserID, Password, Token),
+            generate_return_value(Profile);
+        {error, Error} ->
+            {error, #{error => Error}}
     end.
 
 generate_return_value(Profile) ->
@@ -125,7 +158,7 @@ generate_return_value(Profile) ->
         }.
 
 query_user_login_id(LoginID) ->
-    case login_db_access:get_user_profile(LoginID) of 
+    case login_db_access:get_user_profile(public, LoginID) of 
         {aborted, Reason} ->
             io:format("error reading users_login_table: ~p~n", [Reason]),
             {error, ErrorPayload} = utils:format_error(?SERVER_ERROR_DATABASE_FAULT, <<"unable to read user login data">>),
@@ -136,4 +169,3 @@ query_user_login_id(LoginID) ->
         {ok, Result} ->
             {ok, jiffy:encode(Result)}
     end.
-

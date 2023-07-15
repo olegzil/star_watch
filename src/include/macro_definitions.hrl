@@ -8,6 +8,19 @@
 -define(HTTP_PORT, 8080).
 -define(HTTP_PORT_LOCAL, 8083).
 -define(HTTP_ACTIVE_PORT, ?HTTP_PORT_LOCAL).
+-define(LOGIN_CALLBACK_ADDRESS_LOCAL, <<"http://10.0.0.2:8083/">>).
+-define(LOGIN_CALLBACK_ADDRESS_REMOTE, <<"http://35.208.173.235:8080/">>).
+-define(LOGIN_CALLBACK_ADDRESS_ACTIVE, ?LOGIN_CALLBACK_ADDRESS_LOCAL).
+
+-define(LOGIN_STATE_NO_LOGIN, undefined).
+-define(LOGIN_STATE_EMAIL_SENT, 16#AAAA00).
+-define(LOGIN_STATE_TOKEN_EXPIRED, 16#AAAA01).
+-define(LOGIN_STATE_CONFIRMED, 16#AAAA02).
+-define(LOGIN_STATE_LOGEDOUT, 16#AAAA03).
+-define(LOGIN_STATE_RESET_PASSWORD, 16#AAAA04).
+-define(LOGIN_STATE_RESET_USER, 16#AAAA05).
+-define(LOGIN_TOKEN_EXPIRATION_TIME, 60*60*1000).
+
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
 -define(APOD_HOST, "https://api.nasa.gov/planetary/apod?").
 -define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
@@ -33,6 +46,9 @@
 -define(REQUIRED_ACTION_TOKEN, <<"action">>).
 -define(REQUIRED_CHANNEL_ID_TOKEN, <<"channel_id">>).
 -define(REQUIRED_CLIENT_ID_TOKEN, <<"client_id">>).
+-define(LOGIN_EMAIL_FROM_NAME, <<"Sonoma Ashram">>).
+-define(LOGIN_EMAIL_SUBJECT, <<"Please complete your login">>).
+-define(LOGIN_EMAIL_LINK, <<"<a href=\"click me\">www.google.com</a>">>).
 -define(AVAILABLE_CHANNEL_ACTIONS, [<<"fetchclientdirectory">>,
 									<<"fetchchannelvideos">>,
 									<<"updatechannel">>,
@@ -50,7 +66,9 @@
 									<<"login_reset_user">>,
 									<<"login_validate_token">>,
 									<<"login_normal">>,
-									<<"clear_login_table">>]).
+									<<"clear_login_table">>,
+									<<"complete_login">>]).
+-define(EXCEPTIONAL_ACTIONS, [<<"complete_login">>]).
 
 -define(LOGIN_ID_TOKEN, "id:").
 -define(LOGIN_PASSWORD_TOKEN, "password:").
@@ -96,6 +114,10 @@
 -define(SERVER_ERROR_USER_PASSWORD,	 		16#FFAC07).
 -define(SERVER_ERROR_NO_LOGIN_RECORD, 		16#FFAC07).
 -define(SERVER_ERROR_USER_EXISTS, 			16#FFAC08).
+-define(SERVER_ERROR_LOGIN_INVALID_STATE,	16#FFAC09).
+-define(SERVER_ERROR_TOKEN_EXPIRED, 		16#FFAC1A).
+-define(SERVER_ERROR_NO_SUCH_USER_ID, 		16#FFAC1B).
+-define(SERVER_ERROR_MISSING_TOKEN, 		16#FFAC1C).
 
 %%%%%%%%%%%%% System faults &&&&&&&&&&&&&&&&&&&&&&
 -define(SERVER_ERROR_DATABASE_FAULT,		16#FFFF01).

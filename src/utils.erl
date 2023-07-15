@@ -3,6 +3,7 @@
 % @Last Modified by:   Oleg Zilberman
 % @Last Modified time: 2023-03-31 16:58:16
 -module(utils).
+-export([v4/0, to_string/1, get_parts/1]).
 -export([date_to_gregorian_days/1, 
 		 gregorian_days_to_binary/1, 
 		 current_time_string/0,
@@ -716,6 +717,27 @@ decrypt_data(EncryptedData) ->
         {error, Error} ->
             {error, Error}
     end.
+
+
+% Generates a random binary UUID.
+v4() ->
+  v4(rand:uniform(round(math:pow(2, 48))) - 1, rand:uniform(round(math:pow(2, 12))) - 1, rand:uniform(round(math:pow(2, 32))) - 1, rand:uniform(round(math:pow(2, 30))) - 1).
+
+% Origina function. Removed due to deprication
+% v4() ->
+%   v4(crypto:rand_uniform(1, round(math:pow(2, 48))) - 1, crypto:rand_uniform(1, round(math:pow(2, 12))) - 1, crypto:rand_uniform(1, round(math:pow(2, 32))) - 1, crypto:rand_uniform(1, round(math:pow(2, 30))) - 1).
+
+v4(R1, R2, R3, R4) ->
+    <<R1:48, 4:4, R2:12, 2:2, R3:32, R4: 30>>.
+
+% Returns a string representation of a binary UUID.
+to_string(U) ->
+    lists:flatten(io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~2.16.0b~2.16.0b-~12.16.0b", get_parts(U))).
+
+% Returns the 32, 16, 16, 8, 8, 48 parts of a binary UUID.
+get_parts(<<TL:32, TM:16, THV:16, CSR:8, CSL:8, N:48>>) ->
+    [TL, TM, THV, CSR, CSL, N].
+
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_duplicate_channels() ->
 	{atomic, Keys} = mnesia:transaction(fun() -> mnesia:all_keys(client_profile_table) end),
