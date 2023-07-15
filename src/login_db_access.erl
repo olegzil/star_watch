@@ -5,8 +5,17 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/macro_definitions.hrl").
 -module(login_db_access).
--export([get_user_profile/2, create_user_profile/4, clear_login_table/0, get_user_profile_from_token/1]).
+-export([get_user_profile/2, create_user_profile/4, clear_login_table/0, get_user_profile_from_token/1, delete_user/2]).
 -include("include/users_login_table.hrl").
+
+delete_user(token, Token) ->
+    case get_user_profile_from_token(Token) of
+        {ok, Record} ->
+            Fun = fun() -> mnesia:delete({users_login_table, Record#users_login_table.user_id}) end,
+            mnesia:transaction(Fun);
+        _ ->
+            io:format("No such token: ~p~n", [Token])
+    end.
 
 get_user_profile_from_token(Token) ->
     Fun = fun() -> mnesia:match_object(#users_login_table{login_token=Token, _='_'}) end,

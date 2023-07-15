@@ -66,6 +66,7 @@ handle_call({complete_login, Token}, _From, State) ->
             if
                 TimeDelta > ?LOGIN_TOKEN_EXPIRATION_TIME ->
                     {error, Error} = utils:format_error(?SERVER_ERROR_TOKEN_EXPIRED, <<"expired token">>),
+                    login_db_access:delete_user(token, Token),
                     {reply, {error, jiffy:encode(Error)}, State};
                 true ->
                     UserID = Record#users_login_table.user_id,
