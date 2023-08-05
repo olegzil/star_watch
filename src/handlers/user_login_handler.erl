@@ -9,16 +9,19 @@ init(Req0, State) ->
 handle(Req, State) -> 
   case cowboy_req:method(Req) of
     <<"POST">> ->   
-      Request = submit_request_for_processing(standard, Req),
+      Request = submit_request_for_processing(handle_post, Req),
         {ok, Request, State};
     <<"GET">> ->   
-      Request = submit_request_for_processing(exceptional, Req),
+      Request = submit_request_for_processing(handle_get, Req),
+        {ok, Request, State};
+    <<"PUT">> ->   
+      Request = submit_request_for_processing(handle_put, Req),
         {ok, Request, State};
     _ ->
       {error, Req, State}
   end.
 
-submit_request_for_processing(exceptional, Request) ->
+submit_request_for_processing(handle_get, Request) ->
     case validate_request(action, Request, ?EXCEPTIONAL_ACTIONS) of
         {error, Message} ->
             cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Message, Request),
@@ -28,7 +31,7 @@ submit_request_for_processing(exceptional, Request) ->
             Pid = utils:select_pid(Response),
             if
                 is_pid(Pid) ->
-                    case execute_request(exceptional, Action, undefined, Parameter) of
+                    case execute_request(handle_get, Action, undefined, Parameter) of
                         {ok, Good} ->
                             cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
                             Good;
@@ -42,7 +45,31 @@ submit_request_for_processing(exceptional, Request) ->
             end
     end;
 
-submit_request_for_processing(standard, Request) ->
+submit_request_for_processing(handle_put, Request) ->
+    case validate_request(put, Request, ?PUT_ACTIONS) of
+        {error, Message} ->
+            cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Message, Request),
+            Message;
+        {ok, {Action, ClientID}} ->
+            Response = star_watch_master_sup:attach_child(login_server, {}),
+            Pid = utils:select_pid(Response),
+            if
+                is_pid(Pid) ->
+                    case execute_request(handle_put, Action, ClientID, undefined) of
+                        {ok, Good} ->
+                            cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
+                            Good;
+                        {error, Bad} ->
+                            cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Bad, Request),
+                        Bad;
+                            {_, Other} ->
+                                Other
+                    end;
+                true -> utils:log_message(["failed to start server", login_server])
+            end
+    end;
+
+submit_request_for_processing(handle_post, Request) ->
     case validate_request(all, Request, ?AVAILABLE_CHANNEL_ACTIONS) of
         {error, Message} ->
             cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Message, Request),
@@ -52,7 +79,7 @@ submit_request_for_processing(standard, Request) ->
             Pid = utils:select_pid(Response),
             if
             	is_pid(Pid) ->
-		            case execute_request(standard, Action, ClientID, Parameter) of
+		            case execute_request(handle_post, Action, ClientID, Parameter) of
                         {ok, Good} ->
                             cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
                             Good;
@@ -66,7 +93,7 @@ submit_request_for_processing(standard, Request) ->
 	        end
     end.
 
-execute_request(exceptional, Action, _ClientID, Token) -> 
+execute_request(handle_get, Action, ClientID, Token) -> 
     case Action of
         <<"complete_login">> ->
             Result = gen_server:call(login_server, {complete_login, Token}, infinity),
@@ -75,13 +102,51 @@ execute_request(exceptional, Action, _ClientID, Token) ->
                     {ok, jiffy:encode(#{success => Good})};
                 {error, Bad} ->
                     {error, jiffy:encode(#{error =>Bad})}
+            end;
+        <<"logout_user">> ->
+            Result = gen_server:call(login_server, {logout_user, ClientID}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}
             end
     end;
 
-execute_request(standard, Action, ClientID, ClientData) ->
+execute_request(handle_put, Action, ClientID, _Token) -> 
     case Action of
+        <<"logout_user">> ->
+            Result = gen_server:call(login_server, {logout_user, ClientID}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}
+            end
+    end;
+
+execute_request(handle_post, Action, ClientID, ClientData) ->
+    case Action of
+        <<"user_profile">> ->
+            Result = gen_server:call(login_server, {user_profile, ClientID, ClientData}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}                    
+            end;
+
         <<"login_new_password">> ->
             Result = gen_server:call(login_server, {login_new_password, ClientID, ClientData}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}
+            end;
+
+        <<"login_existing">> ->
+            Result = gen_server:call(login_server, {login_existing, ClientID, ClientData}, infinity),
             case Result of
                 {ok, Good} ->
                     {ok, jiffy:encode(#{success => Good})};
@@ -131,6 +196,22 @@ validate_request(all, Request, AvailableActions) ->
             {error, Message}
     end;
 
+validate_request(put, Request, AvailableActions) ->
+    KeyValidation = validate_request(key, Request, AvailableActions),
+    ClientIDValidation = validate_request(client_id, Request, AvailableActions),
+    ActionValidation = validate_request(action, Request, AvailableActions),
+    TestList = [KeyValidation, ClientIDValidation, ActionValidation],
+    Found = lists:keyfind(error, 1, TestList),
+    case Found  of
+        false -> %%% no errors found.
+            {ok, ClientID} = ClientIDValidation,
+            {ok, Action} = ActionValidation,
+            {ok, {Action, ClientID}}; 
+        {error, Message} ->
+
+            {error, Message}
+    end;
+
 validate_request(action, Request, AvailableActions) ->
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_ACTION_TOKEN, 1, TokenList) of 
@@ -161,7 +242,7 @@ validate_request(login_payload, Request, _AvailableActions) ->
                     {_, Data, _} = FullRequest,
                     {ok, Data};
                 true ->
-                    {error, Message}  = utils:format_error(?SERVER_ERROR_USER_LOGIN, <<"missing user id and password">>),
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_USER_LOGIN, <<"missing user email and/or password">>),
                     {error, jiffy:encode(Message)}
             end
         end;

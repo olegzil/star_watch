@@ -8,17 +8,22 @@
 -define(HTTP_PORT, 8080).
 -define(HTTP_PORT_LOCAL, 8083).
 -define(HTTP_ACTIVE_PORT, ?HTTP_PORT_LOCAL).
--define(LOGIN_CALLBACK_ADDRESS_LOCAL, <<"http://10.0.0.2:8083/">>).
+-define(LOGIN_CALLBACK_ADDRESS_LOCAL, <<"http://10.0.0.12:8083/">>).
 -define(LOGIN_CALLBACK_ADDRESS_REMOTE, <<"http://35.208.173.235:8080/">>).
 -define(LOGIN_CALLBACK_ADDRESS_ACTIVE, ?LOGIN_CALLBACK_ADDRESS_LOCAL).
 
--define(LOGIN_STATE_NO_LOGIN, undefined).
--define(LOGIN_STATE_EMAIL_SENT, 16#AAAA00).
--define(LOGIN_STATE_TOKEN_EXPIRED, 16#AAAA01).
--define(LOGIN_STATE_CONFIRMED, 16#AAAA02).
--define(LOGIN_STATE_LOGEDOUT, 16#AAAA03).
--define(LOGIN_STATE_RESET_PASSWORD, 16#AAAA04).
--define(LOGIN_STATE_RESET_USER, 16#AAAA05).
+-define(LOGIN_STATE_USER_NOT_FOUND, 16#AAAA00).
+-define(LOGIN_STATE_EMAIL_SENT, 16#AAAA01).
+-define(LOGIN_STATE_TOKEN_EXPIRED, 16#AAAA02).
+-define(LOGIN_STATE_CONFIRMED, 16#AAAA03).
+-define(LOGIN_STATE_LOGGEDOUT, 16#AAAA04).
+-define(LOGIN_STATE_RESET_PASSWORD, 16#AAAA05).
+-define(LOGIN_STATE_RESET_USER, 16#AAAA06).
+-define(LOGIN_STATE_NOT_LOGGED_IN, 16#AAAA07).
+-define(LOGIN_STATE_LOGGED_IN, 16#AAAA08).
+-define(LOGIN_ERROR_PASSWORD, 16#AAAA09).
+-define(LOGIN_STATE_LOGIN_EXPIRED, 16#AAAA0A).
+-define(LOGIN_STATE_EMAIL_NOTIFICATION_FAILED, 15#AAAA0B).
 -define(LOGIN_TOKEN_EXPIRATION_TIME, 60*60*1000).
 
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
@@ -65,10 +70,12 @@
 									<<"login_reset_password">>,
 									<<"login_reset_user">>,
 									<<"login_validate_token">>,
-									<<"login_normal">>,
+									<<"login_existing">>,
 									<<"clear_login_table">>,
-									<<"complete_login">>]).
+									<<"complete_login">>,
+									<<"user_profile">>]).
 -define(EXCEPTIONAL_ACTIONS, [<<"complete_login">>]).
+-define(PUT_ACTIONS, [<<"logout_user">>]).
 
 -define(LOGIN_ID_TOKEN, "id:").
 -define(LOGIN_PASSWORD_TOKEN, "password:").
@@ -112,13 +119,13 @@
 -define(SERVER_ERROR_USER_LOGIN,	 		16#FFAC05).
 -define(SERVER_ERROR_USER_ID,		 		16#FFAC06).
 -define(SERVER_ERROR_USER_PASSWORD,	 		16#FFAC07).
--define(SERVER_ERROR_NO_LOGIN_RECORD, 		16#FFAC07).
--define(SERVER_ERROR_USER_EXISTS, 			16#FFAC08).
--define(SERVER_ERROR_LOGIN_INVALID_STATE,	16#FFAC09).
--define(SERVER_ERROR_TOKEN_EXPIRED, 		16#FFAC1A).
--define(SERVER_ERROR_NO_SUCH_USER_ID, 		16#FFAC1B).
--define(SERVER_ERROR_MISSING_TOKEN, 		16#FFAC1C).
-
+-define(SERVER_ERROR_NO_LOGIN_RECORD, 		16#FFAC08).
+-define(SERVER_ERROR_USER_EXISTS, 			16#FFAC09).
+-define(SERVER_ERROR_LOGIN_INVALID_STATE,	16#FFAC0A).
+-define(SERVER_ERROR_NO_SUCH_USER_ID, 		16#FFAC0B).
+-define(SERVER_ERROR_MISSING_TOKEN, 		16#FFAC0C).
+-define(SERVER_ERROR_INVALID_EMAIL, 		16#FFAC0D).
+-define(SERVER_ERROR_INVALID_CREDENTIALS,	16#FFAC0E).
 %%%%%%%%%%%%% System faults &&&&&&&&&&&&&&&&&&&&&&
 -define(SERVER_ERROR_DATABASE_FAULT,		16#FFFF01).
 

@@ -32,7 +32,10 @@
 		 decrypt/2,
 		 select_pid/1,
 		 make_nonstring_binary/1,
-		 decrypt_data/1]).
+		 decrypt_data/1,
+		 format_login_server_return/3,
+		 extract_id_and_password/1,
+		 extract_id/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -41,6 +44,7 @@
 -include("include/macro_definitions.hrl").
 -include("include/client_profile_table.hrl").
 -include("src/include/registration_query.hrl").
+-include("include/users_login_table.hrl").
 
 date_to_gregorian_days(<<A,B,C,D,E,F,G,H,I,J>>) ->
 	Date = <<A,B,C,D,E,F,G,H,I,J>>,
@@ -620,6 +624,27 @@ format_success(Code, Message) ->
 	},
 	{ok, Success}.
 
+format_login_server_return(Code, Type, Message) ->
+	if
+		erlang:is_map(Type) =:= true ->
+			{ok, #{
+				    user_id => maps:get(user_id, Type),
+				    client_id => maps:get(client_id, Type),
+				    log_in_state => Code,
+				    log_in_time => maps:get(log_in_time, Type),
+				    error_text => Message
+				}};
+		erlang:is_record(Type, users_login_table) =:= true ->
+			{ok, #{
+				    user_id => Type#users_login_table.user_id,
+				    client_id => Type#users_login_table.client_id,
+				    log_in_state => Code,
+				    log_in_time => Type#users_login_table.log_in_time,
+				    error_text => Message
+						}};
+		true -> error
+	end.
+
 package_channel_record_list(RecordList) ->
 	List = package_records(RecordList, []),
 	{ok, jiffy:encode(#{videos => List})}.
@@ -696,6 +721,34 @@ decrypt(Key, EncryptedData) ->
 	Binary = make_nonstring_binary(Data),
     DecryptedData = public_key:decrypt_private(Binary, Key),
     {ok, DecryptedData}.
+
+extract_id(Data) ->
+    {ok, Id} = utils:decrypt_data(Data),
+    utils:log_message([{"ClearText", Id}]),
+    {ok, Id}.
+
+extract_id_and_password(Data) ->
+	extract_id_and_password(start, Data).
+
+extract_id_and_password(start, Data) ->
+    {ok, ClearText} = utils:decrypt_data(Data),
+    Parts = string:split(ClearText, ?LOGIN_ID_TOKEN),
+    extract_id_and_password(validate_part1, Parts);
+
+extract_id_and_password(validate_part1, Data) when length(Data) =:= 2 ->
+    extract_id_and_password(validate_part2, Data);
+
+extract_id_and_password(validate_part1, _Data) -> false;
+extract_id_and_password(validate_part2, [_,Data]) ->
+    Parts = string:split(Data, ?LOGIN_PASSWORD_TOKEN),
+    extract_id_and_password(validate_part3, Parts);
+
+extract_id_and_password(validate_part3, Data) when length(Data) =:= 2 ->
+    [ID, Password] = Data,
+    {string:trim(ID), string:trim(Password)};
+
+extract_id_and_password(validate_part3, _Data) -> false.
+
 
 make_nonstring_binary(Data) ->
 	List = lists:map(fun(X) -> list_to_integer(X) end, string:tokens(binary_to_list(Data), ", ")),
