@@ -8,7 +8,7 @@
 -define(HTTP_PORT, 8080).
 -define(HTTP_PORT_LOCAL, 8083).
 -define(HTTP_ACTIVE_PORT, ?HTTP_PORT_LOCAL).
--define(LOGIN_CALLBACK_ADDRESS_LOCAL, <<"http://10.0.0.12:8083/">>).
+-define(LOGIN_CALLBACK_ADDRESS_LOCAL, <<"http://10.0.0.16:8083/">>).
 -define(LOGIN_CALLBACK_ADDRESS_REMOTE, <<"http://35.208.173.235:8080/">>).
 -define(LOGIN_CALLBACK_ADDRESS_ACTIVE, ?LOGIN_CALLBACK_ADDRESS_LOCAL).
 
@@ -23,7 +23,8 @@
 -define(LOGIN_STATE_LOGGED_IN, 16#AAAA08).
 -define(LOGIN_ERROR_PASSWORD, 16#AAAA09).
 -define(LOGIN_STATE_LOGIN_EXPIRED, 16#AAAA0A).
--define(LOGIN_STATE_EMAIL_NOTIFICATION_FAILED, 15#AAAA0B).
+-define(LOGIN_STATE_EMAIL_NOTIFICATION_FAILED, 16#AAAA0B).
+-define(LOGIN_STATE_IDENTICAL_PASSWORDS, 16#AAAA0C).
 -define(LOGIN_TOKEN_EXPIRATION_TIME, 60*60*1000).
 
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
@@ -68,13 +69,12 @@
 									<<"login_new_userid">>,
 									<<"login_new_password">>,
 									<<"login_reset_password">>,
-									<<"login_reset_user">>,
 									<<"login_validate_token">>,
 									<<"login_existing">>,
 									<<"clear_login_table">>,
 									<<"complete_login">>,
 									<<"user_profile">>]).
--define(EXCEPTIONAL_ACTIONS, [<<"complete_login">>]).
+-define(EXCEPTIONAL_ACTIONS, [<<"complete_login">>, <<"complete_password_reset">>]).
 -define(PUT_ACTIONS, [<<"logout_user">>]).
 
 -define(LOGIN_ID_TOKEN, "id:").

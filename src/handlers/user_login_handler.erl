@@ -95,6 +95,15 @@ submit_request_for_processing(handle_post, Request) ->
 
 execute_request(handle_get, Action, ClientID, Token) -> 
     case Action of
+        <<"complete_password_reset">> ->
+            Result = gen_server:call(login_server, {complete_password_reset, Token}, infinity),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}
+            end;
+
         <<"complete_login">> ->
             Result = gen_server:call(login_server, {complete_login, Token}, infinity),
             case Result of
@@ -136,6 +145,15 @@ execute_request(handle_post, Action, ClientID, ClientData) ->
                     {error, jiffy:encode(#{error =>Bad})}                    
             end;
 
+        <<"login_new_userid">> ->
+            Result = gen_server:call(login_server, {login_new_userid, ClientID, ClientData}),
+            case Result of
+                {ok, Good} ->
+                    {ok, jiffy:encode(#{success => Good})};
+                {error, Bad} ->
+                    {error, jiffy:encode(#{error =>Bad})}
+            end;
+
         <<"login_new_password">> ->
             Result = gen_server:call(login_server, {login_new_password, ClientID, ClientData}, infinity),
             case Result of
@@ -154,8 +172,9 @@ execute_request(handle_post, Action, ClientID, ClientData) ->
                     {error, jiffy:encode(#{error =>Bad})}
             end;
 
-        <<"login_new_userid">> ->
-            Result = gen_server:call(login_server, {login_new_userid, ClientID, ClientData}, infinity),
+        <<"login_reset_password">> ->
+            Result = gen_server:call(login_server, {login_reset_password, ClientID, ClientData}, infinity),
+            utils:log_message([{"Result", Result}]),
             case Result of
                 {ok, Good} ->
                     {ok, jiffy:encode(#{success => Good})};
@@ -275,6 +294,16 @@ validate_request(client_id, Request, _AvailableActions) ->
 
 secondary_action_validation(Action, TokenList) ->
     case Action of
+        <<"complete_password_reset">> ->
+            LoginTokenTuple = lists:keyfind(<<"login_token">>, 1, TokenList),
+            if
+                LoginTokenTuple =:= false ->
+                    {error, <<"missing login token">>};
+                true ->
+                    {_, Token} = LoginTokenTuple,
+                    {ok, {Action, Token}}
+            end;
+
         <<"complete_login">> ->
             LoginTokenTuple = lists:keyfind(<<"login_token">>, 1, TokenList),
             if

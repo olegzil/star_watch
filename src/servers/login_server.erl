@@ -65,17 +65,52 @@ handle_call({user_profile, _ClientID, EncryptedData}, _From, State) ->
             {reply, {ok, UserMap}, State}
     end;
 
-
-handle_call({login_new_userid, ClientID, EncryptedData}, _From, State) ->
+handle_call({login_reset_password, _ClientID, EncryptedData}, _From, State) ->
     case utils:extract_id_and_password(EncryptedData) of
         {Email, Password} ->
+            utils:log_message([{"Password", Password}]),
             Profile = login_db_access:get_user_profile(private, Email),
-            CreateNewUserResult = handle_new_user_id(userid, Profile, ClientID, Email, Password),
+            utils:log_message([{"Profile", Profile}]),
+            CreateNewUserResult = handle_profile_update(password, Profile, Password),
             {reply, CreateNewUserResult, State};
         error ->
             {error, Error} = utils:format_error(false, <<"invalid login string">>),
             {reply, {error, Error}, State}
     end;
+
+handle_call({login_new_userid, ClientID, EncryptedData}, _From, State) ->
+    case utils:extract_id_and_password(EncryptedData) of
+        {Email, Password} ->
+            Profile = login_db_access:get_user_profile(private, Email),
+            CreateNewUserResult = handle_profile_update(userid, Profile, ClientID, Email, Password),
+            {reply, CreateNewUserResult, State};
+        error ->
+            {error, Error} = utils:format_error(false, <<"invalid login string">>),
+            {reply, {error, Error}, State}
+    end;
+
+handle_call({complete_password_reset, Token}, _From, State) ->
+    io:format("from handle_call:complete_password_reset~n"),
+    Profile=login_db_access:get_user_profile_from_token(Token),
+    case Profile of
+        {error, _} ->
+            {error, Error} = utils:format_error(?SERVER_ERROR_NO_SUCH_USER_ID, <<"no such token: ", Token/binary>>),
+            {error, Error};
+        {ok, Record} ->
+            TimeDelta = erlang:system_time(millisecond) - Record#users_login_table.log_in_time,
+            if
+                TimeDelta > ?LOGIN_TOKEN_EXPIRATION_TIME ->
+                    {error, Error} = utils:format_error(?LOGIN_TOKEN_EXPIRATION_TIME, <<"expired token">>),
+                    login_db_access:delete_user(token, Token),
+                    {reply, {error, Error}, State};
+                true ->
+                    Email = Record#users_login_table.user_id,
+                    complete_password_reset(Email),
+                    {ok, Success} = utils:format_success(?SERVER_ERROR_OK, <<"password reset for user: ", Email/binary>>),
+                    {reply, {ok, Success}, State}
+            end
+    end;
+
 
 handle_call({complete_login, Token}, _From, State) ->
     io:format("from handle_call:complete_login~n"),
@@ -130,57 +165,123 @@ complete_registration(Email)->
     end,
     mnesia:transaction(UpdateFun).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% This function validates the current login states   %%%
-%%% The return value is a tuple where the first   %%%
-%%% member is either error or ok. ok Is returned only  %%% 
-%%% if the user is currently loged in. Any other state %%%
-%%% is considered an error states                      %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-validate_email_state(Map) ->
+complete_password_reset(Email) ->
+    UpdateFun = fun()->
+        [Record] = mnesia:read(users_login_table, Email, write),
+        mnesia:write(Record#users_login_table{
+                    login_token = undefined,
+                    log_in_time = erlang:system_time(millisecond),
+                    log_in_state = ?LOGIN_STATE_LOGGED_IN,
+                    user_password = Record#users_login_table.pending_password,
+                    pending_password = undefined,
+                    user_validated = true
+            })
+    end,
+    mnesia:transaction(UpdateFun).
+
+
+validate_login_state(Map) ->
     VerificationState = maps:get(log_in_state, Map),
     case VerificationState of
+        ?LOGIN_STATE_TOKEN_EXPIRED -> 
+            Email = maps:get(user_id, Map),
+            utils:format_error(?LOGIN_STATE_TOKEN_EXPIRED, <<"Attempt to validate email with expired token " , Email/binary>>);
         ?LOGIN_STATE_USER_NOT_FOUND ->
             Email = maps:get(user_id, Map),
             utils:format_error(?LOGIN_STATE_USER_NOT_FOUND, <<"user profile does not exist " , Email/binary>>);
         ?LOGIN_STATE_EMAIL_SENT ->
             Email = maps:get(user_id, Map),
-            utils:format_error(?LOGIN_STATE_EMAIL_SENT, <<"email sent. waiting for response " , Email/binary>>);
-        ?LOGIN_STATE_TOKEN_EXPIRED -> 
-            Email = maps:get(user_id, Map),
-            utils:format_error(?LOGIN_STATE_TOKEN_EXPIRED, <<"Attempt to validate email with expired token " , Email/binary>>);
+            utils:format_success(?LOGIN_STATE_EMAIL_SENT, <<"email sent. waiting for response " , Email/binary>>);
         ?LOGIN_STATE_CONFIRMED ->
             Email = maps:get(user_id, Map),
             utils:format_success(?LOGIN_STATE_CONFIRMED, <<"user login confirmed ", Email/binary>>);  
         ?LOGIN_STATE_LOGGED_IN -> 
             Email = maps:get(user_id, Map),
-            utils:format_success(?LOGIN_STATE_LOGGED_IN, <<"user is logged in ", Email/binary>>);
+            utils:format_success(?LOGIN_STATE_LOGGED_IN, <<"user is logged in as ", Email/binary>>);
         ?LOGIN_STATE_LOGGEDOUT ->
             Email = maps:get(user_id, Map),
-            utils:format_error(?LOGIN_STATE_LOGGEDOUT, <<"user is not logged in ", Email/binary>>);      
+            utils:format_success(?LOGIN_STATE_LOGGEDOUT, <<"user is not logged in ", Email/binary>>);      
         ?LOGIN_STATE_RESET_PASSWORD ->
             Email = maps:get(user_id, Map),
-            utils:format_error(?LOGIN_STATE_RESET_PASSWORD, <<"Password reset requested ", Email/binary>>);      
+            utils:format_success(?LOGIN_STATE_RESET_PASSWORD, <<"Password reset requested ", Email/binary>>);      
         ?LOGIN_STATE_RESET_USER ->
             Email = maps:get(user_id, Map),
-            utils:format_error(?LOGIN_STATE_RESET_PASSWORD, <<"Email reset requested ", Email/binary>>)                
+            utils:format_success(?LOGIN_STATE_RESET_PASSWORD, <<"Email reset requested ", Email/binary>>)                
     end.
 
-handle_new_user_id(userid, UserProfile, ClientID, Email, Password) ->
+updated_profile_password(Email, NewPassword, EmailResult) ->
+    case EmailResult of
+         {ok, Token} ->
+            login_db_access:update_user_profile(Email, login_token, Token),
+            login_db_access:update_user_profile(Email, pending_password, NewPassword),
+            utils:format_success(?LOGIN_STATE_EMAIL_SENT, <<"password reset email sent">>);
+         {error, Error} ->
+            utils:format_error(Error, <<"error sending email notification">>)
+    end.
+
+handle_password_reset(UserProfile, NewPassword) ->
+    OldPassword = maps:get(user_password, UserProfile),
+    Equal = string:equal(OldPassword, NewPassword),
+    if 
+        Equal =:= true ->
+            utils:format_error(?LOGIN_STATE_IDENTICAL_PASSWORDS, <<"new password cannot be equal to old password">>);
+        true ->
+            Email = maps:get(user_id, UserProfile),
+            case extract_user_name(Email) of 
+                {error, _Message} ->
+                    utils:format_error(?SERVER_ERROR_INVALID_EMAIL, <<"invalid email">>);
+                {ok, {User, _}} ->
+                    EmailResult = mail_utility:send_email(Email, list_to_binary(User), <<"click to complete password reset">>, <<"complete_password_reset">>),
+                    updated_profile_password(Email, NewPassword, EmailResult)
+            end
+    end.
+
+handle_profile_update(password, UserProfile, Password) ->
+    case UserProfile of
+        {aborted, Reason} ->
+            {error, Reason};
+
+        {error, no_records} ->
+            {error, no_such_client};
+
+        {_, Map} -> 
+            Result = validate_login_state(Map),
+            case Result of
+                {error, Message} ->
+                    {error, Message};
+                {ok, UserMap} ->
+                    Code = maps:get(code, UserMap),
+                    case Code of
+                        ?LOGIN_STATE_RESET_USER ->
+                            utils:format_error(Code, <<"complete user id reset">>);
+                        ?LOGIN_STATE_RESET_PASSWORD ->
+                            utils:format_error(Code, <<"complete password reset">>);
+                        ?LOGIN_STATE_EMAIL_SENT ->
+                            utils:format_error(Code, <<"complete profile creation">>);
+                        ?LOGIN_STATE_LOGGEDOUT ->
+                            utils:format_error(Code, <<"must be logged in to change password">>);
+                        _ ->
+                            handle_password_reset(Map, Password)
+                    end
+                    
+            end
+            
+    end.
+
+handle_profile_update(userid, UserProfile, ClientID, Email, Password) ->
     case UserProfile of
         {aborted, Reason} ->
             {error, Reason};
         {error, no_records} ->
             case extract_user_name(Email) of 
                 {ok, {User, _}} ->
-                    utils:log_message([{"Email", Email}]),
-                    EmeailResult = mail_utility:send_email(Email, list_to_binary(User)),
-                    check_email_sent_result(EmeailResult, ClientID, Email, Password);
+                    EmailResult = mail_utility:send_email(Email, list_to_binary(User), <<"click to complete login">>, <<"complete_login">>),
+                    check_email_sent_result(EmailResult, ClientID, Email, Password);
                 {error, Result} ->
                     utils:format_error(?SERVER_ERROR_INVALID_EMAIL, <<"Invalid email address: ", Result/binary>>)
             end;
         {_, Map} ->
-            validate_email_state(Map)
+            validate_login_state(Map)
     end.
 
 extract_user_name(Email) ->
@@ -202,7 +303,6 @@ check_email_sent_result(EmailResponse, ClientID, Email, Password) ->
 
 query_user_login_id(EncryptedData) ->
     Result = utils:extract_id(EncryptedData),
-    utils:log_message([{"Result", Result}]),
     case Result of
         {ok, Email} ->
             process_query_request(Email);
@@ -237,7 +337,6 @@ process_query_request(Email) ->
     process_user_profile_query_result(UserProfile).
 
 process_user_profile_query_result(Result) ->
-    utils:log_message([{"Result", Result}]),
     case Result of
         {aborted, Reason} ->
             io:format("error reading users_login_table: ~p~n", [Reason]),

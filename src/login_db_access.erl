@@ -55,8 +55,6 @@ get_user_profile_from_token(Token) ->
 
 get_user_profile(public, LoginID) ->
     ReaderFun = fun() -> mnesia:read(users_login_table, LoginID) end, 
-    utils:log_message([{"LoginID", LoginID}]),
-    utils:log_message([{"Return", mnesia:transaction(ReaderFun)}]),
     case mnesia:transaction(ReaderFun) of
         {aborted,{Reason,_}} -> 
             {aborted, Reason};
@@ -85,6 +83,7 @@ get_user_profile(private, LoginID) ->
                 user_id=>Record#users_login_table.user_id,
                 client_id=>Record#users_login_table.client_id,
                 user_password=>Record#users_login_table.user_password,
+                pending_password=>Record#users_login_table.pending_password,
                 login_token=>Record#users_login_table.login_token,
                 log_in_time=>Record#users_login_table.log_in_time,
                 log_in_state=>Record#users_login_table.log_in_state,
@@ -108,7 +107,6 @@ update_user_profile(DataMap) ->
 
 mark_user_as_logged_in(Email) ->
     DebugMsg = login_db_access:get_user_profile(public, Email),
-    utils:log_message([{"DebugMsg", DebugMsg}, {"Email", Email}]),
     case login_db_access:get_user_profile(private, Email) of 
         {aborted, Reason} ->
             io:format("error reading users_login_table: ~p~n", [Reason]),
@@ -150,6 +148,10 @@ update_user_profile(LoginID, Member, NewValue) ->
                     mnesia:transaction(WriteFun);
                 permitions ->
                     UpdateRecord = Record#users_login_table{permitions = NewValue},
+                    WriteFun = fun() -> mnesia:write(UpdateRecord) end,
+                    mnesia:transaction(WriteFun);
+                pending_password ->
+                    UpdateRecord = Record#users_login_table{pending_password = NewValue},
                     WriteFun = fun() -> mnesia:write(UpdateRecord) end,
                     mnesia:transaction(WriteFun)
             end,
