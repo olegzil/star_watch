@@ -35,7 +35,8 @@
 		 decrypt_data/1,
 		 format_login_server_return/3,
 		 extract_id_and_password/1,
-		 extract_id/1]).
+		 extract_id/1,
+		 my_exec/1]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -745,7 +746,7 @@ extract_id_and_password(validate_part2, [_,Data]) ->
 
 extract_id_and_password(validate_part3, Data) when length(Data) =:= 2 ->
     [ID, Password] = Data,
-    {string:trim(ID), string:trim(Password)};
+    {string:lowercase(string:trim(ID)), string:trim(Password)};
 
 extract_id_and_password(validate_part3, _Data) -> false.
 
@@ -792,6 +793,34 @@ get_parts(<<TL:32, TM:16, THV:16, CSR:8, CSL:8, N:48>>) ->
     [TL, TM, THV, CSR, CSL, N].
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+my_exec(Command) ->
+    Port = open_port({spawn, Command}, [stream, in, eof, hide, exit_status]),
+    get_data(Port, []).
+
+get_data(Port, Sofar) ->
+    receive
+    {Port, {data, Bytes}} ->
+        get_data(Port, [Sofar|Bytes]);
+    {Port, eof} ->
+        Port ! {self(), close},
+        receive
+        {Port, closed} ->
+            true
+        end,
+        receive
+        {'EXIT',  Port,  _} ->
+            ok
+        after 1 ->              % force context switch
+            ok
+        end,
+        ExitCode =
+            receive
+            {Port, {exit_status, Code}} ->
+                Code
+        end,
+        {ExitCode, lists:flatten(Sofar)}
+    end.
+
 remove_duplicate_channels() ->
 	{atomic, Keys} = mnesia:transaction(fun() -> mnesia:all_keys(client_profile_table) end),
 	lists:foreach(fun(Key)-> 

@@ -258,8 +258,6 @@ handle_profile_update(password, UserProfile, Password) ->
                             utils:format_error(Code, <<"complete password reset">>);
                         ?LOGIN_STATE_EMAIL_SENT ->
                             utils:format_error(Code, <<"complete profile creation">>);
-                        ?LOGIN_STATE_LOGGEDOUT ->
-                            utils:format_error(Code, <<"must be logged in to change password">>);
                         _ ->
                             handle_password_reset(Map, Password)
                     end
