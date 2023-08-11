@@ -28,11 +28,13 @@ start(_Type, _Args) ->
     RegistrationRoute = {"/telemetry/request/[...]", [ApiKeyConstraints], telemetry_request_handler, []},
     TelemetryRoute = {"/telemetry/stats/[...]", [ApiKeyConstraints], telemetry_handler, []},
     CatchAllRoute = {"/[...]", no_such_endpoint, []},
+    IPMap = utils:get_current_endpoints(),
+    ActivePort = maps:get(active_port, IPMap),
     Dispatch = cowboy_router:compile([
         {'_', [LoginRoute, FetchAdminRoute, FetchYoutubeChanneRoute, FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
-         [{port, ?HTTP_ACTIVE_PORT}],
+         [{port, ActivePort}],
         #{env => #{dispatch => Dispatch}}
     ),
     inets:start(),

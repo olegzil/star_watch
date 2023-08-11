@@ -118,7 +118,7 @@ validate_request(action, Request) ->
             if Found =:= true->
                     secondary_action_validation(Action, TokenList);
                 true ->
-                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"no such action: ", Action/binary>>),
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"no such action2: ", Action/binary>>),
                     {error, jiffy:encode(Message)}
             end
         end.

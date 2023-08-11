@@ -47,7 +47,7 @@ get_user_profile_from_token(Token) ->
     Fun = fun() -> mnesia:match_object(#users_login_table{login_token=Token, _='_'}) end,
     Result = mnesia:transaction(Fun),
     case Result of
-        [] -> 
+        {atomic, []} -> 
             {error, <<"not found">>};
         {atomic, [Record]} ->
             {ok, Record}
@@ -66,6 +66,7 @@ get_user_profile(public, LoginID) ->
         		client_id => Record#users_login_table.client_id,
         		log_in_time => Record#users_login_table.log_in_time,
                 log_in_state => Record#users_login_table.log_in_state,
+                user_validated => Record#users_login_table.user_validated,
         		error_text => <<"">>
         	},
         	{ok, Result}
@@ -87,6 +88,7 @@ get_user_profile(private, LoginID) ->
                 login_token=>Record#users_login_table.login_token,
                 log_in_time=>Record#users_login_table.log_in_time,
                 log_in_state=>Record#users_login_table.log_in_state,
+                user_validated =>Record#users_login_table.user_validated,
                 permitions => Record#users_login_table.permitions
             },
             {ok, Result}
@@ -99,6 +101,7 @@ update_user_profile(DataMap) ->
                 login_token = maps:get(login_token,DataMap),
                 log_in_time = maps:get(log_in_time,DataMap),
                 log_in_state = maps:get(log_in_state,DataMap),
+                user_validated = maps:get(user_validated, DataMap),
                 permitions = maps:get(permitions,DataMap)
         },
     WriteFun = fun() -> mnesia:write(Record) end,
@@ -106,7 +109,6 @@ update_user_profile(DataMap) ->
     {ok, Record}.
 
 mark_user_as_logged_in(Email) ->
-    DebugMsg = login_db_access:get_user_profile(public, Email),
     case login_db_access:get_user_profile(private, Email) of 
         {aborted, Reason} ->
             io:format("error reading users_login_table: ~p~n", [Reason]),
@@ -153,7 +155,11 @@ update_user_profile(LoginID, Member, NewValue) ->
                 pending_password ->
                     UpdateRecord = Record#users_login_table{pending_password = NewValue},
                     WriteFun = fun() -> mnesia:write(UpdateRecord) end,
-                    mnesia:transaction(WriteFun)
+                    mnesia:transaction(WriteFun);
+                user_validated ->
+                    UpdateRecord = Record#users_login_table{user_validated = NewValue},
+                    WriteFun = fun() -> mnesia:write(UpdateRecord) end,
+                    mnesia:transaction(WriteFun)                    
             end,
             {atomic, [NewRecord]} = mnesia:transaction(ReaderFun),
             Result = #{
@@ -176,6 +182,7 @@ create_user_profile(ClientID, UserID, Password, Token) ->
         login_token=Token,
         log_in_time=erlang:system_time(millisecond),
         log_in_state=?LOGIN_STATE_EMAIL_SENT,
+        user_validated = true,
         permitions = 0
     },
     WriteFun = fun() -> mnesia:write(UserProfile) end,

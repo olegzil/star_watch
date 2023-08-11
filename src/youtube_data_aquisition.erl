@@ -30,7 +30,7 @@ fetch_single_page(Date, MasterMap, [Head|Tail], MaxResults) ->
 					SectionMap = maps:put(ChannelID, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
 					NewMaster = maps:merge(SectionMap, MasterMap),
 					fetch_channel_data(Date, NewMaster, Tail, ?YOUTUBE_MAXRESULTS);
-				{error, ErrorMessage} ->
+				{error, _ErrorMessage} ->
 					fetch_channel_data(Date, MasterMap, [], ?YOUTUBE_MAXRESULTS)
 			end;
 

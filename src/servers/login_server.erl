@@ -68,9 +68,7 @@ handle_call({user_profile, _ClientID, EncryptedData}, _From, State) ->
 handle_call({login_reset_password, _ClientID, EncryptedData}, _From, State) ->
     case utils:extract_id_and_password(EncryptedData) of
         {Email, Password} ->
-            utils:log_message([{"Password", Password}]),
             Profile = login_db_access:get_user_profile(private, Email),
-            utils:log_message([{"Profile", Profile}]),
             CreateNewUserResult = handle_profile_update(password, Profile, Password),
             {reply, CreateNewUserResult, State};
         error ->
@@ -95,7 +93,7 @@ handle_call({complete_password_reset, Token}, _From, State) ->
     case Profile of
         {error, _} ->
             {error, Error} = utils:format_error(?SERVER_ERROR_NO_SUCH_USER_ID, <<"no such token: ", Token/binary>>),
-            {error, Error};
+            {reply, {error, Error}, State};
         {ok, Record} ->
             TimeDelta = erlang:system_time(millisecond) - Record#users_login_table.log_in_time,
             if
@@ -113,7 +111,6 @@ handle_call({complete_password_reset, Token}, _From, State) ->
 
 
 handle_call({complete_login, Token}, _From, State) ->
-    io:format("from handle_call:complete_login~n"),
     Profile=login_db_access:get_user_profile_from_token(Token),
     case Profile of
         {error, _} ->
@@ -125,6 +122,8 @@ handle_call({complete_login, Token}, _From, State) ->
                 TimeDelta > ?LOGIN_TOKEN_EXPIRATION_TIME ->
                     {error, Error} = utils:format_error(?LOGIN_TOKEN_EXPIRATION_TIME, <<"expired token">>),
                     login_db_access:delete_user(token, Token),
+                    login_db_access:update_user_profile(Record#users_login_table.user_id, login_token, ?LOGIN_STATE_TOKEN_EXPIRED),
+
                     {reply, {error, Error}, State};
                 true ->
                     Email = Record#users_login_table.user_id,
@@ -155,7 +154,7 @@ terminate(_Reason, _State) -> ok.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 complete_registration(Email)->
     UpdateFun = fun()->
-        [Record] = mnesia:read(users_login_table, Email, write),
+        [Record] = mnesia:read(users_login_table, Email),
         mnesia:write(Record#users_login_table{
                     login_token = undefined,
                     log_in_time = erlang:system_time(millisecond),
@@ -163,7 +162,9 @@ complete_registration(Email)->
                     user_validated = true
             })
     end,
-    mnesia:transaction(UpdateFun).
+    mnesia:transaction(UpdateFun),
+    VerificationRead = fun()-> mnesia:read(users_login_table, Email) end,
+    mnesia:transaction(VerificationRead).    
 
 complete_password_reset(Email) ->
     UpdateFun = fun()->
@@ -214,11 +215,11 @@ updated_profile_password(Email, NewPassword, EmailResult) ->
          {ok, Token} ->
             login_db_access:update_user_profile(Email, login_token, Token),
             login_db_access:update_user_profile(Email, pending_password, NewPassword),
+            login_db_access:update_user_profile(Email, log_in_state, ?LOGIN_STATE_LOGGEDOUT),
             utils:format_success(?LOGIN_STATE_EMAIL_SENT, <<"password reset email sent">>);
          {error, Error} ->
             utils:format_error(Error, <<"error sending email notification">>)
     end.
-
 handle_password_reset(UserProfile, NewPassword) ->
     OldPassword = maps:get(user_password, UserProfile),
     Equal = string:equal(OldPassword, NewPassword),
@@ -279,7 +280,13 @@ handle_profile_update(userid, UserProfile, ClientID, Email, Password) ->
                     utils:format_error(?SERVER_ERROR_INVALID_EMAIL, <<"Invalid email address: ", Result/binary>>)
             end;
         {_, Map} ->
-            validate_login_state(Map)
+            Validated = maps:get(user_validated, Map),
+             if 
+                Validated =:= true ->
+                    utils:format_error(?LOGIN_ERROR_ACCOUNT_EXISTS, <<"user ", Email/binary, " already exists">>);
+                true ->
+                    validate_login_state(Map)
+             end
     end.
 
 extract_user_name(Email) ->

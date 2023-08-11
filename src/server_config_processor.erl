@@ -32,7 +32,8 @@
 		 copy_profile_and_add_new_channel/2,
 		 restore_default_client/1,
 		 read_private_key_file/0,
-		 get_email_keys/1]).
+		 get_email_keys/1,
+		 get_ip_flag/1]).
 
 -compile(export_all).
 
@@ -72,7 +73,9 @@ get_email_keys(File) ->
 	PublicKey = maps:get(api_key_public, ControlBlock),
 	SecreteKey = maps:get(api_key_private, ControlBlock),
 	{PublicKey, SecreteKey}.
-
+get_ip_flag(File) ->
+	ControlBlock = get_server_control_block(File),
+	maps:get(use_local_ip, ControlBlock).	
 %%% Returns a map: #{directoryrecords => [Item1, ..., ItemN] }, where Item is itself a map: #{channel_id => a, client => b, name => c}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% Begin fetch_channel_directory logic %%%%%%%%%%%%%

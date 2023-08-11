@@ -154,15 +154,6 @@ execute_request(handle_post, Action, ClientID, ClientData) ->
                     {error, jiffy:encode(#{error =>Bad})}
             end;
 
-        <<"login_new_password">> ->
-            Result = gen_server:call(login_server, {login_new_password, ClientID, ClientData}, infinity),
-            case Result of
-                {ok, Good} ->
-                    {ok, jiffy:encode(#{success => Good})};
-                {error, Bad} ->
-                    {error, jiffy:encode(#{error =>Bad})}
-            end;
-
         <<"login_existing">> ->
             Result = gen_server:call(login_server, {login_existing, ClientID, ClientData}, infinity),
             case Result of
@@ -174,7 +165,6 @@ execute_request(handle_post, Action, ClientID, ClientData) ->
 
         <<"login_reset_password">> ->
             Result = gen_server:call(login_server, {login_reset_password, ClientID, ClientData}, infinity),
-            utils:log_message([{"Result", Result}]),
             case Result of
                 {ok, Good} ->
                     {ok, jiffy:encode(#{success => Good})};
@@ -246,7 +236,7 @@ validate_request(action, Request, AvailableActions) ->
             if Found =:= true->
                     secondary_action_validation(Action, TokenList);
                 true ->
-                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"no such action: ", Action/binary>>),
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_ACTION, <<"no such action_1: ", Action/binary>>),
                     {error, jiffy:encode(Message)}
             end
         end;

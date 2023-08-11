@@ -36,7 +36,8 @@
 		 format_login_server_return/3,
 		 extract_id_and_password/1,
 		 extract_id/1,
-		 my_exec/1]).
+		 exec_extern_cmd/1,
+		 get_current_endpoints/0]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -633,7 +634,8 @@ format_login_server_return(Code, Type, Message) ->
 				    client_id => maps:get(client_id, Type),
 				    log_in_state => Code,
 				    log_in_time => maps:get(log_in_time, Type),
-				    error_text => Message
+				    error_text => Message,
+				    user_validated => maps:get(user_validated, Type)
 				}};
 		erlang:is_record(Type, users_login_table) =:= true ->
 			{ok, #{
@@ -641,8 +643,9 @@ format_login_server_return(Code, Type, Message) ->
 				    client_id => Type#users_login_table.client_id,
 				    log_in_state => Code,
 				    log_in_time => Type#users_login_table.log_in_time,
-				    error_text => Message
-						}};
+				    error_text => Message,
+				    user_validated => Type#users_login_table.user_validated
+				}};
 		true -> error
 	end.
 
@@ -725,7 +728,6 @@ decrypt(Key, EncryptedData) ->
 
 extract_id(Data) ->
     {ok, Id} = utils:decrypt_data(Data),
-    utils:log_message([{"ClearText", Id}]),
     {ok, Id}.
 
 extract_id_and_password(Data) ->
@@ -793,7 +795,29 @@ get_parts(<<TL:32, TM:16, THV:16, CSR:8, CSL:8, N:48>>) ->
     [TL, TM, THV, CSR, CSL, N].
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-my_exec(Command) ->
+get_current_endpoints() ->
+	case server_config_processor:get_ip_flag(?SERVER_CONFIG_FILE) of 
+		true ->
+			{0, Result} = exec_extern_cmd("ifconfig"),
+			Start = string:rstr(Result, "wlp3s0:"),
+			Substr = string:sub_string(Result, Start),
+			Tokens = string:tokens(Substr, " "),
+			IPValue = list_to_binary(lists:nth(6, Tokens)),
+			EndPoint = <<"http://", IPValue/binary, ":", ?HTTP_PORT_LOCAL/binary, "/">>,
+			#{
+				ip_value => IPValue,
+				active_port => binary_to_integer(?HTTP_PORT_LOCAL),
+				call_back_endpoint => EndPoint
+			};
+		false ->
+			#{
+				ip_value => ?REMOTE_IP,
+				active_port => binary_to_integer(?HTTP_PORT_REMOTE),
+				call_back_endpoint => ?LOGIN_CALLBACK_ADDRESS_REMOTE
+			}
+	end.
+
+exec_extern_cmd(Command) ->
     Port = open_port({spawn, Command}, [stream, in, eof, hide, exit_status]),
     get_data(Port, []).
 

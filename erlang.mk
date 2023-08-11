@@ -1353,14 +1353,6 @@ pkg_eredis_fetch = git
 pkg_eredis_repo = https://github.com/wooga/eredis
 pkg_eredis_commit = master
 
-PACKAGES += eredis_pool
-pkg_eredis_pool_name = eredis_pool
-pkg_eredis_pool_description = eredis_pool is Pool of Redis clients, using eredis and poolboy.
-pkg_eredis_pool_homepage = https://github.com/hiroeorz/eredis_pool
-pkg_eredis_pool_fetch = git
-pkg_eredis_pool_repo = https://github.com/hiroeorz/eredis_pool
-pkg_eredis_pool_commit = master
-
 PACKAGES += erl_streams
 pkg_erl_streams_name = erl_streams
 pkg_erl_streams_description = Streams in Erlang
@@ -3129,22 +3121,6 @@ pkg_ponos_fetch = git
 pkg_ponos_repo = https://github.com/klarna/ponos
 pkg_ponos_commit = master
 
-PACKAGES += poolboy
-pkg_poolboy_name = poolboy
-pkg_poolboy_description = A hunky Erlang worker pool factory
-pkg_poolboy_homepage = https://github.com/devinus/poolboy
-pkg_poolboy_fetch = git
-pkg_poolboy_repo = https://github.com/devinus/poolboy
-pkg_poolboy_commit = master
-
-PACKAGES += pooler
-pkg_pooler_name = pooler
-pkg_pooler_description = An OTP Process Pool Application
-pkg_pooler_homepage = https://github.com/seth/pooler
-pkg_pooler_fetch = git
-pkg_pooler_repo = https://github.com/seth/pooler
-pkg_pooler_commit = master
-
 PACKAGES += pqueue
 pkg_pqueue_name = pqueue
 pkg_pqueue_description = Erlang Priority Queues
@@ -4160,14 +4136,6 @@ pkg_websocket_client_homepage = https://github.com/jeremyong/websocket_client
 pkg_websocket_client_fetch = git
 pkg_websocket_client_repo = https://github.com/jeremyong/websocket_client
 pkg_websocket_client_commit = master
-
-PACKAGES += worker_pool
-pkg_worker_pool_name = worker_pool
-pkg_worker_pool_description = a simple erlang worker pool
-pkg_worker_pool_homepage = https://github.com/inaka/worker_pool
-pkg_worker_pool_fetch = git
-pkg_worker_pool_repo = https://github.com/inaka/worker_pool
-pkg_worker_pool_commit = master
 
 PACKAGES += wrangler
 pkg_wrangler_name = wrangler

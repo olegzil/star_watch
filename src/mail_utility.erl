@@ -10,14 +10,15 @@ send_email(ToEmail, ToName, Message, Endpoint) ->
     SandboxMode = false,
     FromEmail = <<"TheTinkerersShop@gmail.com">>,
 
-    PREAMBLE = << "<a href=\"">>,
-    POSTAMBLE = << "\">", Message/binary, "</a>" >>,
-    LOGIN_CALLBACK_PATH = <<"youtube/login">>,
+    Preamble = << "<a href=\"">>,
+    Postamble = << "\">", Message/binary, "</a>" >>,
+    LoginCallbackPath = <<"youtube/login">>,
     LoginAction = <<"?action=", Endpoint/binary, "&login_token=">>,
     Token = list_to_binary(utils:to_string(utils:v4())),
-    MainLink = << ?LOGIN_CALLBACK_ADDRESS_ACTIVE/binary, LOGIN_CALLBACK_PATH/binary, LoginAction/binary, Token/binary >>,
-    Link = <<PREAMBLE/binary, MainLink/binary, POSTAMBLE/binary >>,
-    utils:log_message([{"Link", Link}]),
+    IPMap = utils:get_current_endpoints(),
+    LoginCallbackAddress = maps:get(call_back_endpoint, IPMap),
+    MainLink = << LoginCallbackAddress/binary, LoginCallbackPath/binary, LoginAction/binary, Token/binary >>,
+    Link = <<Preamble/binary, MainLink/binary, Postamble/binary >>,
     % Create the request payload
     Payload = #{<<"SandboxMode">> => SandboxMode,
                 <<"Messages">> => [
@@ -38,13 +39,17 @@ send_email(ToEmail, ToName, Message, Endpoint) ->
     Request = {Url, Headers, "POST", JsonPayload},
 
     % Perform the HTTP request
-    {ok, {StatusCode, _RespHeaders, _RespBody}} = httpc:request(post, Request, Options, [{body_format, binary}]),
-    {_, Code, _} = StatusCode,
+    Result = httpc:request(post, Request, Options, [{body_format, binary}]),
+    check_email_provider_return(Token, Result).
 
-    % Handle the response
+check_email_provider_return(Token, {ok, {StatusCode, _RespHeaders, _RespBody}}) ->
+    {_, Code, _} = StatusCode,
     case Code of
         200 ->
             {ok, Token};
         _ErrorCode ->
             {error, ?LOGIN_STATE_EMAIL_NOTIFICATION_FAILED}
-    end.
+    end;
+
+check_email_provider_return(_Token, {error, {StatusCode, RespHeaders, RespBody}}) ->
+    {error, ?LOGIN_STATE_EMAIL_NOTIFICATION_FAILED}.
