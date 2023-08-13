@@ -308,7 +308,7 @@ is_channel_id_in_youtube_channel(ClientID, Link) ->
 %%%
 %%% Get the latest image associate with this channel
 %%%
-get_channel_data(_ClientID, ChannelID) ->
+get_channel_data(ClientID, ChannelID) ->
     Records = get_channel_data_db(ChannelID),
     Predicate = fun(Lhs, Rhs) ->
         if
@@ -319,9 +319,7 @@ get_channel_data(_ClientID, ChannelID) ->
     end,
     case length(Records) of
         0 ->
-            % A = youtube_data_aquisition:fetch_single_video(ClientID, ChannelID),
-            UpdatedRecord = get_channel_data_db(ChannelID),
-           %TODO: This needs to be changed. Records will be [] so the asigment will fail
+            UpdatedRecord = process_channel_list(ClientID, ChannelID, get_channel_data_db(ChannelID)),
             SortedList = lists:sort(Predicate, UpdatedRecord),
             [First | _] = SortedList,
             First;
@@ -342,6 +340,12 @@ does_record_exist(TargetID, TableName) ->
         {atomic, []} -> false;
         {atomic, _} -> true
     end.
+
+process_channel_list(_ClientID, _ChannelID, [NoneEmptyList]) -> 
+    [NoneEmptyList];
+process_channel_list(ClientID, ChannelID, []) ->
+    db_access_server:fetch_channel_data(serverfirst, ClientID, ChannelID),
+    get_channel_data_db(ChannelID).
 
 %%% This function deletes a channel associated with this client id. If the cient ID is not found, 
 %%% the funnction assumes it's a new ID. In this case, the channels from the default client id

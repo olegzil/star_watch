@@ -435,4 +435,3 @@ restore_default_client(ClientID) ->
 		_ ->
 			utils:format_error(?SERVER_ERROR_NO_SUCH_CLIENT, <<"no such client id: ", ClientID/binary>>)
 	end.
-

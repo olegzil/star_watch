@@ -7,7 +7,7 @@
 -include("include/macro_definitions.hrl").
 -export([start_link/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2,
-         handle_info/2, code_change/3, terminate/2]).
+         handle_info/2, code_change/3, terminate/2, fetch_channel_data/3]).
 -compile(export_all).
 
 start_link(Args) ->
@@ -156,7 +156,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(_Reason, _State) -> ok.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Helper functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fetch_channel_data(serverfirst, ClientID, ChannelID) ->
         respond_to_video_fetch_request(ClientID, ChannelID, []);
@@ -165,6 +165,8 @@ fetch_channel_data(dbfirst, ClientID, ChannelID) ->
         ListOfRecords = db_access:fetch_videos_for_channel_id(ChannelID),
         respond_to_video_fetch_request(ClientID, ChannelID, ListOfRecords).
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Private Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 respond_to_video_fetch_request(ClientID, ChannelID, []) ->
     ChannelDescriptor = 
