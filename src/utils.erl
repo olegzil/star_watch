@@ -620,7 +620,6 @@ format_success(Code, Message) ->
 			end,
 	 Success = #{
 	 	code => Code,
-	 	status => success,
 		date_time => utils:current_time_string(),
 		text => Message
 	},

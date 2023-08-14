@@ -350,8 +350,9 @@ process_channel_list(ClientID, ChannelID, []) ->
 %%% This function deletes a channel associated with this client id. If the cient ID is not found, 
 %%% the funnction assumes it's a new ID. In this case, the channels from the default client id
 %%% are serched for the target clientID. If not found, an error is returned. If found, all channels
-%%% from the default client id are coppied to the new client id and the targe id is deleted.
+%%% from the default client id are coppied to the new client id and the target id is deleted.
 delete_channel_from_client(ClientID, ChannelID) ->
+    utils:log_message([{"clien id", ClientID}, {"channel id", ChannelID}]),
     ReadResult = mnesia:transaction(fun() -> mnesia:read(client_profile_table, ClientID) end),
     case ReadResult of
         {atomic, []} ->
@@ -374,21 +375,37 @@ delete_channel_from_client(ClientID, ChannelID) ->
             end
     end.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Given the default record that contains multiple channels and a channel id     %%%
+%%% this function returns a tuple: {<<"Title">>, <<"Channel ID">>} for an exiting %%% 
+%%% channel id in the default client record or false if the channel id does not   %%%
+%%% exist in the default client record.                                           %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+extract_client_channel_or_error(DefaultRecord, ChannelID) ->
+    case DefaultRecord of
+        {error, no_such_client} ->
+            {error, no_such_client};
+        {ok, Record} ->
+            SearchResult = lists:keyfind(ChannelID, 2, Record#client_profile_table.channel_list),
+            {SearchResult, Record}
+    end.
+
 use_default_client(ClientID, ChannelID) ->
     DefaultClient = server_config_processor:get_client_key(?SERVER_CONFIG_FILE),
     DefaultRecord = server_config_processor:fetch_client_config_data_db(not_json, DefaultClient),
-    Found = lists:keyfind(ChannelID, 2, DefaultRecord#client_profile_table.channel_list),
-    case Found of
-        false ->
+    case extract_client_channel_or_error(DefaultRecord, ChannelID) of
+        {error, no_such_client} ->
+            utils:format_error(?SERVER_ERROR_NO_SUCH_CLIENT, no_such_client);
+        {false, _} ->
             utils:format_error(?SERVER_ERROR_NO_SUCH_CHANNEL, no_such_channel);
-        _ ->
-            mnesia:transaction(fun()-> 
-                NewList = lists:keydelete(ChannelID, 2, DefaultRecord#client_profile_table.channel_list),
-                NewRecord = DefaultRecord#client_profile_table{
+        {_, Record} ->
+            Result = mnesia:transaction(fun()-> 
+                NewList = lists:keydelete(ChannelID, 2, Record#client_profile_table.channel_list),
+                mnesia:write(Record#client_profile_table{
                     client_id = ClientID,
                     channel_list = NewList
-                },
-                mnesia:write(NewRecord)
+                })
             end),
             {ok, Message} = utils:format_success(?SERVER_ERROR_OK, <<"channelID: ", ChannelID/binary, " has been deleted">>),
             {ok, jiffy:encode(Message)}
