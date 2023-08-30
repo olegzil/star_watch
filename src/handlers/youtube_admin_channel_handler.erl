@@ -26,7 +26,8 @@ submit_request_for_processing(Request) ->
 
     case ValidationResult of
         {ok, Result} ->
-            case administrator:handle_admin_action(Result) of
+            {Action, Parameter} = Result,
+            case administrator:handle_admin_action(Action, Parameter) of
             {ok, Good} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, jiffy:encode(Good), Request),
                 Good;
@@ -41,9 +42,10 @@ submit_request_for_processing(Request) ->
     end.
 validate_request(all, TokenList) ->
     ValidateAdminKey =  validate_request(adminkey, TokenList),
+    ValidateClientKey = validate_request(clientkey, TokenList),
     AdminAction = validate_request(action, TokenList),
 
-    TestList = [ValidateAdminKey, AdminAction],
+    TestList = [ValidateAdminKey, AdminAction, ValidateClientKey],
     ErrorTuple = lists:keyfind(error, 1, TestList),
     case ErrorTuple of
         false ->
@@ -62,6 +64,22 @@ validate_request(adminkey, TokenList) ->
             {_Tag, AdminKey} = Target,
             validate_admin_key(AdminKey)
     end;
+
+validate_request(clientkey, TokenList)     ->
+    Result = lists:keyfind(<<"client_id">>, 1, TokenList),
+    case Result of
+        {<<"client_id">>, ClientID} ->
+            Found = server_config_processor:is_client_in_profile_map(ClientID),
+            if
+                Found =:= false ->
+                    {error, no_such_client};
+                true ->
+                    {ok, ClientID}
+            end;
+        _ ->
+            {error, client_id_required}
+    end;
+
 validate_request(action, TokenList) ->
     Target = lists:keyfind(<<"action">>, 1, TokenList),
     if
@@ -78,64 +96,44 @@ validate_request(action, TokenList) ->
 
 validate_action(Action, TokenList) ->
     case Action of
+        <<"addchannel">> ->
+            {_, ClientID} = lists:keyfind(<<"client_id">>, 1, TokenList),
+            case lists:keyfind(<<"channel_id">>, 1, TokenList) of
+                false ->
+                    {error, channel_id_required};
+                {_, ChannelID} ->
+                    case lists:keyfind(<<"channel_name">>, 1, TokenList) of
+                        false ->
+                            {error, channel_name_required};
+                        {_, ChannelName} ->
+                            {ok, {<<"addchannel">>, {ClientID, ChannelID, ChannelName}}}
+                    end
+            end;
+
         <<"deleteconfigrecord">> -> % Format: action=deleteconfigrecord&client_id=<ClientID>
-            validate_client_id_for_action(<<"deleteconfigrecord">>, TokenList);
+            {_, ClientID} = lists:keyfind(<<"client_id">>, 1, TokenList),
+            {ok, {<<"deleteconfigrecord">>, {ClientID, undefined}}}; %% Degenerate case this call has no other parameters
 
         <<"fetchprofilemap">> ->
-            {ok, <<"fetchprofilemap">>};
+            {_, ClientID} = lists:keyfind(<<"client_id">>, 1, TokenList),
+            {ok, {<<"fetchprofilemap">>, {ClientID, undefined}}}; %% Degenerate case this call has no other parameters
 
         <<"fetchclientprofile">> ->
-            validate_client_id_for_action(<<"fetchclientprofile">>, TokenList);
+            {_, ClientID} = lists:keyfind(<<"client_id">>, 1, TokenList),
+            {ok, {<<"fetchclientprofile">>, {ClientID, undefined}}};  %% Degenerate case this call has no other parameters
 
-        <<"updateclientprofile">> ->
-            TargetIDParam = lists:keyfind(<<"target_client_id">>, 1, TokenList),
-            ChannelParam = lists:keyfind(<<"channel_descipion">>, 1, TokenList),
-            VideoParam = lists:keyfind(<<"video_link">>, 1, TokenList),
-            if
-                TargetIDParam =:= false ->
-                    {error, target_client_id_required};
-                ChannelParam =:= false ->
-                    {error, channel_data_required};
-                true ->
-                    {_, TargetID} = TargetIDParam,
-                    {_, ChannelData} = ChannelParam, % {name, channel_id}
-                    {_, VideoLink}   = VideoParam,
-                    NameAndID = validate_channel_data(ChannelData),
-                    if
-                        NameAndID =:= false ->
-                            {error, invalid_channel_data};
-                        true ->
-                          {<<"updateclientprofile">>,  {ClientID, {ChannelName, ChannelID}}} =
-                          {<<"updateclientprofile">>, {TargetID, NameAndID}},
-                          {ok, {<<"updateclientprofile">>,  {ClientID, {ChannelName, ChannelID, VideoLink}}}}
-                    end
+        <<"deleteyoutubechannel">> ->
+            case lists:keyfind(<<"channel_id">>, 1, TokenList) of
+                false ->
+                    {error, channel_id_required};
+                {_, ChannelID} ->
+                    {_, ClientID} = lists:keyfind(<<"client_id">>, 1, TokenList),
+                    {ok, {<<"deleteyoutubechannel">>, {ClientID, ChannelID}}};
+                _ ->
+                    {error, no_such_command}
             end;
         _ ->
             {error, no_such_command}
-    end.
-validate_channel_data(ChannelData) ->
-    Data = string:split(ChannelData, ",", all),
-    Count = length(Data), 
-    case Count of
-        2 ->
-            {lists:nth(1, Data), lists:nth(2, Data)};
-        _ ->
-            false
-    end.
-
-validate_client_id_for_action(Action, TokenList) ->
-    Result = lists:keyfind(<<"client_id">>, 1, TokenList),
-    case Result of
-        {<<"client_id">>, ClientID} ->
-            Found = server_config_processor:is_client_in_profile_map(approved, ClientID),
-            if
-                Found =:= false ->
-                    {error, no_such_client};
-                true ->
-                    {ok, {Action, ClientID}}
-            end;
-        _ ->
-            {error, invalid_parameters}
     end.
 
 validate_admin_key(Key) when ?ADMINISTRATOR_KEY =:= Key -> ok;

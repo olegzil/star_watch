@@ -14,26 +14,24 @@
 		 delete_client_config_data_db/1,
 		 process_channel_request/3,
 		 add_client_config_data/4,
-		 update_client_profile_channels/3,
-		 update_client_record/3,
 		 fetch_profile_map_from_db/1,
 		 generate_profile_map/1,
 		 get_default_youtube_key/1, 
 		 get_client_key/1,
 		 populate_client_profile_table/1,
-		 is_client_in_profile_map/2,
+		 is_client_in_profile_map/1,
 		 delete_config_record/1, 
 		 is_channel_in_profile/2,
 		 delete_youtube_channel/2,
 		 fetch_config_data_for_client/1,
-		 update_existing_client/1,
+		 update_existing_client/4,
 		 add_new_client_record/1,
-		 add_new_channel_to_profile/2,
 		 copy_profile_and_add_new_channel/2,
 		 restore_default_client/1,
 		 read_private_key_file/0,
 		 get_email_keys/1,
-		 get_ip_flag/1]).
+		 get_ip_flag/1,
+		 update_existing_client_unconditionally/3]).
 
 -compile(export_all).
 
@@ -174,53 +172,6 @@ add_client_config_data(ClientID, Name, YoutubeKey, ChannelID) ->
 			mnesia:transaction(fun() -> mnesia:write(NewRecord) end)
 	end.
 
-%%% The production profile table does not have this client. Add it unconditionally
-update_client_profile_channels(_ClientID, [], NewRecord) ->
-	OutRecord = #client_profile_table{client_id = NewRecord#client_profile_table_pending.client_id,	
-																			 channel_list = NewRecord#client_profile_table_pending.video_id_list},
-	mnesia:activity(transaction, fun() -> mnesia:write(OutRecord) end),
-	{ok, record_promoted_1};
-
-%%% The Production profile table does have this client. Search its chanel list and update it accordingly.
-update_client_profile_channels(_ChannelID, [ClientProfile], NewRecord) ->
-	[{NewName,[{_,_},{_,_}]}] = NewRecord#client_profile_table_pending.video_id_list,
-	Found = lists:any(fun(Item)-> 
-		{ChannelName,[{_,_},{_,_}]} = Item,
-		ChannelName =:= NewName
-	end, NewRecord#client_profile_table_pending.video_id_list),
-	update_client_record(Found, ClientProfile, NewRecord).
-
-%%% The Client channel list did not contain this channel name. Append it to the channel list and write it.
-update_client_record(false, _ClientProfile, NewRecord) ->
-	mnesia:activity(transaction, fun() -> mnesia:write(NewRecord) end),
-	{ok, record_promoted_2};
-
-
-%%% The Client channel list did contian the target channel name. Update the specific entry in the channel list and write it.
-%%% The update is performed by first removing the target channel and then appending the updated channel.
-update_client_record(true, ClientProfile, NewRecord) ->
-	{_,ClientID,[{NewName,[{_,_},{_,_}]}]}  = NewRecord,
-	TargetList = ClientProfile#client_profile_table.channel_list,
-	AccumulatorFun = fun(OldRecord, Acc) -> 
-		WorkRecord = OldRecord,
-		{OldName,[{_,_},{_,_}]} = WorkRecord,
-		case OldName =/= NewName of
-			true ->
-				lists:append(Acc, [OldRecord]);
-			false -> Acc
-		end
-	end,
-	UpdatedList = lists:foldr(AccumulatorFun, [], TargetList),
-	case is_list(UpdatedList) of
-		true ->
-			FinalList = lists:append(UpdatedList, NewRecord#client_profile_table_pending.video_id_list),
-			mnesia:activity(transaction, fun() -> mnesia:write(#client_profile_table{client_id=ClientID, channel_list = FinalList}) end);
-		false ->
-			FinalList = lists:append([UpdatedList], NewRecord#client_profile_table_pending.video_id_list),
-			mnesia:activity(transaction, fun() -> mnesia:write(#client_profile_table{client_id=ClientID, channel_list = FinalList}) end)
-	end,
-	{ok, record_promoted_3}.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%% Begin fetch_profile_map_from_file logic %%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -297,13 +248,8 @@ populate_client_profile_table(true) ->
     end,
     lists:foreach(ListFun, ClientProfilesList).
 
-is_client_in_profile_map(approved, ClientID) ->
+is_client_in_profile_map(ClientID) ->
 	Map = fetch_profile_map_from_db(client_profile_table),
-	Keys = maps:keys(Map),
-	lists:member(ClientID, Keys);
-
-is_client_in_profile_map(pending, ClientID) ->
-	Map = fetch_profile_map_from_db(client_profile_table_pending),
 	Keys = maps:keys(Map),
 	lists:member(ClientID, Keys).
 
@@ -322,17 +268,26 @@ is_channel_in_profile(ClientID, ChannelID) ->
 
 delete_config_record(ClientID) ->
 	DelFun = fun() -> mnesia:delete({client_profile_table, ClientID}) end,
-	mnesia:transaction(DelFun).
+
+	TransactionResult = mnesia:activity(sync_transaction, 
+		fun()-> 
+			mnesia:delete({client_profile_table, ClientID})
+		end).
 
 delete_youtube_channel(ClientID, ChannelID) ->
 	Map = fetch_profile_map_from_db(client_profile_table),
 	[Profile] = maps:get(ClientID, Map),
-	Target = lists:keyfind(ChannelID, 2, Profile#client_profile_table.channel_list),
-	NewList = lists:delete(Target, Profile#client_profile_table.channel_list),
-	NewProfile=Profile#client_profile_table{
-		channel_list = NewList
-	},
-	mnesia:transaction(fun()-> mnesia:write(NewProfile) end).
+	case lists:keyfind(ChannelID, 2, Profile#client_profile_table.channel_list) of
+		{ChannelName, ChannelID} ->
+			NewList = lists:delete({ChannelName, ChannelID}, Profile#client_profile_table.channel_list),
+			NewProfile=Profile#client_profile_table{
+				channel_list = NewList
+			},
+			mnesia:transaction(fun()-> mnesia:write(NewProfile) end),
+			{ok, {ChannelName, ClientID}};
+		false ->
+			{error, no_such_channel}
+	end.
 
 fetch_config_data_for_client(ClientID)->
 	{atomic, Keys} = mnesia:transaction(fun()-> mnesia:all_keys(client_profile_table) end),
@@ -360,38 +315,58 @@ add_new_client_record(NewClient) ->
 			mnesia:transaction(fun()-> mnesia:write(UpdatedRecrod) end)
 	end.
 
-update_existing_client(Client) ->
-	ClientID = maps:get(client_id, Client),
-	Map = fetch_profile_map_from_db(client_profile_table),
-	[Record] = maps:get(ClientID, Map),
-	UpdatedRecord = Record#client_profile_table{
-		youtube_key = maps:get(youtube_api_key, Client),
-		channel_list = Record#client_profile_table.channel_list ++ maps:get(client_channel_data, Client)
-	},
-	mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
-	ProfileMap = utils:config_records_to_list_of_maps([ClientID], #{ClientID => [UpdatedRecord]}),
-	{ok, ProfileMap}.
+update_existing_client_unconditionally(ClientID, ChannelID, ChannelName) ->
+	Map = fetch_profile_map_from_db(client_profile_table), %% fetch all client records from db
+	[Record] = maps:get(ClientID, Map),	%% locate the client in question
+	ChannelIdExists = lists:keyfind(ChannelID, 2, Record#client_profile_table.channel_list), %%does this client have this channel id?
 
-
-%%% All arguments must be validated by the caller. Including
-%%% the existance of the TargetID
-add_new_channel_to_profile(TargetID, {ChannelName, ChannelID, VideoLink}) ->
-	{atomic, Result} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, TargetID) end), 
-	case Result of
-		[] ->
-			{error, no_such_client};
-		[Record] ->
-			NewList = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}],
+	case ChannelIdExists of
+		false ->	%% this channel id is new, add it
 			UpdatedRecord = Record#client_profile_table{
-				channel_list = NewList
+				channel_list = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
 			},
-			mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
-		    db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
-			{ok, video_link_added}
+			TransactionResult = mnesia:activity(sync_transaction, 
+				fun()-> 
+					mnesia:write(UpdatedRecord),
+					youtube_data_aquisition:fetch_single_video(ClientID, ChannelID)					
+				end),
+			case TransactionResult of
+				{ok, _Success} ->
+					{ok, ChannelName, ChannelID};
+				{error, Error} ->
+					{error, Error}
+			end;
+		_ -> %% duplicate channel id
+			{error, duplicate_channel}
 	end.
 
+update_existing_client(ClientID, ChannelName, ChannelID, VideoID) ->
+	Map = fetch_profile_map_from_db(client_profile_table), %% fetch all client records from db
+	[Record] = maps:get(ClientID, Map),	%% locate the client in question
+	ChannelIdExists = lists:keyfind(ChannelID, 2, Record#client_profile_table.channel_list), %%does this client have this channel id?
+
+	case ChannelIdExists of
+		false ->	%% this channel id is new, add it
+			UpdatedRecord = Record#client_profile_table{
+				channel_list = Record#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
+			},
+			mnesia:transaction(fun()-> mnesia:write(UpdatedRecord) end),
+			Key = db_access:construct_key(ChannelID, VideoID),
+			case db_access:get_video_record(Key) of  %%does this video exist in the db? If it doesn't, update this channel, otherwise do nothing.
+				error ->
+					youtube_data_aquisition:fetch_single_video(ClientID, ChannelID);
+				{ok, _Record} ->
+					ok
+			end,
+			{ok, client_updated};
+
+		true -> %% duplicate channel id
+			{error, duplicate_channel}
+	end.
+
+
 %%% All arguments must be validated by the caller.
-copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID, VideoLink}) ->
+copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID}) ->
 	DefaultClient = get_client_key(?SERVER_CONFIG_FILE), % get default client key we need for coppying
 	DefaultYoutubeKey = get_default_youtube_key("server_config.cfg"),
 	{atomic, [DefaultRecord]} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, DefaultClient) end), 
@@ -403,15 +378,14 @@ copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID, VideoLink}) 
 					channel_list = DefaultRecord#client_profile_table.channel_list ++ [{ChannelName, ChannelID}]
 				},
 				mnesia:transaction(fun()-> mnesia:write(NewRecord) end),
-			    db_access:delete_video_link_from_pending_profile_table(TargetID, VideoLink),
 				ProfileMap = utils:config_records_to_list_of_maps([TargetID], #{TargetID => [NewRecord]}),
 				{ok, ProfileMap};
 	_ ->
-		{error, video_link_exists}
+		{error, video_link_ChannelIdExists}
 	end.
 
 restore_default_client(ClientID) ->
-	case is_client_in_profile_map(approved, ClientID) of 
+	case is_client_in_profile_map(ClientID) of 
 		true ->
 			DefaultClientID = get_client_key(?SERVER_CONFIG_FILE),
 			Profiles = get_profiles_list(?SERVER_CONFIG_FILE),

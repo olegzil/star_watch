@@ -73,7 +73,7 @@ validate_request(all, Request) ->
         false -> %%% no errors found.
             {ok, {Action, Parameter}} = ActionValidation,
             {ok, ClientID} = ClientIDValidation,
-            {ok, {Action, ClientID, Parameter}}; %possible values {ok, {ChannelID, ClientID}} | {ok, {ClientID, VideoLink}}
+            {ok, {Action, ClientID, Parameter}}; %possible values {ok, {ChannelID, ClientID}} | {ok, {ClientID, ChannelName, VideoID}}
         {error, Message} ->
             {error, Message}
     end;
@@ -85,8 +85,9 @@ validate_request(key, Request) ->
             {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CLIENT, <<"<key=your client key>">>),
             {error, jiffy:encode(Message)};
         {_, Key} ->        
+            Found = lists:member(Key, ?CLIENT_ACCESS_KEY),
             if
-                Key =/= ?CLIENT_ACCESS_KEY ->
+                Found =:= false ->
                 {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_CLIENT, <<"default key: ", Key/binary, " is not valid">>),
                 {error, jiffy:encode(Message)};                    
             true ->
@@ -125,41 +126,36 @@ validate_request(action, Request) ->
 
 secondary_action_validation(Action, TokenList) ->
     case Action of
-        <<"linkstatus">> ->
+        <<"addvideolink">> -> %% Returns {error, ErrorMessage} or {Action, ChannelName, VideoID}
             VideoLinkParam = lists:keyfind(<<"video_link">>, 1, TokenList),
+            ChannelNameParam = lists:keyfind(<<"channel_name">>, 1, TokenList),
+            ChannelIDParam = lists:keyfind(<<"channel_id">>, 1, TokenList),
             if
-                VideoLinkParam =:= false ->
-                    {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO, missing_video_link),
+                VideoLinkParam =:= false orelse ChannelNameParam =:= false orelse ChannelIDParam ->
+                    {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_PARAMETER),
                     {error, jiffy:encode(Message)};
                 true ->
-
-                    {_, Link} = VideoLinkParam,
-                    Parts = string:split(Link, "/", all),
-                    if 
-                        length(Parts) < 4 ->
-                            {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_LINK, video_link_wrong_format),
+                    if
+                        VideoLinkParam =:= false ->
+                            {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO, missing_video_link),
                             {error, jiffy:encode(Message)};
                         true ->
-                            {ok, {Action, Link}}                    
-                    end
-            end;
 
-        <<"addvideolink">> -> %% Returns {error, ErrorMessage} or {ClientID, VideoLink}
-            VideoLinkParam = lists:keyfind(<<"video_link">>, 1, TokenList),
-            if
-                VideoLinkParam =:= false ->
-                    {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO, missing_video_link),
-                    {error, jiffy:encode(Message)};
-                true ->
-
-                    {_, Link} = VideoLinkParam,
-                    Parts = string:split(Link, "/", all),
-                    if 
-                        length(Parts) < 4 ->
-                            {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_LINK, video_link_wrong_format),
-                            {error, jiffy:encode(Message)};
-                        true ->
-                            {ok, {Action, Link}}                    
+                            {_, Link} = VideoLinkParam,
+                            Parts = string:split(Link, "/", all),
+                            if 
+                                length(Parts) < 4 ->
+                                    {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_LINK, video_link_wrong_format),
+                                    {error, jiffy:encode(Message)};
+                                true ->
+                                    Parts = string:split(VideoLinkParam, "/", all),
+                                    Target = lists:nth(4, Parts),
+                                    [VideoID|_]  = string:split(Target, "?", all),
+                                    {_, ChannelName} = ChannelNameParam,
+                                    {_, ChannelID} = ChannelIDParam,
+                                    VideoID = lists:nth(4, Parts),
+                                    {ok, {Action, {ChannelName, ChannelID, VideoID}}}                    
+                            end
                     end
             end;
         <<"deletechannel">> ->
@@ -224,6 +220,14 @@ secondary_action_validation(Action, TokenList) ->
                 {_, ClientID} ->
                     {ok, {Action, ClientID}}
             end;    
+        <<"linkstatus">> ->
+            case lists:keyfind(?REQUIRED_TOKEN_VIDEO_LINK, 1, TokenList) of
+                false ->
+                    {error, Message} = utils:format_error(?SERVER_ERROR_MISSING_VIDEO_LINK, <<"video_link=<a valid video link>">>),
+                    {error, jiffy:encode(Message)};
+                {_, VideoLink} ->
+                    {ok, {Action, VideoLink}}
+            end;
         _ ->
             {ok, Action}
 

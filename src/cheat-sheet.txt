@@ -16,4 +16,4 @@ http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&ac
 http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=deleteyoutubechannel&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g 
 http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchprofilemap&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
 http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=fetchclientprofile&client_id=389b4e36-b3d2-11ed-afa1-0242ac120002
-http://10.0.0.35:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=updateclientprofile&target_client_id=52e1e0b3-04ff-4811-9547-0a22fa7d85a0&channel_description=Anton Petrov&channel_id,UCciQ8wFcVoIIMi-lfu8-cjQ
+10.0.0.2:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=addchannel&client_id=415b403b-deaa-43bd-85bc-f15b6c403b5f&channel_name=The Map of Chemistry&channel_id=UCxqAWLTk1CmBvZFPzeZMd9A

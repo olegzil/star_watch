@@ -71,23 +71,8 @@ handle_call({updatechannel, ClientID, ChannelID}, _From, State) ->
             {reply, {Code, jiffy:encode(Data)},  State}
     end;
 
-handle_call({linkstatus, ClientID, VideoLink}, _From, State) ->
-    {ok, Code} = db_access:get_link_status(ClientID, VideoLink),
-    Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
-    RequestResult = 
-    if
-        Result =:= false ->
-            BinaryCode = atom_to_binary(Code),
-            throw(<<"no such code: ", BinaryCode/binary>>);
-        true ->
-            {_AtomicCode, ServerErrorCode} = Result,
-            {ok , Return} = utils:format_success(ServerErrorCode, VideoLink),
-            {ok, jiffy:encode(#{success => Return})}
-    end,
-    {reply, RequestResult, State};
-
-handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
-    RequestResult = db_access:add_video_link(ClientID, VideoLink),
+handle_call({addvideolink, ClientID, ChannelName, ChannelID, VideoID}, _From, State) ->
+    RequestResult = server_config_processor:update_existing_client(ClientID, ChannelName, ChannelID, VideoID),
     Response = case RequestResult of
         {error, Code} ->
             Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
@@ -97,18 +82,18 @@ handle_call({addvideolink, ClientID, VideoLink}, _From, State) ->
                     {error, jiffy:encode(#{error => Return})};
                 true ->
                     {_AtomicCode, ServerErrorCode} = Result,
-                    {error , Return} = utils:format_error(ServerErrorCode, VideoLink),
+                    {error , Return} = utils:format_error(ServerErrorCode, VideoID),
                     {error, jiffy:encode(#{error => Return})}
             end;
         {ok, Code} ->
             Result = lists:keyfind(Code, 1, ?RESPONSE_CODES),
             if
                 Result =:= false ->
-                    {error , Return} = utils:format_success(Code, VideoLink),
+                    {error , Return} = utils:format_success(Code, VideoID),
                     {ok, jiffy:encode(#{success => Return})};
                 true ->
                     {_AtomicCode, ServerErrorCode} = Result,
-                    {ok , Return} = utils:format_success(ServerErrorCode, VideoLink),
+                    {ok , Return} = utils:format_success(ServerErrorCode, VideoID),
                     {ok, jiffy:encode(#{success => Return})}
             end
     end,
@@ -141,6 +126,31 @@ handle_call({deletevideolink, ClientID, VideoLink}, _From, State) ->
             end
     end,
     {reply, Response, State};
+
+handle_call({linkstatus, ClientID, VideoLink}, _From, State) ->
+    Found = db_access:is_channel_id_in_youtube_channel(ClientID, VideoLink),
+    Response = case Found of 
+                    false ->
+                        {ok, Result} = utils:format_success(?SERVER_ERROR_LINK_NOT_FOUND, VideoLink),
+                        {ok, jiffy:encode(#{success => Result})};
+                    true ->
+                        {ok, Result} = utils:format_success(?SERVER_ERROR_LINK_EXISTS, VideoLink),
+                        {ok, jiffy:encode(#{success => Result})}
+                end,
+    {reply, Response, State};
+
+handle_call({fetch_video_data, ClientID, VideoLink}, _From, State) ->
+    Found = db_access:is_channel_id_in_youtube_channel(ClientID, VideoLink),
+    Response = case Found of 
+                    false ->
+                        {ok, Result} = utils:format_success(?SERVER_ERROR_LINK_NOT_FOUND, VideoLink),
+                        {ok, jiffy:encode(#{error => Result})};
+                    true ->
+                        {ok, Result} = db_access:fetch_video_data(ClientID, VideoLink),
+                        {ok, jiffy:encode(#{video_data => Result})}
+                end,
+    {reply, Response, State};
+
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.

@@ -31,7 +31,7 @@
 -define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
 -define(ASTRONOMY_API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
 -define(YOUTUBE_CHANNEL_IDS, [<<"UC7_gcs09iThXybpVgjHZ_7g">>, <<"UCQfZkf3-Y2RwzdRFWXYsdaQ">>]).
--define(CLIENT_ACCESS_KEY, <<"389b4e36-b3d2-11ed-afa1-0242ac120002">>).
+-define(CLIENT_ACCESS_KEY, [<<"389b4e36-b3d2-11ed-afa1-0242ac120002">>, <<"415b403b-deaa-43bd-85bc-f15b6c403b5f">>]).
 -define(ADMINISTRATOR_KEY, <<"f09a2270-ac19-418c-a443-9f9e4f4c9019">>).
 -define(YOUTUBE_MAXRESULTS, "50").
 -define(FIRST_PUBLISH_DATE, "1970-01-01T00:00:00Z").
@@ -45,6 +45,7 @@
 -define(YOUTUBE_RETURN_VIEDO_LIST_KEY, <<"Videos">>).
 -define(ADMIN_AVAILABLE_ACTIONS, [<<"delete">>, <<add>>]).
 -define(YOUTUBE_KEY, <<"youtubekey">>).
+-define(REQUIRED_TOKEN_VIDEO_LINK, <<"video_link">>).
 -define(REQUIRED_TOKEN_USERID, <<"user_id">>).
 -define(REQUIRED_TOKEN_USERPASSWORD, <<"user_password">>).
 -define(REQUIRED_CLIENT_KEY_TOKEN, <<"key">>).
@@ -58,9 +59,7 @@
 									<<"fetchchannelvideos">>,
 									<<"updatechannel">>,
 									<<"addvideolink">>, 
-									<<"linkstatus">>, 
 									<<"fetchclientprofile">>, 
-									<<"updateclientprofile">>, 
 									<<"fetchchannelimage">>,
 									<<"deletechannel">>,
 									<<"restoredefaultclient">>,
@@ -71,7 +70,9 @@
 									<<"login_existing">>,
 									<<"clear_login_table">>,
 									<<"complete_login">>,
-									<<"user_profile">>]).
+									<<"linkstatus">>,
+									<<"user_profile">>,
+									<<"fetch_video_data">>]).
 -define(EXCEPTIONAL_ACTIONS, [<<"complete_login">>, <<"complete_password_reset">>]).
 -define(PUT_ACTIONS, [<<"logout_user">>]).
 
@@ -94,7 +95,6 @@
 -define(SERVER_ERROR_MISSING_VIDEO,			16#FFAA0D).
 -define(SERVER_ERROR_INVALID_LINK,			16#FFAB00).
 -define(SERVER_ERROR_LINK_EXISTS, 			16#FFAB01).
--define(SERVER_ERROR_LINK_PENDING, 			16#FFAB02).
 -define(SERVER_ERROR_LINK_ADDED,			16#FFAB03).
 -define(SERVER_ERROR_LINK_DENIED, 			16#FFAB04).
 -define(SERVER_ERROR_LINK_NOT_FOUND,		16#FFAB05).
@@ -124,12 +124,14 @@
 -define(SERVER_ERROR_MISSING_TOKEN, 		16#FFAC0C).
 -define(SERVER_ERROR_INVALID_EMAIL, 		16#FFAC0D).
 -define(SERVER_ERROR_INVALID_CREDENTIALS,	16#FFAC0E).
+-define(SERVER_ERROR_MISSING_VIDEO_LINK, 	16#FFAC0F).
+-define(SERVER_ERROR_CLIENT_UPDATED,		16#FFAC10).
+-define(SERVER_ERROR_CHANNEL_NAME_REQUIRED,	16#FFAC11).
 %%%%%%%%%%%%% System faults &&&&&&&&&&&&&&&&&&&&&&
 -define(SERVER_ERROR_DATABASE_FAULT,		16#FFFF01).
 
 -define(RESPONSE_CODES, [{video_link_added, ?SERVER_ERROR_LINK_ADDED},
 						 {video_link_exists, ?SERVER_ERROR_LINK_EXISTS}, 
-						 {link_pending, ?SERVER_ERROR_LINK_PENDING}, 
 						 {duplicate_channel, ?SERVER_ERROR_DUPLICATE_CHANNEL},
 						 {no_records, ?SERVER_ERROR_RECORD_NOT_FOUND},
 						 {no_admin_key, ?SERVER_ERROR_ADMIN_KEY},
@@ -149,7 +151,9 @@
 						 {video_link_required, ?SERVER_ERROR_VIDEO_LINK_REQUIRED},
  						 {no_such_endpoint, ?SERVER_ERROR_NO_SUCH_ENDPOINT},
  						 {missing_user_id, ?SERVER_ERROR_USER_ID},
- 						 {missing_password, ?SERVER_ERROR_USER_PASSWORD}]).
+ 						 {missing_password, ?SERVER_ERROR_USER_PASSWORD},
+ 						 {client_updated, ?SERVER_ERROR_CLIENT_UPDATED},
+ 						 {channel_name_required, ?SERVER_ERROR_CHANNEL_NAME_REQUIRED}]).
 
 %%% List of tuples, such that the first member is the query command. The second member is the query value
 -define(CELESTIAL_OBJECTS, [{mercury, {keywords, [<<"mercury">>]}}, 
