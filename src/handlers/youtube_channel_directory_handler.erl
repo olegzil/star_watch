@@ -105,7 +105,7 @@ validate_request(client_id, Request) ->
             {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CLIENT, <<"<client_key=your client id. NOT your client key>">>),
             {error, jiffy:encode(Message)};
         {_, Key} ->        
-            {ok, Key}
+            {ok, string:trim(Key)}
         end;
 
 validate_request(action, Request) ->

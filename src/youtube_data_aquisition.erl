@@ -20,6 +20,7 @@ fetch_data(periodic, ClientProfile, Date) ->
 fetch_single_page(Date, MasterMap, [Head|Tail], MaxResults) ->
 	{YoutubeKey, ChannelID} = Head,
 	Request = first_page_query(YoutubeKey, ChannelID, Date, MaxResults),
+    Options = [{ssl, [{verify, verify_none}]}],
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, FirstPageMap} = utils:update_database(youtube, Body),							% Commit data from the first fetch to the database
@@ -51,7 +52,7 @@ fetch_channel_data(Date, MasterMap, [Head|Tail], MaxResults) ->
 	{YoutubeKey, ChannelID} = Head,
 	Request = first_page_query(YoutubeKey, ChannelID, Date, MaxResults),
     Options = [{ssl, [{verify, verify_none}]}],
-	case httpc:request(get, Request, Options, []) of
+	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, FirstPageMap} = utils:update_database(youtube, Body),							% Commit data from the first fetch to the database
 			PageMap = #{<<"first_page">> => FirstPageMap},										% First page does not have a token identifier
@@ -80,6 +81,7 @@ fetch_channel_data(Date, MasterMap, [Head|Tail], MaxResults) ->
 
 fetch_next_page(YoutubeKey, ChannelID, Date, [PageToken], MaxResults, Acc) ->
 	Request = next_page_query(YoutubeKey, ChannelID, Date, PageToken, MaxResults),
+    Options = [{ssl, [{verify, verify_none}]}],
 	case httpc:request(Request) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, Map} = utils:update_database(youtube, Body),

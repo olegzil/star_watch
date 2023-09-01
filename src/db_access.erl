@@ -305,7 +305,9 @@ get_channel_data(ClientID, ChannelID) ->
     case length(Records) of
         0 ->
             UpdatedRecord = process_channel_list(ClientID, ChannelID, get_channel_data_db(ChannelID)),
+            utils:log_message([{"UpdatedRecord", UpdatedRecord},{"ClientID", ClientID}, {"ChannelID", ChannelID}]),
             SortedList = lists:sort(Predicate, UpdatedRecord),
+            utils:log_message([{"SortedList", SortedList}]),
             [First | _] = SortedList,
             First;
         _->
@@ -326,11 +328,11 @@ does_record_exist(TargetID, TableName) ->
         {atomic, _} -> true
     end.
 
-process_channel_list(_ClientID, _ChannelID, [NoneEmptyList]) -> 
-    [NoneEmptyList];
 process_channel_list(ClientID, ChannelID, []) ->
     db_access_server:fetch_channel_data(serverfirst, ClientID, ChannelID),
-    get_channel_data_db(ChannelID).
+    get_channel_data_db(ChannelID);
+process_channel_list(_ClientID, _ChannelID, NoneEmptyList) -> 
+    NoneEmptyList.
 
 %%% This function deletes a channel associated with this client id. If the cient ID is not found, 
 %%% the funnction assumes it's a new ID. In this case, the channels from the default client id
