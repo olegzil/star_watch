@@ -40,7 +40,7 @@ read_private_key_file() ->
 
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
-	utis:log_message([{"ConfigMap", ConfigMap}]),
+	utils:log_message([{"ConfigMap", ConfigMap}]),
 	ConfigMap.
 
 
