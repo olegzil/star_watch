@@ -29,13 +29,16 @@ submit_request_for_processing(Request) ->
             Message;
         {ok, {Action, ClientID, Parameter}} ->
             case execute_request(Action, ClientID, Parameter) of
+            {error, noent} ->
+                cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, #{error => noent}, Request),
+                #{error => noent};
             {ok, Good} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Good, Request),
                 Good;
-              {error, Bad} ->
+            {error, Bad} ->
                 cowboy_req:reply(200,  #{<<"content-type">> => <<"application/json; charset=utf-8">>}, Bad, Request),
                 Bad;
-              {_, Other} ->
+            {_, Other} ->
                 Other
             end
     end.
