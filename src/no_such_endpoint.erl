@@ -28,7 +28,8 @@ handle(Req, State) ->
 parse_request(Request) ->
 	Headers = maps:get(headers, Request),
 	Endpoint = maps:find(<<"referer">>, Headers),
-  ErrorResponse = case Endpoint of
+  ErrorResponse = 
+  case Endpoint of
     {ok, Value} ->
       {error, Error} = utils:format_error(-1, <<"No such endpoint: ", Value/binary>>),
       Error;
@@ -40,6 +41,7 @@ parse_request(Request) ->
         error ->
           {error, Error} = utils:format_error(-1, <<"error ", Headers>>),
           Error
-      end,
-    jiffy:encode(ErrorResponse)
-  end.
+      end
+  end,
+  jiffy:encode(ErrorResponse).
+

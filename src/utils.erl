@@ -603,7 +603,7 @@ format_error(ErrorCode, ErrorMessage) ->
 			end,
 	 Error = #{
 	 	status => error,
-		date_time => utils:current_time_string()ErrorCode
+		date_time => utils:current_time_string(),
 		error_code => ErrorCode,
 		error_text => list_to_binary(io_lib:format("~p hex code: ~.16B", [Message, ErrorCode]))
 	},
