@@ -42,8 +42,8 @@ start(_Type, _Args) ->
     utils:start_cron_job(apod),
     MasterPid = star_watch_master_sup:start_link(),
     %% Create a child process that will handle all file access to the server_config.cfg file.
-    DbServerStart = star_watch_master_sup:attach_child(db_access_server, {"server_config.cfg"}),
-    ServerConfigStart = star_watch_master_sup:attach_child(serverconfig, {"server_config.cfg"}),
+    DbServerStart = star_watch_master_sup:attach_child(db_access_server, {?SERVER_CONFIG_FILE}),
+    ServerConfigStart = star_watch_master_sup:attach_child(serverconfig, {?SERVER_CONFIG_FILE}),
     DbServerPid = utils:select_pid(DbServerStart),
     ServerConfigPid = utils:select_pid(ServerConfigStart),
     if

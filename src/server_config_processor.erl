@@ -40,6 +40,7 @@ read_private_key_file() ->
 
 parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
+	utis:log_message([{"ConfigMap", ConfigMap}]),
 	ConfigMap.
 
 
@@ -267,8 +268,6 @@ is_channel_in_profile(ClientID, ChannelID) ->
 
 
 delete_config_record(ClientID) ->
-	DelFun = fun() -> mnesia:delete({client_profile_table, ClientID}) end,
-
 	TransactionResult = mnesia:activity(sync_transaction, 
 		fun()-> 
 			mnesia:delete({client_profile_table, ClientID})
@@ -368,7 +367,7 @@ update_existing_client(ClientID, ChannelName, ChannelID, VideoID) ->
 %%% All arguments must be validated by the caller.
 copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID}) ->
 	DefaultClient = get_client_key(?SERVER_CONFIG_FILE), % get default client key we need for coppying
-	DefaultYoutubeKey = get_default_youtube_key("server_config.cfg"),
+	DefaultYoutubeKey = get_default_youtube_key(?SERVER_CONFIG_FILE),
 	{atomic, [DefaultRecord]} = mnesia:transaction(fun()-> mnesia:read(client_profile_table, DefaultClient) end), 
 	case lists:keyfind(ChannelID, 2, DefaultRecord#client_profile_table.channel_list) of
 			false ->
