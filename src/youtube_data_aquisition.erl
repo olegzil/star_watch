@@ -69,6 +69,10 @@ fetch_channel_data(Date, MasterMap, [Head|Tail], MaxResults) ->
 		{ok,{_,_,ErrorMessage}} ->
 			io:format("fetch_channel_data failed: ~p~n", [ErrorMessage]),
 			{error, ErrorMessage};
+		{error,enoent} ->
+			io:format("fetch_channel_data failed: ~p~n", [enoent]),
+			{error, enoent};
+			
 		Other ->
 			{error, Other}
 	end.
