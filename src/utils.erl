@@ -599,13 +599,13 @@ format_error(ErrorCode, ErrorMessage) ->
 				is_binary(ErrorMessage) ->
 					ErrorMessage;
 				true ->
-					<<"undefined">>
+					io_lib:format("~p", [ErrorMessage])
 			end,
 	 Error = #{
 	 	status => error,
-		date_time => utils:current_time_string(),
-		error_code => list_to_binary(io_lib:format("~.16B", [ErrorCode])),
-		error_text => Message
+		date_time => utils:current_time_string()ErrorCode
+		error_code => ErrorCode,
+		error_text => list_to_binary(io_lib:format("~p hex code: ~.16B", [Message, ErrorCode]))
 	},
 	{error, Error}.
 

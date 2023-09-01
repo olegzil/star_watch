@@ -28,12 +28,18 @@ handle(Req, State) ->
 parse_request(Request) ->
 	Headers = maps:get(headers, Request),
 	Endpoint = maps:find(<<"referer">>, Headers),
-  case Endpoint of
+  ErrorResponse = case Endpoint of
     {ok, Value} ->
       {error, Error} = utils:format_error(-1, <<"No such endpoint: ", Value/binary>>),
-      jiffy:encode(Error);
+      Error;
     error ->
-      Data = maps:get(<<"user-agent">>, Headers),
-      {error, Error} = utils:format_error(-1, <<"Unknown user-agent ", Data/binary>>),
-      jiffy:encode(Error)      
+      case maps:find(<<"user-agent">>, Headers) of
+        {ok, Value} ->
+          {error, Error} = utils:format_error(-1, <<"Unknown user-agent ", Value/binary>>),
+          Error;
+        error ->
+          {error, Error} = utils:format_error(-1, <<"error ", Headers>>),
+          Error
+      end,
+    jiffy:encode(ErrorResponse)
   end.

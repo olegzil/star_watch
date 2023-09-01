@@ -38,6 +38,7 @@ start(_Type, _Args) ->
         #{env => #{dispatch => Dispatch}}
     ),
     inets:start(),
+    ssl:start(),
     utils:start_cron_job(youtube),
     utils:start_cron_job(apod),
     MasterPid = star_watch_master_sup:start_link(),
