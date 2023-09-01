@@ -50,7 +50,8 @@ fetch_channel_data(_Date, NewMaster, [], ?YOUTUBE_MAXRESULTS) ->
 fetch_channel_data(Date, MasterMap, [Head|Tail], MaxResults) ->
 	{YoutubeKey, ChannelID} = Head,
 	Request = first_page_query(YoutubeKey, ChannelID, Date, MaxResults),
-	case httpc:request(Request) of
+    Options = [{ssl, [{verify, verify_none}]}],
+	case httpc:request(get, Request, Options, []) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			{ok, FirstPageMap} = utils:update_database(youtube, Body),							% Commit data from the first fetch to the database
 			PageMap = #{<<"first_page">> => FirstPageMap},										% First page does not have a token identifier
@@ -72,7 +73,7 @@ fetch_channel_data(Date, MasterMap, [Head|Tail], MaxResults) ->
 		{error,enoent} ->
 			io:format("fetch_channel_data failed: ~p~n", [enoent]),
 			{error, enoent};
-			
+
 		Other ->
 			{error, Other}
 	end.
