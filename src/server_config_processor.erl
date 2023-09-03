@@ -40,13 +40,6 @@ parse_server_config_file(File) ->
 	{ok, [ConfigMap]} = file:consult(File),
 	ConfigMap.
 
-
-get_qualified_file_name(File) ->
-	{ok, CurrentDirectory} = file:get_cwd(),
-	QualifiedFile = string:concat("/", File),
-	string:concat(CurrentDirectory, QualifiedFile).
-
-
 % Returns a list of maps. The map key is the client ID and the value is a list with format:  {two_pbs_space_time,[{youtubekey,<<"AIzaSyDXepMVUKYMdn9ui3Nn9X6rau37r-89t6Q">>}, 
 get_profiles_list(File) ->
 	MasterMap = parse_server_config_file(File),
@@ -74,8 +67,11 @@ get_ip_flag(File) ->
 	maps:get(use_local_ip, ControlBlock).	
 
 get_known_clients(File) ->
-	ControlBlock = get_server_control_block(File),
-	maps:get(known_clients, ControlBlock).
+	ProfileMap = get_profiles_list(File),
+	Keys = maps:keys(ProfileMap),
+	ProfileList = extract_record(Keys, ProfileMap, []),
+	Fun = fun(Item, Acc) -> NewAcc = maps:get(client_id, Item), Acc ++ [NewAcc] end,
+	lists:foldl(Fun, [], ProfileList).
 
 %%% Returns a map: #{directoryrecords => [Item1, ..., ItemN] }, where Item is itself a map: #{channel_id => a, client => b, name => c}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
