@@ -28,13 +28,13 @@
            delete_video_link_from_profile_table/2,
            delete_channel_from_client/2,
            get_valid_client_id/1,
-           is_channel_id_in_youtube_channel/2,
+           is_video_in_youtube_channel/2,
            fetch_video_data/2,
            construct_key/2,
-           get_video_record/1]).
+           get_video_record/1,
+           is_channel_in_db/1]).
 
 -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
--compile(export_all).
 
 update_nasa_table(DBItem) -> 
     Fun = 
@@ -231,13 +231,23 @@ get_video_record(Key) ->
             {ok, Record}
     end.
 
+is_channel_in_db(ChannelID) ->
+    ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
+    {atomic, Records} = mnesia:transaction(ReaderFun),
+    case length(Records) of
+        0 ->
+            false;
+        _ ->
+            true
+    end.
+
 %%%
 %%% Determine if the client has this video link. First, use and indexed read to determine if the link exits at all.
 %%% If it does not, report false.
 %%% If it does, read each record and extract the channel id from its key. Compare the channel id to the value in 
 %%% the config record of the client. If they match return true, false otherwise.
 %%%
-is_channel_id_in_youtube_channel(ClientID, Link) ->
+is_video_in_youtube_channel(ClientID, Link) ->
     Parts = string:split(Link, "/", all),
     VideoID = lists:nth(4, Parts),
     ReaderFun = fun() -> mnesia:index_read(youtube_channel, VideoID, #youtube_channel.video_id) end,
@@ -305,9 +315,7 @@ get_channel_data(ClientID, ChannelID) ->
     case length(Records) of
         0 ->
             UpdatedRecord = process_channel_list(ClientID, ChannelID, get_channel_data_db(ChannelID)),
-            utils:log_message([{"UpdatedRecord", UpdatedRecord},{"ClientID", ClientID}, {"ChannelID", ChannelID}]),
             SortedList = lists:sort(Predicate, UpdatedRecord),
-            utils:log_message([{"SortedList", SortedList}]),
             [First | _] = SortedList,
             First;
         _->

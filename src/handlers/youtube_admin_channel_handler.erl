@@ -109,6 +109,8 @@ validate_action(Action, TokenList) ->
                             {ok, {<<"addchannel">>, {ClientID, ChannelID, ChannelName}}}
                     end
             end;
+        <<"refreshclietprofiles">> ->
+            {ok, {<<"refreshclietprofiles">>, {undefined, undefined}}}; 
 
         <<"deleteconfigrecord">> -> % Format: action=deleteconfigrecord&client_id=<ClientID>
             {_, ClientID} = lists:keyfind(<<"client_id">>, 1, TokenList),

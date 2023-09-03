@@ -11,6 +11,11 @@
 
 handle_admin_action(Action, Parameter)	->
 	case Action of
+		<<"refreshclietprofiles">> ->
+			server_config_processor:populate_client_profile_table(true),
+			gen_server:cast(db_access_server, refreshclietprofiles),
+			utils:format_success(?SERVER_ERROR_OK, <<"client profiles updated with contents of server_cofnig.cfg">>);
+
 		<<"addchannel">> ->
 			{ClientID, ChannelID, ChannelName} = Parameter,
 			case server_config_processor:update_existing_client_unconditionally(ClientID, ChannelID, ChannelName) of

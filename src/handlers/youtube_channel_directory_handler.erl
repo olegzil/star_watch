@@ -89,7 +89,8 @@ validate_request(key, Request) ->
             {error, jiffy:encode(Message)};
         {_, Key} ->     
             CleanKey = binary_to_list(string:trim(Key)),
-            Found = lists:member(CleanKey, ?CLIENT_ACCESS_KEY),
+            KnownClients = server_config_processor:get_known_clients(?SERVER_CONFIG_FILE),
+            Found = lists:member(CleanKey, KnownClients),
             if
                 Found =:= false ->
                 {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_CLIENT, <<"default key: ", Key/binary, " is not valid">>),
@@ -135,8 +136,8 @@ secondary_action_validation(Action, TokenList) ->
             ChannelNameParam = lists:keyfind(<<"channel_name">>, 1, TokenList),
             ChannelIDParam = lists:keyfind(<<"channel_id">>, 1, TokenList),
             if
-                VideoLinkParam =:= false orelse ChannelNameParam =:= false orelse ChannelIDParam ->
-                    {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_PARAMETER),
+                VideoLinkParam =:= false orelse ChannelNameParam =:= false orelse ChannelIDParam =:= false ->
+                    {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_PARAMETER, <<"missing parameters">>),
                     {error, jiffy:encode(Message)};
                 true ->
                     if

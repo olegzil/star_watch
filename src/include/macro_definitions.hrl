@@ -31,7 +31,6 @@
 -define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
 -define(ASTRONOMY_API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
 -define(YOUTUBE_CHANNEL_IDS, [<<"UC7_gcs09iThXybpVgjHZ_7g">>, <<"UCQfZkf3-Y2RwzdRFWXYsdaQ">>]).
--define(CLIENT_ACCESS_KEY, ["389b4e36-b3d2-11ed-afa1-0242ac120002", "415b403b-deaa-43bd-85bc-f15b6c403b5f","437ea0f3-20eb-46c4-a7cb-2a611947206c"]).
 -define(ADMINISTRATOR_KEY, <<"f09a2270-ac19-418c-a443-9f9e4f4c9019">>).
 -define(YOUTUBE_MAXRESULTS, "50").
 -define(FIRST_PUBLISH_DATE, "1970-01-01T00:00:00Z").

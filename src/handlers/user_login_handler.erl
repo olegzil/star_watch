@@ -263,7 +263,8 @@ validate_request(key, Request, _AvailableActions) ->
             {error, Message}  = utils:format_error(?SERVER_ERROR_MISSING_CLIENT, <<"<key=your client key>">>),
             {error, jiffy:encode(Message)};
         {_, Key} ->        
-            Found = lists:member(Key, ?CLIENT_ACCESS_KEY),
+            KnownClients = server_config_processor:get_known_clients(?SERVER_CONFIG_FILE),
+            Found = lists:member(Key, KnownClients),
             if
                 Found =:= false ->
                 {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_CLIENT, <<"default key: ", Key/binary, " is not valid">>),

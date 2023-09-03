@@ -62,7 +62,6 @@ fetch_channel_data(Date, MasterMap, [Head|Tail], MaxResults) ->
 					CompleteChannelMap = maps:merge(PageMap, RemainderChannelMap),						% PageMap contains data for first_page. Merge it with the rest of the pages to get a map of all pages for this channel
 					SectionMap = maps:put(ChannelID, CompleteChannelMap, #{}),							% Insert the map of all pages into a new map with the channel id as the key
 					NewMaster = maps:merge(SectionMap, MasterMap),
-					utils:log_message([{"NewMaster", NewMaster}]),
 					fetch_channel_data(Date, NewMaster, Tail, ?YOUTUBE_MAXRESULTS);
 				{error, ErrorMessage} ->
 					utils:log_message([{"Youtube error: ", ErrorMessage}]),

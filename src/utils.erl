@@ -803,7 +803,7 @@ get_current_endpoints() ->
 			Tokens = string:tokens(Substr, " "),
 			IPValue = list_to_binary(lists:nth(6, Tokens)),
 			EndPoint = <<"http://", IPValue/binary, ":", ?HTTP_PORT_LOCAL/binary, "/">>,
-			utils:log_message([{"IPValue", IPValue}, {"active_port", active_port}, {"call_back_endpoint", EndPoint}]),
+			utils:log_message([{"IPValue", IPValue}, {"active_port", ?HTTP_PORT_LOCAL}, {"call_back_endpoint", EndPoint}]),
 			#{
 				ip_value => IPValue,
 				active_port => binary_to_integer(?HTTP_PORT_LOCAL),

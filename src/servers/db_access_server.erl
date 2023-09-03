@@ -8,7 +8,6 @@
 -export([start_link/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2,
          handle_info/2, code_change/3, terminate/2, fetch_channel_data/3]).
--compile(export_all).
 
 start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [Args], []).
@@ -128,7 +127,7 @@ handle_call({deletevideolink, ClientID, VideoLink}, _From, State) ->
     {reply, Response, State};
 
 handle_call({linkstatus, ClientID, VideoLink}, _From, State) ->
-    Found = db_access:is_channel_id_in_youtube_channel(ClientID, VideoLink),
+    Found = db_access:is_video_in_youtube_channel(ClientID, VideoLink),
     Response = case Found of 
                     false ->
                         {ok, Result} = utils:format_success(?SERVER_ERROR_LINK_NOT_FOUND, VideoLink),
@@ -140,7 +139,7 @@ handle_call({linkstatus, ClientID, VideoLink}, _From, State) ->
     {reply, Response, State};
 
 handle_call({fetch_video_data, ClientID, VideoLink}, _From, State) ->
-    Found = db_access:is_channel_id_in_youtube_channel(ClientID, VideoLink),
+    Found = db_access:is_video_in_youtube_channel(ClientID, VideoLink),
     Response = case Found of 
                     false ->
                         {ok, Result} = utils:format_success(?SERVER_ERROR_LINK_NOT_FOUND, VideoLink),
@@ -154,6 +153,31 @@ handle_call({fetch_video_data, ClientID, VideoLink}, _From, State) ->
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
+
+handle_cast(refreshclietprofiles, State) ->
+    DBCompareFunction = fun({ChannelName, ChannelID}, Acc) ->
+        case db_access:is_channel_in_db(ChannelID) of
+            false ->
+                Acc ++ [{ChannelName, ChannelID}];
+            true ->
+                Acc
+        end
+    end,
+    MapFunction = fun(ClientProfile, Acc) ->
+        ChannelList = maps:get(client_channel_data, ClientProfile),
+        lists:foldl(DBCompareFunction, Acc, ChannelList)
+    end,
+
+    ProfileList = server_config_processor:fetch_profile_map_from_file(?SERVER_CONFIG_FILE),
+    case lists:foldl(MapFunction, [], ProfileList) of 
+        [] ->
+            io:format("Not refreshing db. No new channels added~n");
+        ChannelList ->
+            UpdateFunction = fun({_Name, ID}) -> youtube_data_aquisition:fetch_single_video(server_config_processor:get_client_key(?SERVER_CONFIG_FILE), ID) end,
+            lists:foreach(UpdateFunction, ChannelList),
+            io:format("Successful update of Channels: ~p~n", [ChannelList])
+    end,
+    {noreply, State};    
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

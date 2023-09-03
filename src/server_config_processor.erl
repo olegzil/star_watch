@@ -18,6 +18,7 @@
 		 generate_profile_map/1,
 		 get_default_youtube_key/1, 
 		 get_client_key/1,
+		 get_known_clients/1,
 		 populate_client_profile_table/1,
 		 is_client_in_profile_map/1,
 		 delete_config_record/1, 
@@ -32,9 +33,6 @@
 		 get_email_keys/1,
 		 get_ip_flag/1,
 		 update_existing_client_unconditionally/3]).
-
--compile(export_all).
-
 read_private_key_file() ->
 	file:read_file("private-key.pem").
 
@@ -74,6 +72,11 @@ get_email_keys(File) ->
 get_ip_flag(File) ->
 	ControlBlock = get_server_control_block(File),
 	maps:get(use_local_ip, ControlBlock).	
+
+get_known_clients(File) ->
+	ControlBlock = get_server_control_block(File),
+	maps:get(known_clients, ControlBlock).
+
 %%% Returns a map: #{directoryrecords => [Item1, ..., ItemN] }, where Item is itself a map: #{channel_id => a, client => b, name => c}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% Begin fetch_channel_directory logic %%%%%%%%%%%%%
@@ -267,7 +270,7 @@ is_channel_in_profile(ClientID, ChannelID) ->
 
 
 delete_config_record(ClientID) ->
-	TransactionResult = mnesia:activity(sync_transaction, 
+	mnesia:activity(sync_transaction, 
 		fun()-> 
 			mnesia:delete({client_profile_table, ClientID})
 		end).
