@@ -34,14 +34,9 @@ parse_request(Request) ->
       {error, Error} = utils:format_error(-1, <<"No such endpoint: ", Value/binary>>),
       Error;
     error ->
-      case maps:find(<<"user-agent">>, Headers) of
-        {ok, Value} ->
-          {error, Error} = utils:format_error(-1, <<"Unknown user-agent ", Value/binary>>),
-          Error;
-        error ->
-          {error, Error} = utils:format_error(-1, <<"error ", Headers>>),
-          Error
-      end
+      {error, Error} = utils:format_error(-1, maps:get(path, Request)),
+      utils:log_message([{"bad path", maps:get(path, Request)}]),
+      Error
   end,
   jiffy:encode(ErrorResponse).
 
