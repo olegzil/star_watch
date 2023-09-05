@@ -96,7 +96,21 @@ update_database(youtube, Data) ->
     	Class:Reason ->
     		Message = io_lib:format("~p~n ~p~n", [Class, Reason]),
     		{error, Message}
+    end;
+
+update_database(video_link, Data) ->
+    try jiffy:decode(Data, [return_maps]) of
+    	Map ->
+		    %% insert the json data into mnesia
+    		insert_db_entries(video_link, Map),
+		    {ok, Map}
+
+    catch
+    	Class:Reason ->
+    		Message = io_lib:format("~p~n ~p~n", [Class, Reason]),
+    		{error, Message}
     end.
+
 
 current_time_string() ->
 	{{Year, Month, Day}, {Hour, Min, Sec}} = 
@@ -417,7 +431,16 @@ insert_db_entries(apod, JsonData) when JsonData =/= [] ->
 
 insert_db_entries(youtube, JsonData) ->
 	Items =  maps:get(?YOUTUBE_VIDEO_ARRAY_KEY, JsonData),
-	extract_item_from_list(Items).
+	extract_item_from_list(Items);
+
+insert_db_entries(video_link, JsonData) ->
+	Items =  maps:get(?YOUTUBE_VIDEO_ARRAY_KEY, JsonData),
+	ItemMap = lists:nth(1, Items),
+	Fun = fun() ->
+		Record = create_record(youtube_link, ItemMap), %% convert the item to a struct
+		mnesia:write(Record)			%% if this is an image, store it
+	end,
+	mnesia:transaction(Fun).
 
 extract_item_from_list([Item|Items]) ->
 	Fun = fun() ->
@@ -495,8 +518,30 @@ create_record(youtube, Item) ->
 					}
 	catch _:_ ->
 			io:format("Badkey for record: ~p~n", [Id])
-	end.
+	end;
 
+create_record(video_link, ItemMap) ->
+	SnippetMap = maps:get(<<"snippet">>, ItemMap),
+	ThumbnailMap = maps:get(<<"thumbnails">>, SnippetMap),
+	DimentionsMap = maps:get(<<"standard">>, ThumbnailMap),
+	VideoID = maps:get(<<"id">>),
+	Date = maps:get(<<"publishedAt">>, SnippetMap),
+	Title = maps:get(<<"title">>, SnippetMap),
+	ChannelID = maps:get(<<"channelId">>, SnippetMap),
+	Thumbnail = maps:get(<<"url">>, DimentionsMap),
+	Width = maps:get(<<"width">>, DimentionsMap),
+	Height = maps:get(<<"height">>, DimentionsMap),
+	Key = <<ChannelID/binary,<<":">>/binary, VideoID/binary>>,
+	#youtube_channel{
+			key 			= Key,
+			channel_id 		= ChannelID,
+			video_id 		= VideoID,
+			date 			= date_to_gregorian_days(Date),
+			width			=	Width,
+			height			=	Height,
+			title			=	Title,
+			url_medium		=	Thumbnail
+			}.
 
 find_token_in_string(Heystack, [Needle|ListOfNeedles]) ->
 	case string:find(Heystack, Needle) of

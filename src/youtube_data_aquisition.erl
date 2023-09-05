@@ -3,11 +3,18 @@
 % @Last Modified by:   Oleg Zilberman
 % @Last Modified time: 2023-03-21 10:48:08
 -module(youtube_data_aquisition).
--export([fetch_data/3, fetch_single_video/2]).
+-export([fetch_data/3, fetch_single_channel/2, fetch_single_video/2]).
 -include("include/server_config_item.hrl").
 -include("include/macro_definitions.hrl").
 
-fetch_single_video(ClientID, ChannelID) ->
+%%%%TODO: fetch_sing_video() is not currently used. This function is the begining of a new feature.
+%%%%TODO: A client should be able to have a collection of videos from different channels. For now
+%%%% this is a massive change that needs to wait
+fetch_single_video(ClientID, ChannelLink) ->
+	{ok, YoutubeKey} = db_access:get_client_youtube_key(ClientID),
+	fetch_video(ClientID, YoutubeKey, ChannelLink).
+
+fetch_single_channel(ClientID, ChannelID) ->
 	{ok, YoutubeKey} = db_access:get_client_youtube_key(ClientID),
 	fetch_single_page([], #{}, [{YoutubeKey, ChannelID}], "10").
 
@@ -16,6 +23,29 @@ fetch_data(production, ClientProfile, Date) ->
 
 fetch_data(periodic, ClientProfile, Date) ->
 	fetch_channel_data(Date, #{}, ClientProfile, ?YOUTUBE_MAXRESULTS).
+
+
+fetch_video(ClientID, YoutubeKey, ChannelLink) ->
+	Parts = string:split(ChannelLink, "/", all),
+	if 
+	    length(Parts) < 4 ->
+	        {error, Message} = utils:format_error(?SERVER_ERROR_INVALID_LINK, video_link_wrong_format);
+	    true ->
+	       Target = lists:nth(4, Parts),
+	       VideoParts = string:split(Target, "?", all),
+	       [VideoID, _] = VideoParts,
+	       Request = video_link_query(YoutubeKey, VideoID),
+		    Options = [{ssl, [{verify, verify_none}]}],
+			case httpc:request(get, {Request, []}, Options, []) of
+				{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
+					{ok, FirstPageMap} = utils:update_database(video_link, Body);
+				{ok,{_,_,ErrorMessage}} ->
+					io:format("fetch_channel_data failed: ~p~n", [ErrorMessage]),
+					{error, ErrorMessage};
+				Other ->
+					{error, Other}
+			end
+	end.
 
 fetch_single_page(Date, MasterMap, [Head|Tail], MaxResults) ->
 	{YoutubeKey, ChannelID} = Head,
@@ -106,6 +136,12 @@ get_next_page_token(Map) ->
 			[]
 	end.
 
+video_link_query(YoutbeApiKey, VideoID) ->
+	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
+									  {"id", VideoID},
+									  {"part", snippet}
+									  ]),
+	string:join([?YOUTBE_VIDEO_HOST, Query], "").
 
 first_page_query(YoutbeApiKey, ChannelID, [Date], MaxResults) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
@@ -115,7 +151,7 @@ first_page_query(YoutbeApiKey, ChannelID, [Date], MaxResults) ->
 									  {"publishedAfter", Date},
 									  {"maxResults", MaxResults}
 									  ]),
-	string:join([?YOUTUBE_HOST, Query], "");
+	string:join([?YOUTUBE_SEARCH_HOST, Query], "");
 
 first_page_query(YoutbeApiKey, ChannelID, [], MaxResults) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
@@ -125,7 +161,7 @@ first_page_query(YoutbeApiKey, ChannelID, [], MaxResults) ->
   									  {"publishedAfter", ?FIRST_PUBLISH_DATE},
 									  {"maxResults", MaxResults}
 									  ]),
-	string:join([?YOUTUBE_HOST, Query], "").
+	string:join([?YOUTUBE_SEARCH_HOST, Query], "").
 
 next_page_query(YoutbeApiKey, ChannelID, [Date], PageToken, MaxResults) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
@@ -136,7 +172,7 @@ next_page_query(YoutbeApiKey, ChannelID, [Date], PageToken, MaxResults) ->
 									  {"maxResults", MaxResults},
 									  {"pageToken", PageToken}
 									  ]),
-	string:join([?YOUTUBE_HOST, Query], "");
+	string:join([?YOUTUBE_SEARCH_HOST, Query], "");
 
 next_page_query(YoutbeApiKey, ChannelID, [], PageToken, MaxResults) ->
 	Query = uri_string:compose_query([{"key", YoutbeApiKey}, 
@@ -147,4 +183,4 @@ next_page_query(YoutbeApiKey, ChannelID, [], PageToken, MaxResults) ->
   									  {"publishedAfter", ?FIRST_PUBLISH_DATE},
 									  {"pageToken", PageToken}
 									  ]),
-	string:join([?YOUTUBE_HOST, Query], "").
+	string:join([?YOUTUBE_SEARCH_HOST, Query], "").

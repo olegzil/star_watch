@@ -325,7 +325,7 @@ update_existing_client_unconditionally(ClientID, ChannelID, ChannelName) ->
 			TransactionResult = mnesia:activity(sync_transaction, 
 				fun()-> 
 					mnesia:write(UpdatedRecord),
-					youtube_data_aquisition:fetch_single_video(ClientID, ChannelID)					
+					youtube_data_aquisition:fetch_single_channel(ClientID, ChannelID)					
 				end),
 			case TransactionResult of
 				{ok, _Success} ->
@@ -351,7 +351,7 @@ update_existing_client(ClientID, ChannelName, ChannelID, VideoID) ->
 			Key = db_access:construct_key(ChannelID, VideoID),
 			case db_access:get_video_record(Key) of  %%does this video exist in the db? If it doesn't, update this channel, otherwise do nothing.
 				error ->
-					youtube_data_aquisition:fetch_single_video(ClientID, ChannelID);
+					youtube_data_aquisition:fetch_single_channel(ClientID, ChannelID);
 				{ok, _Record} ->
 					ok
 			end,

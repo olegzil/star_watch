@@ -28,7 +28,8 @@
 
 -define(NASA_IMAGES_HOST, "https://images-api.nasa.gov/search?").
 -define(APOD_HOST, "https://api.nasa.gov/planetary/apod?").
--define(YOUTUBE_HOST, "https://www.googleapis.com/youtube/v3/search?").
+-define(YOUTBE_VIDEO_HOST, "https://www.googleapis.com/youtube/v3/videos?").
+-define(YOUTUBE_SEARCH_HOST, "https://www.googleapis.com/youtube/v3/search?").
 -define(ASTRONOMY_API_KEY, "K9jqPfqphwz3s1BsTbPQjsi2c4kn4eV7wBFh2MR8").
 -define(YOUTUBE_CHANNEL_IDS, [<<"UC7_gcs09iThXybpVgjHZ_7g">>, <<"UCQfZkf3-Y2RwzdRFWXYsdaQ">>]).
 -define(ADMINISTRATOR_KEY, <<"f09a2270-ac19-418c-a443-9f9e4f4c9019">>).

@@ -173,7 +173,7 @@ handle_cast(refreshclietprofiles, State) ->
         [] ->
             io:format("Not refreshing db. No new channels added~n");
         ChannelList ->
-            UpdateFunction = fun({_Name, ID}) -> youtube_data_aquisition:fetch_single_video(server_config_processor:get_client_key(?SERVER_CONFIG_FILE), ID) end,
+            UpdateFunction = fun({_Name, ID}) -> youtube_data_aquisition:fetch_single_channel(server_config_processor:get_client_key(?SERVER_CONFIG_FILE), ID) end,
             lists:foreach(UpdateFunction, ChannelList),
             io:format("Successful update of Channels: ~p~n", [ChannelList])
     end,
