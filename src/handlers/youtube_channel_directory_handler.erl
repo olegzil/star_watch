@@ -82,7 +82,6 @@ validate_request(all, Request) ->
     end;
 
 validate_request(key, Request) ->
-    io:format("********************* TEST ************************~n"),
     TokenList = cowboy_req:parse_qs(Request),
     case lists:keyfind(?REQUIRED_CLIENT_KEY_TOKEN, 1, TokenList) of 
         false -> 
