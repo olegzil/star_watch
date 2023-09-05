@@ -23,7 +23,8 @@ fetch_apod_data(production, Past, Future) ->
 									  {"thumbs", "true"}
 									  ]),
 	Request = string:join([?APOD_HOST, Query], ""),
-	case httpc:request(Request) of
+    Options = [{ssl, [{verify, verify_none}]}],
+	case httpc:request(get, {Request, []}, Options, []) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			utils:update_database(apod, Body);
 		{ok,{_,_,ErrorMessage}} ->
@@ -46,7 +47,8 @@ fetch_apod_data(tuples, {StartYear, StartMonth, StartDay}, {EndYear, EndMonth, E
 									  {"thumbs", "true"}
 									  ]),
 	Request = string:join([?APOD_HOST, Query], ""),
-	case httpc:request(Request) of
+    Options = [{ssl, [{verify, verify_none}]}],
+	case httpc:request(get, {Request, []}, Options, []) of
 		{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} ->
 			utils:update_database(apod, Body),
 			{ok, Body};
