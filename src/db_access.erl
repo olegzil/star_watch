@@ -20,6 +20,7 @@
            update_nasa_table/1, 
            package_channel_data/1, 
            fetch_videos_for_channel_id/1, 
+           fetch_client_data/2,
            purge_table/1, 
            get_channel_descriptors_for_client/1,
            get_client_youtube_key/1,
@@ -128,18 +129,34 @@ format_channel_videos(ClientKey, {error, _Map}) ->
     {error, jiffy:encode(#{error => utils:compose_error_message(500, Message)})};
 
 format_channel_videos(_ClientKey, {ok, Map}) -> 
-    [ListOfMaps] = maps:values(Map),
-    ListOfChannelIDS = format_channel_videos_helper(ListOfMaps, []),
-    collect_all_videos(ListOfChannelIDS, []).
+    List = maps:get(channel_list,Map),
+    ListOfChannelIDS = format_channel_videos_helper(List, []),
+    ChannelVideos = collect_all_videos(ListOfChannelIDS, []),
+    youtube_channel_record_to_map(ChannelVideos, []).
 
+youtube_channel_record_to_map([], Acc) ->
+    Acc;
+youtube_channel_record_to_map([ChannelVideos | Tail], Acc) ->
+    NewAcc = #{
+        video_id => ChannelVideos#youtube_channel.video_id,
+        channel_id => ChannelVideos#youtube_channel.channel_id,
+        url_medium => ChannelVideos#youtube_channel.url_medium,
+        width => ChannelVideos#youtube_channel.width,
+        height => ChannelVideos#youtube_channel.height,
+        title => ChannelVideos#youtube_channel.title,
+        date => ChannelVideos#youtube_channel.date
+    },
+    youtube_channel_record_to_map(Tail, lists:append(Acc, [NewAcc])).
+
+collect_all_videos([], Acc) ->
+    Acc;
 collect_all_videos([ChannelID|Tail], Acc) ->
     {_, ListOfRecords} = fetch_channel_data_from_db(ChannelID),
     collect_all_videos(Tail, lists:append(Acc, ListOfRecords)).
 
 
 format_channel_videos_helper([], Acc) -> Acc;
-format_channel_videos_helper([ChannelDescriptor|Tail], Acc) ->
-    ChannelID = maps:get(channel_id, ChannelDescriptor),
+format_channel_videos_helper([{_ChannelName, ChannelID} | Tail], Acc) ->
     NewList = lists:append(Acc, [ChannelID]),
     format_channel_videos_helper(Tail, NewList).
 

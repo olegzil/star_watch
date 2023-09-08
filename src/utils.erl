@@ -524,7 +524,7 @@ create_record(video_link, ItemMap) ->
 	SnippetMap = maps:get(<<"snippet">>, ItemMap),
 	ThumbnailMap = maps:get(<<"thumbnails">>, SnippetMap),
 	DimentionsMap = maps:get(<<"standard">>, ThumbnailMap),
-	VideoID = maps:get(<<"id">>),
+	VideoID = maps:get(<<"id">>, SnippetMap),
 	Date = maps:get(<<"publishedAt">>, SnippetMap),
 	Title = maps:get(<<"title">>, SnippetMap),
 	ChannelID = maps:get(<<"channelId">>, SnippetMap),
