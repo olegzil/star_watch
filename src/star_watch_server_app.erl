@@ -12,6 +12,7 @@
 -include("include/server_config_item.hrl").
 -include("include/users_login_table.hrl").
 -include("include/client_profile_table.hrl").
+-include("include/client_random_video_list.hrl").
  
 start(_Type, _Args) ->
     initialize_mnesia(), %% Start mnesia
@@ -87,9 +88,11 @@ initialize_mnesia() ->
     init_table(celestial_object_table),
     init_table(youtube_channel),
     init_table(users_login_table),
+    init_table(client_random_video_list),
     Empty = init_table(client_profile_table),
     mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel, client_profile_table], 10000),
-    timer:apply_after(1000, server_config_processor, populate_client_profile_table, [Empty]),
+    timer:apply_after(1000, server_config_processor, populate_client_profile_table, [client_channel_data, Empty]),
+    timer:apply_after(1000, server_config_processor, populate_client_profile_table, [client_video_data, Empty]),
     mnesia:add_table_index(youtube_channel, video_id),
     mnesia:add_table_index(youtube_channel, channel_id).
 init_table(TableName) ->
@@ -107,6 +110,15 @@ init_table(TableName) ->
             io:format("DB Table: ~p exists with size: ~p~n", [TableName, InitData]),
             false
     end.
+create_table(client_random_video_list) ->
+    mnesia:create_table(
+        client_random_video_list,
+        [
+            {attributes, record_info(fields, client_random_video_list)},
+            {type, ordered_set},
+            {disc_copies, [node()]}
+        ]);
+
 
 create_table(client_profile_table) ->
     mnesia:create_table(

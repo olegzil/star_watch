@@ -37,7 +37,10 @@
 		 extract_id_and_password/1,
 		 extract_id/1,
 		 exec_extern_cmd/1,
-		 get_current_endpoints/0]).
+		 get_current_endpoints/0,
+		 parse_video_link/1,
+		 create_record/2,
+		 create_youtube_channel_table_key/2]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include("include/apodtelemetry.hrl").
@@ -436,11 +439,15 @@ insert_db_entries(youtube, JsonData) ->
 insert_db_entries(video_link, JsonData) ->
 	Items =  maps:get(?YOUTUBE_VIDEO_ARRAY_KEY, JsonData),
 	ItemMap = lists:nth(1, Items),
-	Fun = fun() ->
-		Record = create_record(youtube_link, ItemMap), %% convert the item to a struct
-		mnesia:write(Record)			%% if this is an image, store it
-	end,
-	mnesia:transaction(Fun).
+	case create_record(video_link, ItemMap) of %% convert the item to a struct
+		{error, Message} ->
+			{error, Message};
+		{ok, Record} -> %% if this is a valid record, store it
+			Fun = fun() ->
+				mnesia:write(Record)			
+			end,
+			mnesia:transaction(Fun)
+	end.
 
 extract_item_from_list([Item|Items]) ->
 	Fun = fun() ->
@@ -484,6 +491,39 @@ get_all_lines(Device) ->
         Line -> Line ++ get_all_lines(Device)
     end.
 
+create_youtube_channel_table_key(ChannelID, VideoID) ->
+	<<ChannelID/binary,<<":">>/binary, VideoID/binary>>.
+
+
+%%%TODO: Instead of <<"default">>, use a higher resolution entry
+create_record(video_link, ItemMap) ->
+	SnippetMap = maps:get(<<"snippet">>, ItemMap),
+	Thumbnails = maps:get(<<"thumbnails">>, SnippetMap),
+	LocalizedMap = maps:get(<<"localized">>, SnippetMap),
+	DefaultData = maps:get(<<"standard">>, Thumbnails),
+	Height = maps:get(<<"height">>, DefaultData),
+	Width = maps:get(<<"width">>, DefaultData),
+	Url =  maps:get(<<"url">>, DefaultData),
+	VideoID = maps:get(<<"id">>, ItemMap),
+	Date = maps:get(<<"publishedAt">>, SnippetMap),
+	Title = maps:get(<<"title">>, LocalizedMap),
+	case db_access:get_channel_from_video_id(synthetic, VideoID) of
+		{ok, ChannelID} ->
+			Key = <<ChannelID/binary,<<":">>/binary, VideoID/binary>>,
+			{ok, #youtube_channel{
+					key 			= Key,
+					channel_id 		= ChannelID,
+					video_id 		= VideoID,
+					date 			= date_to_gregorian_days(Date),
+					width			=	Width,
+					height			=	Height,
+					title			=	Title,
+					url_medium		=	Url
+					}};
+		{error, Message} ->
+			{error, Message}
+	end;
+
 create_record(apod, Item) ->
 	#apodimagetable{
 				url 			= proplists:get_value(<<"url">>, Item),
@@ -503,9 +543,8 @@ create_record(youtube, Item) ->
 	UrlDescriptor = maps:get(<<"medium">>, Thumbnails),
 	try maps:get(<<"videoId">>, Id) of
 		VideoID ->
-			Part1 = maps:get(<<"channelId">>, Snippet),
-			Part2 = VideoID,
-			Key = <<Part1/binary,<<":">>/binary, Part2/binary>>,
+			ChannelID = maps:get(<<"channelId">>, Snippet),
+			Key = create_youtube_channel_table_key(ChannelID, VideoID),
 			#youtube_channel{
 					key 			= Key,
 					channel_id 		= maps:get(<<"channelId">>, Snippet),
@@ -518,30 +557,7 @@ create_record(youtube, Item) ->
 					}
 	catch _:_ ->
 			io:format("Badkey for record: ~p~n", [Id])
-	end;
-
-create_record(video_link, ItemMap) ->
-	SnippetMap = maps:get(<<"snippet">>, ItemMap),
-	ThumbnailMap = maps:get(<<"thumbnails">>, SnippetMap),
-	DimentionsMap = maps:get(<<"standard">>, ThumbnailMap),
-	VideoID = maps:get(<<"id">>, SnippetMap),
-	Date = maps:get(<<"publishedAt">>, SnippetMap),
-	Title = maps:get(<<"title">>, SnippetMap),
-	ChannelID = maps:get(<<"channelId">>, SnippetMap),
-	Thumbnail = maps:get(<<"url">>, DimentionsMap),
-	Width = maps:get(<<"width">>, DimentionsMap),
-	Height = maps:get(<<"height">>, DimentionsMap),
-	Key = <<ChannelID/binary,<<":">>/binary, VideoID/binary>>,
-	#youtube_channel{
-			key 			= Key,
-			channel_id 		= ChannelID,
-			video_id 		= VideoID,
-			date 			= date_to_gregorian_days(Date),
-			width			=	Width,
-			height			=	Height,
-			title			=	Title,
-			url_medium		=	Thumbnail
-			}.
+	end.
 
 find_token_in_string(Heystack, [Needle|ListOfNeedles]) ->
 	case string:find(Heystack, Needle) of
@@ -837,6 +853,17 @@ to_string(U) ->
 % Returns the 32, 16, 16, 8, 8, 48 parts of a binary UUID.
 get_parts(<<TL:32, TM:16, THV:16, CSR:8, CSL:8, N:48>>) ->
     [TL, TM, THV, CSR, CSL, N].
+
+parse_video_link(Link) ->
+	Parts = string:split(Link, "/", all),
+	if 
+	    length(Parts) < 4 ->
+	        {error, video_link_wrong_format};
+	    true ->
+	        Target = lists:nth(4, Parts),
+	        [VideoID|_]  = string:split(Target, "?", all),
+	        {ok, VideoID}
+	end.
 
 %%%%%%%%%%%%%%%%%%%%% DEBUG CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_current_endpoints() ->

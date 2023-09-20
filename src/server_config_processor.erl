@@ -7,6 +7,7 @@
 -include("include/client_profile_table.hrl").
 -include("include/youtube_channel.hrl").
 -include("include/macro_definitions.hrl").
+-include("include/client_random_video_list.hrl").
 -export([fetch_client_config_data_db/2, 
 		 fetch_list_of_channel_ids_and_youtube_keys_db/0,
 		 fetch_profile_map_from_file/1,
@@ -19,7 +20,7 @@
 		 get_default_youtube_key/1, 
 		 get_client_key/1,
 		 get_known_clients/1,
-		 populate_client_profile_table/1,
+		 populate_client_profile_table/2,
 		 is_client_in_profile_map/1,
 		 delete_config_record/1, 
 		 is_channel_in_profile/2,
@@ -28,11 +29,14 @@
 		 update_existing_client/4,
 		 add_new_client_record/1,
 		 copy_profile_and_add_new_channel/2,
-		 restore_default_client/1,
+		 restore_client/1,
 		 read_private_key_file/0,
 		 get_email_keys/1,
 		 get_ip_flag/1,
-		 update_existing_client_unconditionally/3]).
+		 get_synthetic_channel/2,
+		 update_existing_client_unconditionally/3,
+		 get_video_link_data/1,
+		 get_profiles_list/1]).
 read_private_key_file() ->
 	file:read_file("private-key.pem").
 
@@ -73,6 +77,20 @@ get_known_clients(File) ->
 	Fun = fun(Item, Acc) -> NewAcc = maps:get(client_id, Item), Acc ++ [NewAcc] end,
 	lists:foldl(Fun, [], ProfileList).
 
+get_synthetic_channel(File, ClientID) ->
+	ProfileMap = get_profiles_list(File),
+	ClientMap = maps:get(ClientID, ProfileMap),
+	case maps:find(client_video_data, ClientMap) of
+		error ->
+			error;
+		{ok, ChannelDescriptor} ->
+			package_synthetic_channels(ChannelDescriptor, [])
+	end.
+package_synthetic_channels([], Acc) -> Acc;
+package_synthetic_channels([ChannelDescriptor | Tail], Acc) ->
+	{Name, ChannelID, _} = ChannelDescriptor,
+	package_synthetic_channels(Tail, Acc ++ [{Name, ChannelID}]).
+
 %%% Returns a map: #{directoryrecords => [Item1, ..., ItemN] }, where Item is itself a map: #{channel_id => a, client => b, name => c}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% Begin fetch_channel_directory logic %%%%%%%%%%%%%
@@ -84,15 +102,17 @@ fetch_client_directory(ClientID) ->
 			utils:format_error(?SERVER_ERROR_INVALID_CLIENT, Message);
 		[ClientRecord] ->
 			ChannelList = ClientRecord#client_profile_table.channel_list,
-			process_channel_request(ClientID, ChannelList, [])
+			Final = process_channel_request(ClientID, ChannelList, []),
+			{ok, jiffy:encode(#{directoryrecords => Final})}
 	end.
 
+
 process_channel_request(_Arg1, [], ListOfMaps) -> 
-	Final = maps:put(directoryrecords, ListOfMaps, #{}),
-	{ok, jiffy:encode(Final)};
+	ListOfMaps;
 
 process_channel_request(ClientID, [Channel | ChannelList], Acc) ->
 	{ChannelName,ChannelID} = Channel,
+	utils:log_message([{"ClientID", ClientID}, {"ChannelName", ChannelName}, {"ChannelID", ChannelID}]),
 	case db_access:get_channel_data(ClientID, ChannelID) of
 		false ->
 			process_channel_request(ClientID, ChannelList, Acc);
@@ -185,7 +205,13 @@ extract_record([Key|Keys], ProfileMap, Acc) ->
 	{ok, ClientProfile} = maps:find(Key, ProfileMap),
 	{ok, ChannelData} = maps:find(client_channel_data, ClientProfile),
 	{ok, YoutubeKey} = maps:find(youtube_api_key, ClientProfile),
-	Map = #{client_id => Key, youtube_key => YoutubeKey, client_channel_data => ChannelData},
+	ClientVideoData = maps:find(client_video_data, ClientProfile),
+	Map = case ClientVideoData of
+				{ok, VideoLinks} ->
+					#{client_id => Key, youtube_key => YoutubeKey, client_channel_data => ChannelData, client_video_data => VideoLinks};
+				_ ->
+					#{client_id => Key, youtube_key => YoutubeKey, client_channel_data => ChannelData}
+		  end,
 	List = lists:append(Acc, [Map]),
 	extract_record(Keys, ProfileMap, List).
 
@@ -230,9 +256,24 @@ key_pair_extractor([Key|Remainder], Acc) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%% Begin populate_client_profile_table logic %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-populate_client_profile_table(false) -> 
+populate_client_profile_table(client_video_data, false) ->
 	ok;
-populate_client_profile_table(true) -> 
+populate_client_profile_table(client_video_data, true) ->
+    ClientProfilesList = fetch_profile_map_from_file(?SERVER_CONFIG_FILE),
+    ClientEntryFun = fun(Map) ->
+    	case maps:find(client_video_data, Map) of
+    		error ->
+    			ok;
+    		{ok, VideoData} ->
+		    	ClientID = maps:get(client_id, Map),
+		    	generate_video_link_record(ClientID, VideoData)
+    	end
+    end,
+    lists:foreach(ClientEntryFun, ClientProfilesList);
+
+populate_client_profile_table(client_channel_data, false) -> 
+	ok;
+populate_client_profile_table(client_channel_data, true) -> 
     ClientProfilesList = fetch_profile_map_from_file(?SERVER_CONFIG_FILE),
     ListFun = fun(Map) -> 
     	Record = #client_profile_table{
@@ -246,6 +287,54 @@ populate_client_profile_table(true) ->
     	io:format("written: ~p~n", [mnesia:transaction(WriteFun)])
     end,
     lists:foreach(ListFun, ClientProfilesList).
+
+generate_video_link_record(ClientID, VideoData) ->
+	RandomVideoListRecordFun = fun(VideoLinkEntry, Acc) ->
+		{Name, ChannelID, ListOfLinks} = VideoLinkEntry,
+		UpdateRandomVideoListFun = fun() ->
+			mnesia:write(#client_random_video_list{
+			    		key = ChannelID, 
+						video_link_list = ListOfLinks,
+						channel_name = Name
+			    	})		
+		end,
+		mnesia:transaction(UpdateRandomVideoListFun),
+		conditional_update_youtube_channel_table(ClientID, ListOfLinks),
+		Acc ++ [{Name, ChannelID}]
+	end,
+	ChannelList = lists:foldr(RandomVideoListRecordFun, [], VideoData),
+
+	UpdateProfileTableFun = fun() -> 
+		[Record] = mnesia:read(client_profile_table, ClientID),
+		NewVideoList = Record#client_profile_table.channel_list ++ ChannelList,
+		UpdatedRecord = Record#client_profile_table{channel_list = NewVideoList},
+		mnesia:write(UpdatedRecord)
+	end,
+   	mnesia:transaction(UpdateProfileTableFun).
+
+conditional_update_youtube_channel_table(ClientID, ListOfLinks) ->
+	UpdateFun = fun(VideoLinkEntry) ->
+		{_, VideoLink} = VideoLinkEntry,
+		case db_access:is_video_in_youtube_channel(ClientID, VideoLink) of
+			false ->
+				youtube_data_aquisition:fetch_single_video(ClientID, VideoLink);
+			true ->
+				ok
+		end
+	end,
+	lists:foreach(UpdateFun, ListOfLinks).
+
+get_video_link_data(ClientProfile) ->
+	case maps:find(client_video_data, ClientProfile) of
+		error ->
+			[];
+		{ok, ListOfVideoData} ->
+			Extractor = fun(Entry, Acc) ->
+				{Name, ChannelID, _} = Entry,
+				Acc ++ [{Name, ChannelID}]
+			end,
+			lists:foldl(Extractor, [], ListOfVideoData)
+	end.
 
 is_client_in_profile_map(ClientID) ->
 	Map = fetch_profile_map_from_db(client_profile_table),
@@ -381,25 +470,30 @@ copy_profile_and_add_new_channel(TargetID, {ChannelName, ChannelID}) ->
 		{error, video_link_ChannelIdExists}
 	end.
 
-restore_default_client(ClientID) ->
+restore_client(ClientID) ->
 	case is_client_in_profile_map(ClientID) of 
 		true ->
-			DefaultClientID = get_client_key(?SERVER_CONFIG_FILE),
 			Profiles = get_profiles_list(?SERVER_CONFIG_FILE),
-			Profile = maps:get(DefaultClientID, Profiles),
+			Profile = maps:get(ClientID, Profiles),
 			ChannelList = maps:get(client_channel_data, Profile),
 
-			%% Just in case, restore the default client profile
+			%% restore the client profile from the server configuration file
 			Record = #client_profile_table {
-				client_id = get_profiles_list(?SERVER_CONFIG_FILE),
+				client_id = ClientID,
 				youtube_key = get_default_youtube_key(?SERVER_CONFIG_FILE),
 				channel_list = ChannelList
 			},
 			mnesia:transaction(fun()-> mnesia:write(Record) end),
-				mnesia:transaction(fun() -> 
+			mnesia:transaction(fun() -> 
 				[R] = mnesia:read(client_profile_table, ClientID),
-				MergedList = lists:merge(ChannelList, R#client_profile_table.channel_list),
-				UniqueList = lists:uniq(fun({_Name, ChannelID}) -> ChannelID end, MergedList),
+				UniqueList = case get_synthetic_channel(?SERVER_CONFIG_FILE, ClientID) of
+					error ->
+						ChannelList;
+					ListOfSyntheicChannels ->
+						MergedList = lists:merge(ChannelList, ListOfSyntheicChannels),
+						lists:uniq(fun({_Name, ChannelID}) -> ChannelID end, MergedList)
+				end,
+
 				mnesia:write(R#client_profile_table{channel_list = UniqueList})
 			end),
 			fetch_client_directory(ClientID);

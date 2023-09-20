@@ -13,6 +13,7 @@
 -include("include/macro_definitions.hrl").
 -include("include/server_config_item.hrl").
 -include("include/client_profile_table.hrl").
+-include_lib("include/client_random_video_list.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
  -export([process_date_request/2, 
@@ -33,7 +34,9 @@
            fetch_video_data/2,
            construct_key/2,
            get_video_record/1,
-           is_channel_in_db/1]).
+           is_channel_in_db/1,
+           get_video_links_from_synthetic_channel/1,
+           get_channel_from_video_id/2]).
 
 -export([dump_db/0, get_all_keys/1, count_media_type/1, dump_telemetry_table/0, get_dataset_size/2]).
 
@@ -249,15 +252,40 @@ get_video_record(Key) ->
     end.
 
 is_channel_in_db(ChannelID) ->
-    ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
-    {atomic, Records} = mnesia:transaction(ReaderFun),
-    case length(Records) of
-        0 ->
-            false;
+    case string:find(ChannelID, "synthetic") of
+        nomatch -> %% This is not a synthetic channel. Query the youtube_channel table
+            ReaderFun = fun() -> mnesia:index_read(youtube_channel, ChannelID, #youtube_channel.channel_id) end,
+            {atomic, Records} = mnesia:transaction(ReaderFun),
+            case length(Records) of
+                0 ->
+                    false;
+                _ ->
+                    true
+            end;
+        Target ->   %% This is a syntheic channel. Query the client_random_video_list
+            Result = mnesia:transaction(fun() -> 
+                mnesia:match_object({client_random_video_list, Target, '_', '_'})
+            end),
+            case Result of
+                {atomic,[]} ->
+                    false;
+                {atomic, [Record]} ->
+                    compare_videos_db_to_config(Record#client_random_video_list.video_link_list)
+            end
+        end.
+
+compare_videos_db_to_config([]) ->
+    false;
+compare_videos_db_to_config([Head|Tail]) ->
+    {_Name, VideoLink} = Head,
+    {ok, VideoID} = utils:parse_video_link(VideoLink),
+    Found = mnesia:transaction(fun() -> mnesia:match_object({youtube_channel, '_', VideoID, '_', '_', '_', '_', '_', '_'}) end),
+    case Found of 
+        {atomic,[]} ->
+            compare_videos_db_to_config(Tail);
         _ ->
             true
     end.
-
 %%%
 %%% Determine if the client has this video link. First, use and indexed read to determine if the link exits at all.
 %%% If it does not, report false.
@@ -284,6 +312,35 @@ is_video_in_youtube_channel(ClientID, Link) ->
                 true -> 
                     true
             end
+    end.
+get_channel_from_video_id(synthetic, VideoID) ->
+    FetchKeysFun = fun() -> mnesia:all_keys(client_random_video_list) end,
+    {atomic, Keys} = mnesia:transaction(FetchKeysFun),
+    process_synthetic_channel_record(VideoID, Keys).
+
+process_synthetic_channel_record(VideoID, []) -> {error, <<"video id: ", VideoID, " not found">>};
+process_synthetic_channel_record(VideoID, [Key|Keys]) ->
+        {atomic, [Record]} = mnesia:transaction(
+                fun() ->
+                    mnesia:read(client_random_video_list, Key)
+                end
+            ),
+    Found = process_synthetic_channel_video_list(VideoID, Record#client_random_video_list.video_link_list),
+    case Found of
+        {ok, _Link} ->
+            {ok, Key};
+        _ ->
+            process_synthetic_channel_record(VideoID, Keys)
+    end.
+process_synthetic_channel_video_list(_VideoID, []) -> error;
+process_synthetic_channel_video_list(Target, [Head|Tail]) ->
+    {_Name, Link} = Head,
+    {ok, VideoID} = utils:parse_video_link(Link),
+    if
+        VideoID =:= Target ->
+            {ok, Link};
+        true ->
+            process_synthetic_channel_video_list(Target, Tail)
     end.
 
 fetch_video_data(ClientID, ChannelID) ->
@@ -331,7 +388,7 @@ get_channel_data(ClientID, ChannelID) ->
     end,
     case length(Records) of
         0 ->
-            UpdatedRecord = process_channel_list(ClientID, ChannelID, get_channel_data_db(ChannelID)),
+            UpdatedRecord = process_channel_list(ClientID, ChannelID, []),
             SortedList = lists:sort(Predicate, UpdatedRecord),
             [First | _] = SortedList,
             First;
@@ -442,6 +499,26 @@ delete_video_link_from_profile_table(ClientID, VideoLink) ->
     end.
 construct_key(ChannelID, VideoID) ->
     <<ChannelID/binary, ":", VideoID/binary>>.
+
+get_video_links_from_synthetic_channel(ChannelID) ->
+    Match = ets:fun2ms(
+        fun(Record) 
+            when Record#client_random_video_list.key =:= ChannelID ->
+                Record
+        end),
+
+    SelectRecords = fun() -> mnesia:select(client_random_video_list, Match) end,
+    {_, ListOfRecords} = mnesia:sync_transaction(SelectRecords),
+    MapGenFun = fun(Record, Acc) -> 
+        Acc ++ [
+            #{
+                channel_id => Record#client_random_video_list.key,
+                channel_name => Record#client_random_video_list.channel_name,
+                video_link_list => Record#client_random_video_list.video_link_list
+            }
+        ]
+    end,
+    lists:foldl(MapGenFun, [], ListOfRecords).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Debug functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 dump_telemetry_table() ->

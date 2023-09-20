@@ -7,7 +7,7 @@ telemetry/request -- used only by the StarWatch app to report telementry events.
 telemetry/stats -- same as telemetry/request except when different.
 astronomy/celestialbody -- can be used to retrive images of verious celestial bodies. Not active.
 
-http://10.0.0.35:8083/youtube/channelselector/?key=389b4e36-b3d2-11ed-afa1-0242ac120002&client_id=c6d5c9a4-26ae-42d2-bbe9-8d868839fdb1&action=restoredefaultclient
+http://10.0.0.24:8083/youtube/channelselector/?key=389b4e36-b3d2-11ed-afa1-0242ac120002&client_id=89d57716-aaaa-4741-b1ab-4fa5d9f77b75&action=restoredefaultclient
 http://10.0.0.35:8083/youtube/channelselector/?action=deletechannel&key=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UCMng_0bpueq8iJKY9yOnMDA&client_id=c6d5c9a4-26ae-42d2-bbe9-8d868839fdb1
 http://10.0.0.35:8083/youtube/channelselector/?action=fetchchannelvideos&key=389b4e36-b3d2-11ed-afa1-0242ac120002&channel_id=UC7_gcs09iThXybpVgjHZ_7g&client_id=52e1e0b3-04ff-4811-9547-0a22fa7d85a0
 http://10.0.0.35:8083/youtube/channelselector/?action=addvideolink&key=389b4e36-b3d2-11ed-afa1-0242ac120002&video_link=https://youtu.be/fMIiNY3Ie0c
@@ -20,4 +20,4 @@ http://10.0.0.2:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&act
 
 //Reads the server_config.cfg file. For every channel id regardless of client, the data base is checked if the channle id exists in the database. If not, a call to youtube is made to retrieve all videos assosiated with this 
 //channel and db is updated.
-http://10.0.0.3:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=refreshclietprofiles&client_id=415b403b-deaa-43bd-85bc-f15b6c403b5f
+http://10.0.0.9:8083/youtube/admin/?key=f09a2270-ac19-418c-a443-9f9e4f4c9019&action=refreshclietprofiles&client_id=89d57716-aaaa-4741-b1ab-4fa5d9f77b75

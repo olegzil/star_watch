@@ -267,7 +267,7 @@ validate_request(key, Request, _AvailableActions) ->
             Found = lists:member(Key, KnownClients),
             if
                 Found =:= false ->
-                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_CLIENT, <<"default key: ", Key/binary, " is not valid">>),
+                    {error, Message}  = utils:format_error(?SERVER_ERROR_INVALID_CLIENT, <<"2. default key: ", Key/binary, " is not valid">>),
                     {error, jiffy:encode(Message)};                    
                 true ->
                     {ok, Key}

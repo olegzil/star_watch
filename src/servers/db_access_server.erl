@@ -24,7 +24,7 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
 handle_call({restoredefaultclient, ClientID}, _From, State) ->
-    {Code, Data} = server_config_processor:restore_default_client(ClientID),
+    {Code, Data} = server_config_processor:restore_client(ClientID),
     case Code of
         ok ->
             {reply, {Code, Data},  State};
@@ -148,13 +148,15 @@ handle_call({fetch_video_data, ClientID, VideoLink}, _From, State) ->
                         {ok, Result} = db_access:fetch_video_data(ClientID, VideoLink),
                         {ok, jiffy:encode(#{video_data => Result})}
                 end,
-    {reply, Response, State};
+    {reply, Response, State}.
 
-
-handle_call(_Msg, _From, State) ->
-    {noreply, State}.
 
 handle_cast(refreshclietprofiles, State) ->
+    gen_server:cast(db_access_server, refresh_youtube_channel_id),
+    gen_server:cast(db_access_server, refresh_synthetic_channel_id),
+    {noreply, State};    
+
+handle_cast(refresh_youtube_channel_id, State) ->
     DBCompareFunction = fun({ChannelName, ChannelID}, Acc) ->
         case db_access:is_channel_in_db(ChannelID) of
             false ->
@@ -168,16 +170,48 @@ handle_cast(refreshclietprofiles, State) ->
         lists:foldl(DBCompareFunction, Acc, ChannelList)
     end,
 
-    ProfileList = server_config_processor:fetch_profile_map_from_file(?SERVER_CONFIG_FILE),
+    ProfileList = server_config_processor:fetch_profile_map_from_file(State),
     case lists:foldl(MapFunction, [], ProfileList) of 
         [] ->
-            io:format("Not refreshing db. No new channels added~n");
+            io:format("Not refreshing db with client_channel_data. No new channels added~n");
         ChannelList ->
-            UpdateFunction = fun({_Name, ID}) -> youtube_data_aquisition:fetch_single_channel(server_config_processor:get_client_key(?SERVER_CONFIG_FILE), ID) end,
+            UpdateFunction = fun({_Name, ID}) -> youtube_data_aquisition:fetch_single_channel(server_config_processor:get_client_key(State), ID) end,
             lists:foreach(UpdateFunction, ChannelList),
             io:format("Successful update of Channels: ~p~n", [ChannelList])
     end,
-    {noreply, State};    
+    {noreply, State};
+
+handle_cast(refresh_synthetic_channel_id, State) ->
+    DBCompareFunction = fun({ChannelName, ChannelID}, Acc) ->
+        case db_access:is_channel_in_db(ChannelID) of
+            false ->
+                Acc ++ [{ChannelName, ChannelID}];
+            true ->
+                Acc
+        end
+    end,
+    MapFunction = fun(ClientProfile, Acc) ->
+        ChannelList = server_config_processor:get_video_link_data(ClientProfile),
+        lists:foldl(DBCompareFunction, Acc, ChannelList)
+    end,
+
+    ProfileList = server_config_processor:fetch_profile_map_from_file(State),
+    case lists:foldl(MapFunction, [], ProfileList) of 
+        [] ->
+            io:format("Not refreshing db client_video_data. No new videos added~n");
+        ChannelList ->
+            UpdateFunction = fun({_, ID}) -> 
+                SyntheticChannelData = db_access:get_video_links_from_synthetic_channel(ID),
+                lists:foreach(fun(Map) -> 
+                    ListOfURLs = maps:get(video_link_list, Map),
+                    lists:foreach(fun({_, URL}) -> 
+                        youtube_data_aquisition:fetch_single_video(server_config_processor:get_client_key(?SERVER_CONFIG_FILE), URL) end, ListOfURLs)
+                end, SyntheticChannelData)                 
+            end,
+            lists:foreach(UpdateFunction, ChannelList),
+            io:format("Successful update of Channels: ~p~n", [ChannelList])
+    end,
+    {noreply, State};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

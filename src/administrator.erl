@@ -12,7 +12,8 @@
 handle_admin_action(Action, Parameter)	->
 	case Action of
 		<<"refreshclietprofiles">> ->
-			server_config_processor:populate_client_profile_table(true),
+			server_config_processor:populate_client_profile_table(client_channel_data, true),
+			server_config_processor:populate_client_profile_table(client_video_data, true),
 			gen_server:cast(db_access_server, refreshclietprofiles),
 			utils:format_success(?SERVER_ERROR_OK, <<"client profiles updated with contents of server_cofnig.cfg">>);
 
