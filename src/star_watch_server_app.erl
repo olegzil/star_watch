@@ -21,7 +21,7 @@ start(_Type, _Args) ->
     YearStartConstraint         = {year_start, [fun validate_year_start/2]},
     YearEndConstraint           = {year_end, [fun validate_year_end/2]},
     
-    LoginRoute = {"/youtube/login/[...]", [], user_login_handler, []},   
+    YoutubeLoginRoute = {"/youtube/login/[...]", [], user_login_handler, []},   
     FetchAdminRoute = {"/youtube/admin/[...]", [], youtube_admin_channel_handler, []},
     FetchYoutubeChanneRoute = {"/youtube/channelselector/[...]", [], youtube_channel_directory_handler, []},
     FetchNasaImagesRoute = {"/astronomy/celestialbody/[...]", [ApiKeyConstraints, YearStartConstraint, YearEndConstraint], celestial_body_handler, []},
@@ -32,7 +32,7 @@ start(_Type, _Args) ->
     IPMap = utils:get_current_endpoints(),
     ActivePort = maps:get(active_port, IPMap),
     Dispatch = cowboy_router:compile([
-        {'_', [LoginRoute, FetchAdminRoute, FetchYoutubeChanneRoute, FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
+        {'_', [YoutubeLoginRoute, FetchAdminRoute, FetchYoutubeChanneRoute, FetchNasaImagesRoute, FetchApodRoute, TelemetryRoute, RegistrationRoute, CatchAllRoute]}
     ]),
     {ok, _} = cowboy:start_clear(star_watch_http_listener,
          [{port, ActivePort}],
@@ -92,7 +92,10 @@ initialize_mnesia() ->
     Empty = init_table(client_profile_table),
     mnesia:wait_for_tables([apodimagetable, apodtelemetry, celestial_object_table, youtube_channel, client_profile_table], 10000),
     timer:apply_after(1000, server_config_processor, populate_client_profile_table, [client_channel_data, Empty]),
-    timer:apply_after(1000, server_config_processor, populate_client_profile_table, [client_video_data, Empty]),
+
+    % For now to preserver disk space, video table will not be updated.
+    % timer:apply_after(1000, server_config_processor, populate_client_profile_table, [client_video_data, Empty]),
+    
     mnesia:add_table_index(youtube_channel, video_id),
     mnesia:add_table_index(youtube_channel, channel_id).
 init_table(TableName) ->

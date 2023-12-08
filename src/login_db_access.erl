@@ -53,8 +53,8 @@ get_user_profile_from_token(Token) ->
             {ok, Record}
     end.
 
-get_user_profile(public, LoginID) ->
-    ReaderFun = fun() -> mnesia:read(users_login_table, LoginID) end, 
+get_user_profile(public, Email) ->
+    ReaderFun = fun() -> mnesia:read(users_login_table, Email) end, 
     case mnesia:transaction(ReaderFun) of
         {aborted,{Reason,_}} -> 
             {aborted, Reason};
@@ -72,8 +72,8 @@ get_user_profile(public, LoginID) ->
         	{ok, Result}
     end;
 
-get_user_profile(private, LoginID) ->
-    ReaderFun = fun() -> mnesia:read(users_login_table, LoginID) end, 
+get_user_profile(private, Email) ->
+    ReaderFun = fun() -> mnesia:read(users_login_table, Email) end, 
     case mnesia:transaction(ReaderFun) of
         {aborted,{Reason,_}} -> 
             {aborted, Reason};
@@ -123,8 +123,8 @@ mark_user_as_logged_in(Email) ->
             update_user_profile(UpdatedRecord)
     end.
 
-update_user_profile(LoginID, Member, NewValue) ->
-    ReaderFun = fun() -> mnesia:read(users_login_table, LoginID) end, 
+update_user_profile(Email, Member, NewValue) ->
+    ReaderFun = fun() -> mnesia:read(users_login_table, Email) end, 
     case mnesia:transaction(ReaderFun) of
         {aborted,{Reason,_}} -> 
             {aborted, Reason};

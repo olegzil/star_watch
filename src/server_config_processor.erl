@@ -66,6 +66,7 @@ get_email_keys(File) ->
 	PublicKey = maps:get(api_key_public, ControlBlock),
 	SecreteKey = maps:get(api_key_private, ControlBlock),
 	{PublicKey, SecreteKey}.
+	
 get_ip_flag(File) ->
 	ControlBlock = get_server_control_block(File),
 	maps:get(use_local_ip, ControlBlock).	

@@ -67,7 +67,7 @@ handle_call({user_profile, _ClientID, EncryptedData}, _From, State) ->
 
 handle_call({login_reset_password, _ClientID, EncryptedData}, _From, State) ->
     case utils:extract_id_and_password(EncryptedData) of
-        {Email, Password} ->
+        {Email, Password, _Name} ->
             Profile = login_db_access:get_user_profile(private, Email),
             CreateNewUserResult = handle_profile_update(password, Profile, Password),
             {reply, CreateNewUserResult, State};
@@ -78,7 +78,7 @@ handle_call({login_reset_password, _ClientID, EncryptedData}, _From, State) ->
 
 handle_call({login_new_userid, ClientID, EncryptedData}, _From, State) ->
     case utils:extract_id_and_password(EncryptedData) of
-        {Email, Password} ->
+        {Email, Password, Name} ->
             Profile = login_db_access:get_user_profile(private, Email),
             CreateNewUserResult = handle_profile_update(userid, Profile, ClientID, Email, Password),
             {reply, CreateNewUserResult, State};
@@ -268,6 +268,7 @@ handle_profile_update(password, UserProfile, Password) ->
     end.
 
 handle_profile_update(userid, UserProfile, ClientID, Email, Password) ->
+    utils:log_message([{"UserProfile", UserProfile}, {"ClientID", ClientID}, {"Email", Email}, {"Password", Password}]),
     case UserProfile of
         {aborted, Reason} ->
             {error, Reason};
@@ -315,7 +316,7 @@ query_user_login_id(EncryptedData) ->
             utils:format_error(?SERVER_ERROR_NO_SUCH_USER_ID, <<"invalid credentials", Error/binary>>)
     end.
 query_user_login(EncryptedData) -> 
-    {Email, Password} = utils:extract_id_and_password(EncryptedData),
+    {Email, Password, _Name} = utils:extract_id_and_password(EncryptedData),
     UserProfile = login_db_access:get_user_profile(private, Email),
     case process_user_profile_query_result(UserProfile) of
         {error, Message} ->

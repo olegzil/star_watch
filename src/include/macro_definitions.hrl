@@ -76,7 +76,8 @@
 -define(EXCEPTIONAL_ACTIONS, [<<"complete_login">>, <<"complete_password_reset">>]).
 -define(PUT_ACTIONS, [<<"logout_user">>]).
 
--define(LOGIN_ID_TOKEN, "id:").
+-define(LOGIN_ID_TOKEN, "email:").
+-define(LOGIN_NAME_TOKEN, "name:").
 -define(LOGIN_PASSWORD_TOKEN, "password:").
 
 -define(SERVER_ERROR_OK, 					16#FFAA00).

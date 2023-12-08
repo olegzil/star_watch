@@ -800,17 +800,20 @@ extract_id_and_password(start, Data) ->
 
 extract_id_and_password(validate_part1, Data) when length(Data) =:= 2 ->
     extract_id_and_password(validate_part2, Data);
-
 extract_id_and_password(validate_part1, _Data) -> false;
+
 extract_id_and_password(validate_part2, [_,Data]) ->
     Parts = string:split(Data, ?LOGIN_PASSWORD_TOKEN),
     extract_id_and_password(validate_part3, Parts);
 
 extract_id_and_password(validate_part3, Data) when length(Data) =:= 2 ->
-    [ID, Password] = Data,
-    {string:lowercase(string:trim(ID)), string:trim(Password)};
+    [ID, Tail] = Data,
+	[Password, Name] = extract_id_and_password(validate_part4, Tail),
+    {string:lowercase(string:trim(ID)), string:trim(Password), string:trim(Name)};
+extract_id_and_password(validate_part3, _Data) -> false;
 
-extract_id_and_password(validate_part3, _Data) -> false.
+extract_id_and_password(validate_part4, Data) ->
+	string:split(Data, ?LOGIN_NAME_TOKEN).
 
 
 make_nonstring_binary(Data) ->

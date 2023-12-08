@@ -1,5 +1,5 @@
 -record(users_login_table, {
-	user_id=undefined, % Chosen by the user as a login ID (not the same as client_id)
+	user_id=undefined, % User email
 	client_id=undefined, % client_key => binary UUID, i.e. <<"94be0c40-6d79-4611-87bc-8ee2d48b4dc4">>
 	user_password=undefined,
 	pending_password=undefined,
